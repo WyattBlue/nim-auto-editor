@@ -126,7 +126,8 @@ let my_args = os.commandLineParams()
 const time_base: int = 30
 
 if len(my_args) == 0:
-  echo """Auto-Editor is an automatic video/audio creator and editor. By default, it will detect silence and create a new video with those sections cut out. By changing some of the options, you can export to a traditional editor like Premiere Pro and adjust the edits there, adjust the pacing of the cuts, and change the method of editing like using audio loudness and video motion to judge making cuts.
+  echo """
+Auto-Editor is an automatic video/audio creator and editor. By default, it will detect silence and create a new video with those sections cut out.
 
 Run:
     auto-editor --help
@@ -138,9 +139,9 @@ else:
     dir = createTempDir("tmp", "")
     temp_file = joinPath(dir, "out.wav")
 
-  echo execProcess("ffmpeg",
+  discard execProcess("ffmpeg",
     args=["-hide_banner", "-y", "-i", my_input, "-map", "0:a:0", "-rf64", "always", temp_file],
-    options={poUsePath, poStdErrToStdOut}
+    options={poUsePath}
   )
 
   var
@@ -149,8 +150,6 @@ else:
     max_volume: int16 = 0
     samp: int16
 
-
-  echo wav
   for i in wav.start ..< wav.start + wav.size:
     # https://forum.nim-lang.org/t/2132
     samp = cast[ptr int16](cast[uint64](mm.mem) + 2*i)[]
