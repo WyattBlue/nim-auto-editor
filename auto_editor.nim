@@ -103,7 +103,7 @@ proc read(filename: string): WavContainer =
       n_samples = data_size div bytes_per_sample
 
       if bytes_per_sample != 2:
-        raise newException(IOError, "only support uint16")
+        raise newException(IOError, "only support int16")
 
       if format_tag != 0x0001:
         raise newException(IOError, "only supports PCM audio")
@@ -147,18 +147,48 @@ else:
   var
     wav: WavContainer = read(temp_file)
     mm = memfiles.open(temp_file, mode=fmRead)
-    max_volume: int16 = 0
     samp: int16
+    max_volume: int16 = 0
+    local_max: int16 = 0
+    local_maxs: seq[int16] = @[]
+    thres: seq[float64] = @[]
+
+  let samp_per_ticks = wav.sr div uint64(time_base) * wav.channels
 
   for i in wav.start ..< wav.start + wav.size:
     # https://forum.nim-lang.org/t/2132
     samp = cast[ptr int16](cast[uint64](mm.mem) + 2*i)[]
+
     if samp > max_volume:
       max_volume = samp
-    elif samp < 0 and -samp > max_volume:
+    elif samp == -32768:
+      max_volume = 32767
+    elif -samp > max_volume:
       max_volume = -samp
 
-  echo "max_volume ", max_volume
+    if samp > local_max:
+      local_max = samp
+    elif samp == -32768:
+      local_max = 32767
+    elif -samp > local_max:
+      local_max = -samp
+
+    if i != wav.start and (i - wav.start) mod samp_per_ticks == 0:
+      local_maxs.add(local_max)
+      local_max = 0
+
+  if unlikely(max_volume == 0):
+    for _ in local_maxs:
+      thres.add(0)
+  else:
+    for lo in local_maxs:
+      thres.add(lo / max_volume)
+
+  echo &"\n@start\n{len(thres)}"
+  for t in thres:
+    echo &"{t:.20f}"
+  echo ""
+
   mm.close()
   removeDir(dir)
 
