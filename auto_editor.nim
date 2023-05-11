@@ -184,7 +184,7 @@ else:
     for lo in local_maxs:
       thres.add(lo / max_volume)
 
-  echo &"\n@start\n{len(thres)}"
+  echo &"\n@start"
   for t in thres:
     echo &"{t:.20f}"
   echo ""
