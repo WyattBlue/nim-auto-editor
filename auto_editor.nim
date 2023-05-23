@@ -19,6 +19,12 @@ type
     channels: uint16
     sr: uint32
 
+  Args = object
+    my_input: string
+    ff_loc: string
+    time_base: int
+    stream: int
+
 proc read(filename: string): WavContainer =
   let stream = newFileStream(filename, mode=fmRead)
   defer: stream.close()
@@ -52,6 +58,7 @@ proc read(filename: string): WavContainer =
     bitrate: uint32
     block_align: uint16
     bit_depth: uint16
+    bytes_read: uint
 
     # reading data
     fake_size: uint32
@@ -84,6 +91,21 @@ proc read(filename: string): WavContainer =
       bitrate = stream.readUint32()
       block_align = stream.readUint16()
       bit_depth = stream.readUint16()
+      bytes_read = 16
+
+      if format_tag == 0xFFFE and fmt_size >= 18:
+        let ext_chunk_size = stream.readUint16()
+        bytes_read += 2
+        if unlikely(ext_chunk_size < 22):
+          raise newException(IOError, "Binary structure of wave file is not compliant")
+
+        stream.setPosition(stream.getPosition() + 6)
+        var raw_guid: array[16, char]
+        discard stream.readData(raw_guid.addr, 16)
+        bytes_read += 22
+
+        if raw_guid[4 .. ^1] == ['\x00', '\x00', '\x10', '\x00', '\x80', '\x00', '\x00', '\xAA', '\x00', '\x38', '\x9B', '\x71']:
+          format_tag = cast[uint16](raw_guid[0])
 
       if unlikely(format_tag != 0x0001 and format_tag != 0x0003):
         raise newException(IOError,
@@ -91,8 +113,8 @@ proc read(filename: string): WavContainer =
         )
 
       # move file pointer to next chunk
-      if fmt_size > 16:
-        stream.setPosition(stream.getPosition() + int(fmt_size - 16))
+      if fmt_size > bytes_read:
+        stream.setPosition(stream.getPosition() + int(fmt_size - bytes_read))
 
     elif chunk_id == ['d', 'a', 't', 'a']:
       if unlikely(not fmt_chunk_received):
@@ -102,11 +124,11 @@ proc read(filename: string): WavContainer =
       bytes_per_sample = block_align div channels
       n_samples = data_size div bytes_per_sample
 
-      if bytes_per_sample != 2:
-        raise newException(IOError, "only support int16")
+      if bytes_per_sample == 3 or bytes_per_sample == 5 or bytes_per_sample == 7 or bytes_per_sample == 9:
+        raise newException(IOError, &"Unsupported bytes per sample: {bytes_per_sample}")
 
-      if format_tag != 0x0001:
-        raise newException(IOError, "only supports PCM audio")
+      if format_tag == 0x0003 and (not (bytes_per_sample == 4 or bytes_per_sample == 8)):
+        raise newException(IOError, &"Unsupported bytes_per_sample: {bytes_per_sample}")
 
       return WavContainer(
         start:uint64(stream.getPosition()), size:n_samples,
@@ -119,76 +141,133 @@ proc read(filename: string): WavContainer =
       if unlikely(fake_size == 0):
         raise newException(IOError, "Unknown chunk")
       stream.setPosition(stream.getPosition() + int(fake_size))
-  raise newException(IOError, "No data chunk!")
+  raise newException(IOError, &"No data chunk! {chunk_id}")
 
 
-let my_args = os.commandLineParams()
-const time_base: int = 30
+proc vanparse(args: seq[string]): Args =
+  var
+    my_args = Args(my_input:"", ff_loc:"ffmpeg", time_base:30, stream:0)
+    arg: string
+    i = 0
 
-if len(my_args) == 0:
-  echo """
+  if len(args) == 0:
+    echo """
 Auto-Editor is an automatic video/audio creator and editor. By default, it will detect silence and create a new video with those sections cut out.
 
 Run:
     auto-editor --help
 
 To get the list of options."""
+    system.quit(1)
+
+  while i < len(args):
+    arg = args[i]
+
+    if arg == "--help" or arg == "-h":
+      echo """Usage: [file ...] [options]
+
+Options:
+  --edit METHOD:[ATTRS?]            Select the kind of detection to analyze
+                                    with attributes
+  -tb, --timebase NUM               Set custom timebase
+  --ffmpeg-location                 Point to your custom ffmpeg file
+  -h, --help                        Show info about this program then exit
+"""
+      system.quit(1)
+
+    elif arg == "--ffmpeg-location":
+      my_args.ff_loc = args[i+1]
+      i += 1
+    elif arg == "--edit":
+      if not args[i+1].startswith("audio:"):
+        echo "`--edit` only supports audio method"
+        system.quit(1)
+
+      my_args.stream = parseInt(args[i+1][6 .. ^1])
+      i += 1
+    elif arg == "--timebase" or arg == "-tb":
+      my_args.time_base = parseInt(args[i+1])
+      if my_args.time_base < 1:
+        echo "timebase must be greater than 0"
+      i += 1
+    elif my_args.my_input != "":
+      echo "Only one file allowed"
+      system.quit(1)
+    else:
+      my_args.my_input = arg
+
+    i += 1
+
+  if my_args.my_input == "":
+    echo "Input file required"
+    system.quit(1)
+  return my_args
+
+
+let
+  args = vanparse(os.commandLineParams())
+  my_input = args.my_input
+  time_base = args.time_base
+  dir = createTempDir("tmp", "")
+  temp_file = joinPath(dir, "out.wav")
+
+
+discard execProcess(args.ff_loc,
+  args=["-hide_banner", "-y", "-i", my_input, "-map", &"0:a:{args.stream}", "-rf64", "always", temp_file],
+  options={poUsePath}
+)
+
+var
+  wav: WavContainer = read(temp_file)
+  mm = memfiles.open(temp_file, mode=fmRead)
+  thres: seq[float64] = @[]
+
+let samp_per_ticks = wav.sr div uint64(time_base) * wav.channels
+
+if wav.bytes_per_sample != 2:
+  raise newException(IOError, "Expects int16 only")
+
+var
+  samp: int16
+  max_volume: int16 = 0
+  local_max: int16 = 0
+  local_maxs: seq[int16] = @[]
+
+for i in wav.start ..< wav.start + wav.size:
+  # https://forum.nim-lang.org/t/2132
+  samp = cast[ptr int16](cast[uint64](mm.mem) + wav.bytes_per_sample * i)[]
+
+  if samp > max_volume:
+    max_volume = samp
+  elif samp == low(int16):
+    max_volume = high(int16)
+  elif -samp > max_volume:
+    max_volume = -samp
+
+  if samp > local_max:
+    local_max = samp
+  elif samp == low(int16):
+    local_max = high(int16)
+  elif -samp > local_max:
+    local_max = -samp
+
+  if i != wav.start and (i - wav.start) mod samp_per_ticks == 0:
+    local_maxs.add(local_max)
+    local_max = 0
+
+if unlikely(max_volume == 0):
+  for _ in local_maxs:
+    thres.add(0)
 else:
-  let
-    my_input = my_args[0]
-    dir = createTempDir("tmp", "")
-    temp_file = joinPath(dir, "out.wav")
+  for lo in local_maxs:
+    thres.add(lo / max_volume)
 
-  discard execProcess("ffmpeg",
-    args=["-hide_banner", "-y", "-i", my_input, "-map", "0:a:0", "-rf64", "always", temp_file],
-    options={poUsePath}
-  )
+echo "\n@start"
+for t in thres:
+  echo &"{t:.20f}"
+echo ""
 
-  var
-    wav: WavContainer = read(temp_file)
-    mm = memfiles.open(temp_file, mode=fmRead)
-    samp: int16
-    max_volume: int16 = 0
-    local_max: int16 = 0
-    local_maxs: seq[int16] = @[]
-    thres: seq[float64] = @[]
 
-  let samp_per_ticks = wav.sr div uint64(time_base) * wav.channels
-
-  for i in wav.start ..< wav.start + wav.size:
-    # https://forum.nim-lang.org/t/2132
-    samp = cast[ptr int16](cast[uint64](mm.mem) + 2*i)[]
-
-    if samp > max_volume:
-      max_volume = samp
-    elif samp == -32768:
-      max_volume = 32767
-    elif -samp > max_volume:
-      max_volume = -samp
-
-    if samp > local_max:
-      local_max = samp
-    elif samp == -32768:
-      local_max = 32767
-    elif -samp > local_max:
-      local_max = -samp
-
-    if i != wav.start and (i - wav.start) mod samp_per_ticks == 0:
-      local_maxs.add(local_max)
-      local_max = 0
-
-  if unlikely(max_volume == 0):
-    for _ in local_maxs:
-      thres.add(0)
-  else:
-    for lo in local_maxs:
-      thres.add(lo / max_volume)
-
-  echo &"\n@start"
-  for t in thres:
-    echo &"{t:.20f}"
-  echo ""
-
-  mm.close()
-  removeDir(dir)
+mm.close()
+removeDir(dir)
 
