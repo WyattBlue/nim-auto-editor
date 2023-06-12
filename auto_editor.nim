@@ -9,7 +9,6 @@ import std/strformat
 func mergeUInt32sLE(a: uint32, b: uint32): uint64 =
   # Note: swap `a` and `b` for big endianness
   (uint64(b) shl 32) or uint64(a)
-
 type
   WavContainer = object
     start: uint64
