@@ -5,10 +5,14 @@ import std/memfiles
 import std/tempfiles
 import std/streams
 import std/strformat
+import std/rationals
+
+from subinfo import info
 
 func mergeUInt32sLE(a: uint32, b: uint32): uint64 =
   # Note: swap `a` and `b` for big endianness
   (uint64(b) shl 32) or uint64(a)
+
 type
   WavContainer = object
     start: uint64
@@ -23,6 +27,7 @@ type
     ff_loc: string
     time_base: int
     stream: int
+
 
 proc read(filename: string): WavContainer =
   let stream = newFileStream(filename, mode=fmRead)
@@ -203,8 +208,14 @@ Options:
   return my_args
 
 
+let osargs = os.commandLineParams()
+
+if len(osargs) >= 2 and osargs[0] == "info":
+  info(osargs)
+  system.quit(0)
+
 let
-  args = vanparse(os.commandLineParams())
+  args = vanparse(osargs)
   my_input = args.my_input
   time_base = args.time_base
   dir = createTempDir("tmp", "")
