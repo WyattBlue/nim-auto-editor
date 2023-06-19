@@ -5,7 +5,6 @@ import std/memfiles
 import std/tempfiles
 import std/streams
 import std/strformat
-import std/rationals
 
 from subinfo import info
 
