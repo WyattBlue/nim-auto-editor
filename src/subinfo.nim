@@ -198,6 +198,7 @@ Options:
       p.json = true
     elif arg == "--ffprobe-location":
       p.ff_loc = args[i + 1]
+      i += 1
     else:
       p.input = arg
 
