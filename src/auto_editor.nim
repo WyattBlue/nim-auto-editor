@@ -12,6 +12,10 @@ func mergeUInt32sLE(a: uint32, b: uint32): uint64 =
   # Note: swap `a` and `b` for big endianness
   (uint64(b) shl 32) or uint64(a)
 
+proc error(msg: string) =
+  echo &"Error! {msg}"
+  system.quit(1)
+
 type
   WavContainer = object
     start: uint64
@@ -38,11 +42,11 @@ proc read(filename: string): WavContainer =
 
   discard stream.readData(file_sig.addr, 4)
   if unlikely(file_sig != ['R', 'F', '6', '4']):
-    raise newException(IOError, &"File format {repr(file_sig)} not supported.")
+    error(&"File format {repr(file_sig)} not supported.")
 
   discard stream.readData(heading.addr, 12)
   if unlikely(heading != ['\xFF', '\xFF', '\xFF', '\xFF', 'W', 'A', 'V', 'E', 'd', 's', '6', '4']):
-    raise newException(IOError, &"Invalid heading for rf64 chunk: {repr(heading)}")
+    error(&"Invalid heading for rf64 chunk: {repr(heading)}")
 
   var
     chunk_size = stream.readUint32()
@@ -78,15 +82,15 @@ proc read(filename: string): WavContainer =
     discard stream.readData(chunk_id.addr, 4)
 
     if unlikely(len(chunk_id) == 0):
-      raise newException(IOError, "Unexpected end of file.")
+      error("Unexpected end of file.")
     if unlikely(len(chunk_id) < 4 and not fmt_chunk_received):
-      raise newException(IOError, &"Incomplete chunk ID: {repr(chunk_id)}")
+      error(&"Incomplete chunk ID: {repr(chunk_id)}")
 
     if chunk_id == ['f', 'm', 't', ' ']:
       fmt_chunk_received = true
       discard stream.readData(fmt_size.addr, 4)
       if unlikely(fmt_size < 16):
-        raise newException(IOError, "Binary structure of wave file is not compliant")
+        error("Binary structure of wave file is not compliant")
 
       format_tag = stream.readUint16()
       channels = stream.readUint16()
@@ -100,7 +104,7 @@ proc read(filename: string): WavContainer =
         let ext_chunk_size = stream.readUint16()
         bytes_read += 2
         if unlikely(ext_chunk_size < 22):
-          raise newException(IOError, "Binary structure of wave file is not compliant")
+          error("Binary structure of wave file is not compliant")
 
         stream.setPosition(stream.getPosition() + 6)
         var raw_guid: array[16, char]
@@ -111,9 +115,7 @@ proc read(filename: string): WavContainer =
           format_tag = cast[uint16](raw_guid[0])
 
       if unlikely(format_tag != 0x0001 and format_tag != 0x0003):
-        raise newException(IOError,
-          &"Encountered unknown format tag: {format_tag}, while reading fmt chunk."
-        )
+        error(&"Encountered unknown format tag: {format_tag}, while reading fmt chunk.")
 
       # move file pointer to next chunk
       if fmt_size > bytes_read:
@@ -121,17 +123,17 @@ proc read(filename: string): WavContainer =
 
     elif chunk_id == ['d', 'a', 't', 'a']:
       if unlikely(not fmt_chunk_received):
-        raise newException(IOError, "No fmt chunk before data")
+        error("No fmt chunk before data")
 
       fake_size = stream.readUint32()
       bytes_per_sample = block_align div channels
       n_samples = data_size div bytes_per_sample
 
       if bytes_per_sample == 3 or bytes_per_sample == 5 or bytes_per_sample == 7 or bytes_per_sample == 9:
-        raise newException(IOError, &"Unsupported bytes per sample: {bytes_per_sample}")
+        error(&"Unsupported bytes per sample: {bytes_per_sample}")
 
       if format_tag == 0x0003 and (not (bytes_per_sample == 4 or bytes_per_sample == 8)):
-        raise newException(IOError, &"Unsupported bytes_per_sample: {bytes_per_sample}")
+        error(&"Unsupported bytes_per_sample: {bytes_per_sample}")
 
       return WavContainer(
         start:uint64(stream.getPosition()), size:n_samples,
@@ -142,9 +144,9 @@ proc read(filename: string): WavContainer =
       # Skip unknown chunk
       fake_size = stream.readUint32()
       if unlikely(fake_size == 0):
-        raise newException(IOError, "Unknown chunk")
+        error("Unknown chunk")
       stream.setPosition(stream.getPosition() + int(fake_size))
-  raise newException(IOError, &"No data chunk! {chunk_id}")
+  error(&"No data chunk! {chunk_id}")
 
 
 proc vanparse(args: seq[string]): Args =
@@ -183,33 +185,30 @@ Options:
       i += 1
     elif arg == "--edit":
       if not args[i+1].startswith("audio:"):
-        echo "`--edit` only supports audio method"
-        system.quit(1)
+        error("`--edit` only supports audio method")
 
       my_args.stream = parseInt(args[i+1][6 .. ^1])
       i += 1
     elif arg == "--timebase" or arg == "-tb":
       my_args.time_base = parseInt(args[i+1])
       if my_args.time_base < 1:
-        echo "timebase must be greater than 0"
+        error("timebase must be greater than 0")
       i += 1
     elif my_args.my_input != "":
-      echo "Only one file allowed"
-      system.quit(1)
+      error("Only one file allowed")
     else:
       my_args.my_input = arg
 
     i += 1
 
   if my_args.my_input == "":
-    echo "Input file required"
-    system.quit(1)
+    error("Input file required")
   return my_args
 
 
 let osargs = os.commandLineParams()
 
-if len(osargs) >= 2 and osargs[0] == "info":
+if len(osargs) > 0 and osargs[0] == "info":
   info(osargs)
   system.quit(0)
 

@@ -1,11 +1,18 @@
 import osproc
 import std/strutils
 import std/strformat
+import std/enumerate
 # import std/rationals
 
-# TODO: If ffmpeg's language codes are short enough
-# Make language datatype a char array
+const lbrac = "{"
+const rbrac = "}"
+
 type
+  Args = object
+    json: bool
+    input: string
+    ff_loc: string
+
   StreamKind = enum
     VideoKind,
     AudioKind,
@@ -15,9 +22,10 @@ type
   Stream = ref object
     duration: string
     bitrate: uint64
+    codec: string
+    lang: string
     case kind: StreamKind
     of VideoKind:
-      vcodec: string
       width: uint64
       height: uint64
       fps: string # Rational[int64]
@@ -28,33 +36,39 @@ type
       color_range: string
       color_space: string
       color_primaries: string
-      vlang: string
     of AudioKind:
-      acodec: string
       sampleRate: uint64
       channels: uint64
-      alang: string
     of SubtitleKind:
-      scodec: string
-      slang: string
+      discard
     of ContainerKind:
-      idk: int64
-
-  ReaderKind = enum
-    unknownT,
-    streamT,
-    formatT,
+      discard
 
 
-var
-  vtracks: uint64 = 0
-  atracks: uint64 = 0
-  stracks: uint64 = 0
+proc display_stream(input: string, streams: seq[Stream]) =
+  var
+    allStreams = streams # Cast as mutable
+    Vs: seq[Stream]
+    As: seq[Stream]
+    Ss: seq[Stream]
+    container: Stream = allStreams[^1]
+    temp: Stream
 
-proc display_stream(stream: Stream) =
-  if stream.kind == VideoKind:
-    echo &"""   - track {vtracks - 1}:
-     - codec: {stream.vcodec}
+  while len(allStreams) > 0:
+    temp = allStreams.pop()
+    if temp.kind == VideoKind:
+      Vs.add(temp)
+    if temp.kind == AudioKind:
+      As.add(temp)
+    if temp.kind == SubtitleKind:
+      Ss.add(temp)
+
+  echo &"{input}:"
+  for i, stream in enumerate(Vs):
+    if i == 0:
+      echo " - video:"
+    echo &"""   - track {i}:
+     - codec: {stream.codec}
      - fps: {stream.fps}
      - resolution: {stream.width}x{stream.height}
      - aspect ratio: {stream.aspect_ratio}
@@ -66,53 +80,147 @@ proc display_stream(stream: Stream) =
      - color primaries: {stream.color_primaries}
      - timebase: {stream.timebase}
      - bitrate: {stream.bitrate}
-     - lang: {stream.vlang}"""
-  elif stream.kind == AudioKind:
-    echo &"""   - track {atracks - 1}:
-     - codec: {stream.acodec}
+     - lang: {stream.lang}"""
+
+  for i, stream in enumerate(As):
+    if i == 0:
+      echo " - audio:"
+    echo &"""   - track {i}:
+     - codec: {stream.codec}
      - samplerate: {stream.sampleRate}
      - channels: {stream.channels}
      - duration: {stream.duration}
      - bitrate: {stream.bitrate}
-     - lang: {stream.alang}"""
-  elif stream.kind == SubtitleKind:
-    echo &"""   - track {stracks - 1}:
-     - codec: {stream.scodec}
-     - lang: {stream.slang}"""
-  elif stream.kind == ContainerKind:
-    echo &""" - container:
-   - duration: {stream.duration}
-   - bitrate: {stream.bitrate}
+     - lang: {stream.lang}"""
+  for i, stream in enumerate(Ss):
+    if i == 0:
+      echo " - subtitle:"
+    echo &"""   - track {i}:
+      - codec: {stream.codec}
+      - lang: {stream.lang}"""
+
+  echo &""" - container:
+   - duration: {container.duration}
+   - bitrate: {container.bitrate}"""
+
+proc display_stream_json(input: string, streams: seq[Stream]) =
+  var
+    allStreams = streams # Cast as mutable
+    Vs: seq[Stream]
+    As: seq[Stream]
+    Ss: seq[Stream]
+    container: Stream = allStreams[^1]
+    temp: Stream
+
+  while len(allStreams) > 0:
+    temp = allStreams.pop()
+    if temp.kind == VideoKind:
+      Vs.add(temp)
+    if temp.kind == AudioKind:
+      As.add(temp)
+    if temp.kind == SubtitleKind:
+      Ss.add(temp)
+
+  echo &"""{lbrac}
+    "{input}": {lbrac}
+        "type": "media",
+        "video": ["""
+  for stream in Vs:
+    echo &"""            {lbrac}
+                "codec": "{stream.codec}",
+                "fps": "{stream.fps}",
+                "resolution": [{stream.width}, {stream.height}],
+                "aspect_ratio": [16, 9],
+                "pixel_aspect_ratio": "1:1",
+                "duration": "{stream.duration}",
+                "pix_fmt": "{stream.pix_fmt}",
+                "color_range": "{stream.color_range}",
+                "color_space": "{stream.color_space}",
+                "color_primaries": "{stream.color_primaries}",
+                "color_transfer": "",
+                "timebase": "{stream.timebase}",
+                "bitrate": {stream.bitrate},
+                "lang": "{stream.lang}"
+            {rbrac},"""
+  echo "        ],\n        \"audio\": ["
+  for stream in As:
+    echo &"""            {lbrac}
+                "codec": "{stream.codec}",
+                "samplerate": {stream.sampleRate},
+                "channels": {stream.channels},
+                "duration": "{stream.duration}",
+                "bitrate": {stream.bitrate},
+                "lang": "{stream.lang}"
+            {rbrac},"""
+  echo "        ],\n        \"subtitle\": ["
+  for stream in Ss:
+    echo &"""            {lbrac}
+                "codec": "{stream.codec}",
+                "lang": "{stream.lang}"
+            {rbrac},"""
+  echo &"""        ],
+        "container": {lbrac}
+            "duration": "{container.duration}",
+            "bitrate": {container.bitrate}
+        {rbrac}
+    {rbrac}
+{rbrac}
 """
 
 proc info(args: seq[string]) =
-  # tod: "ffprobe" literal needs to be changed
-  let ffout = execProcess("ffprobe",
-    args=["-v", "-8", "-show_streams", "-show_format", args[1]],
+  var
+    i = 1
+    arg: string
+    p: Args = Args(input:"", json: false, ff_loc:"ffprobe")
+
+  while i < len(args):
+    arg = args[i]
+
+    if arg == "--help" or arg == "-h":
+      echo """Usage: [file ...] [options]
+
+Options:
+  --json                            Export info in JSON format
+  --has-vfr, --include-vfr          Display the number of Variable Frame Rate
+                                    (VFR) frames
+  --ffprobe-location                Point to your custom ffprobe file
+  -h, --help                        Show info about this program or option
+                                    then exit
+"""
+      system.quit(1)
+
+
+    elif arg == "--json":
+      p.json = true
+    elif arg == "--ffprobe-location":
+      p.ff_loc = args[i + 1]
+    else:
+      p.input = arg
+
+    i += 1
+
+  if p.input == "":
+    echo "Retrieve information and properties about media files"
+    system.quit(1)
+
+  let ffout = execProcess(p.ff_loc,
+    args=["-v", "-8", "-show_streams", "-show_format", p.input],
     options={poUsePath}
   )
   var
-    current = unknownT
     foo: seq[string]
     key: string
     val: string
     codec_name: string
-    my_stream: Stream
-    stream_defined: bool = false
+    allStreams: seq[Stream]
 
   for line in splitLines(ffout):
     if line == "" or line.startswith("[/"):
       continue
 
     if line.startswith("["):
-      if line == "[STREAM]":
-        current = streamT
       if line == "[FORMAT]":
-        if stream_defined:
-          display_stream(my_stream)
-        stream_defined = true
-        my_stream = Stream(kind: ContainerKind)
-        current = formatT
+        allStreams.add(Stream(kind: ContainerKind, duration: "", bitrate: 0))
       continue
 
     if line.startswith("TAG:language="):
@@ -124,7 +232,6 @@ proc info(args: seq[string]) =
     if not line.startswith("TAG:"):
       foo = line.split("=")
       if len(foo) != 2:
-        echo &"The invalid line: {line}"
         raise newException(IOError, "Invalid key value pair")
 
       key = foo[0]
@@ -134,70 +241,55 @@ proc info(args: seq[string]) =
       codec_name = val
 
     if key == "codec_type":
-      if stream_defined:
-        display_stream(my_stream)
-      stream_defined = true
       if val == "video":
-        my_stream = Stream(kind: VideoKind, vcodec: codec_name, vlang: "null")
-        if vtracks == 0:
-          echo " - video:"
-        vtracks += 1
+        allStreams.add(Stream(kind: VideoKind, codec: codec_name, lang: ""))
       elif val == "audio":
-        my_stream = Stream(kind: AudioKind, acodec: codec_name, alang: "null")
-        if atracks == 0:
-          echo " - audio:"
-        atracks += 1
+        allStreams.add(Stream(kind: AudioKind, codec: codec_name, lang: ""))
       elif val == "subtitle":
-        my_stream = Stream(kind: SubtitleKind, scodec: codec_name, slang: "null")
-        if stracks == 0:
-          echo " - subtitle:"
-        stracks += 1
-      else:
-        raise newException(IOError, "Unknown codec type")
+        allStreams.add(Stream(kind: SubtitleKind, codec: codec_name, lang: ""))
 
-    if stream_defined:
+    if len(allStreams) > 0:
       if key == "bit_rate":
-        my_stream.bitrate = parseUInt(val)
+        allStreams[^1].bitrate = parseUInt(val)
       if key == "duration":
-        my_stream.duration = val
+        allStreams[^1].duration = val
+      if key == "lang":
+        allStreams[^1].lang = val
 
-      if my_stream.kind == VideoKind:
-        if key == "lang":
-          my_stream.vlang = val
+      if allStreams[^1].kind == VideoKind:
         if key == "width":
-          my_stream.width = parseUInt(val)
+          allStreams[^1].width = parseUInt(val)
         if key == "height":
-          my_stream.height = parseUInt(val)
+          allStreams[^1].height = parseUInt(val)
         if key == "avg_frame_rate":
-          my_stream.fps = val
+          allStreams[^1].fps = val
         if key == "sample_aspect_ratio":
-          my_stream.sar = val
+          allStreams[^1].sar = val
         if key == "display_aspect_ratio":
-          my_stream.aspect_ratio = val
+          allStreams[^1].aspect_ratio = val
         if key == "time_base":
-          my_stream.timebase = val
+          allStreams[^1].timebase = val
 
         if key == "pix_fmt":
-          my_stream.pix_fmt = val
+          allStreams[^1].pix_fmt = val
         if key == "color_range":
-          my_stream.color_range = val
+          allStreams[^1].color_range = val
         if key == "color_space":
-          my_stream.color_space = val
+          allStreams[^1].color_space = val
         if key == "color_primaries":
-          my_stream.color_primaries = val
+          allStreams[^1].color_primaries = val
 
-      if my_stream.kind == AudioKind:
-        if key == "lang":
-          my_stream.alang = val
+      if allStreams[^1].kind == AudioKind:
         if key == "sample_rate":
-          my_stream.sampleRate = parseUInt(val)
+          allStreams[^1].sampleRate = parseUInt(val)
         if key == "channels":
-          my_stream.channels = parseUInt(val)
+          allStreams[^1].channels = parseUInt(val)
 
-      if my_stream.kind == SubtitleKind:
-        if key == "lang":
-          my_stream.slang = val
+  if len(allStreams) == 0 or allStreams[^1].kind != ContainerKind:
+    raise newException(IOError, "Invalid media type")
 
-  if stream_defined:
-    display_stream(my_stream)
+  if p.json:
+    display_stream_json(p.input, allStreams)
+  else:
+    display_stream(p.input, allStreams)
 export info
