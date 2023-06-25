@@ -266,10 +266,14 @@ Options:
         allStreams.add(Stream(kind: SubtitleKind, codec: codec_name, lang: ""))
 
     if len(allStreams) > 0:
-      if key == "bit_rate":
+      if key == "bit_rate" and val != "N/A":
+        echo val
         allStreams[^1].bitrate = parseUInt(val)
       if key == "duration":
-        allStreams[^1].duration = val
+        if val == "N/A":
+          allStreams[^1].duration = "0" 
+        else:
+          allStreams[^1].duration = val
       if key == "lang":
         allStreams[^1].lang = val
 
