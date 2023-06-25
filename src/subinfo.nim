@@ -7,6 +7,10 @@ import std/enumerate
 const lbrac = "{"
 const rbrac = "}"
 
+proc error(msg: string) =
+  stderr.writeLine(&"Error! {msg}")
+  system.quit(1)
+
 type
   Args = object
     json: bool
@@ -200,8 +204,7 @@ Options:
     i += 1
 
   if p.input == "":
-    echo "Retrieve information and properties about media files"
-    system.quit(1)
+    error("Retrieve information and properties about media files")
 
   let ffout = execProcess(p.ff_loc,
     args=["-v", "-8", "-show_streams", "-show_format", p.input],
@@ -232,7 +235,7 @@ Options:
     if not line.startswith("TAG:"):
       foo = line.split("=")
       if len(foo) != 2:
-        raise newException(IOError, "Invalid key value pair")
+        error("error! Invalid key value pair")
 
       key = foo[0]
       val = foo[1]
@@ -286,7 +289,7 @@ Options:
           allStreams[^1].channels = parseUInt(val)
 
   if len(allStreams) == 0 or allStreams[^1].kind != ContainerKind:
-    raise newException(IOError, "Invalid media type")
+    error("Invalid media type")
 
   if p.json:
     display_stream_json(p.input, allStreams)
