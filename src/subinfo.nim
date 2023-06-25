@@ -129,7 +129,7 @@ proc display_stream_json(input: string, streams: seq[Stream]) =
     "{input}": {lbrac}
         "type": "media",
         "video": ["""
-  for stream in Vs:
+  for i, stream in enumerate(Vs):
     echo &"""            {lbrac}
                 "codec": "{stream.codec}",
                 "fps": "{stream.fps}",
@@ -145,9 +145,14 @@ proc display_stream_json(input: string, streams: seq[Stream]) =
                 "timebase": "{stream.timebase}",
                 "bitrate": {stream.bitrate},
                 "lang": "{stream.lang}"
-            {rbrac},"""
+            {rbrac}"""
+    if i == len(Vs) - 1:
+      stdout.write ""
+    else:
+      stdout.write ","
+
   echo "        ],\n        \"audio\": ["
-  for stream in As:
+  for i, stream in enumerate(As):
     echo &"""            {lbrac}
                 "codec": "{stream.codec}",
                 "samplerate": {stream.sampleRate},
@@ -155,13 +160,21 @@ proc display_stream_json(input: string, streams: seq[Stream]) =
                 "duration": "{stream.duration}",
                 "bitrate": {stream.bitrate},
                 "lang": "{stream.lang}"
-            {rbrac},"""
+            {rbrac}"""
+    if i == len(As) - 1:
+      echo ""
+    else:
+      echo ","
   echo "        ],\n        \"subtitle\": ["
-  for stream in Ss:
+  for i, stream in enumerate(Ss):
     echo &"""            {lbrac}
                 "codec": "{stream.codec}",
                 "lang": "{stream.lang}"
-            {rbrac},"""
+            {rbrac}"""
+    if i == len(Ss) - 1:
+      echo ""
+    else:
+      echo ","
   echo &"""        ],
         "container": {lbrac}
             "duration": "{container.duration}",
