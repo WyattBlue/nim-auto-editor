@@ -2,6 +2,7 @@ import osproc
 import std/strutils
 import std/strformat
 import std/enumerate
+import algorithm
 # import std/rationals
 
 const lbrac = "{"
@@ -22,6 +23,7 @@ type
     AudioKind,
     SubtitleKind,
     ContainerKind,
+    DataKind,
 
   Stream = ref object
     duration: string
@@ -47,6 +49,8 @@ type
       discard
     of ContainerKind:
       discard
+    of DataKind:
+      discard
 
 
 proc display_stream(input: string, streams: seq[Stream]) =
@@ -68,44 +72,59 @@ proc display_stream(input: string, streams: seq[Stream]) =
       Ss.add(temp)
 
   echo &"{input}:"
-  for i, stream in enumerate(Vs):
+  for i, stream in enumerate(reversed(Vs)):
     if i == 0:
       echo " - video:"
-    echo &"""   - track {i}:
+    echo &"""
+   - track {i}:
      - codec: {stream.codec}
      - fps: {stream.fps}
+     - timebase: {stream.timebase}
      - resolution: {stream.width}x{stream.height}
      - aspect ratio: {stream.aspect_ratio}
      - pixel aspect ratio: {stream.sar}
-     - duration: {stream.duration}
-     - pix_fmt: {stream.pix_fmt}
-     - color range: {stream.color_range}
-     - color space: {stream.color_space}
-     - color primaries: {stream.color_primaries}
-     - timebase: {stream.timebase}
-     - bitrate: {stream.bitrate}
-     - lang: {stream.lang}"""
+     - pix_fmt: {stream.pix_fmt}"""
+    if stream.duration != "N/A":
+      echo &"     - duration: {stream.duration}"
+    if stream.color_range != "unknown":
+      echo &"     - color range: {stream.color_range}"
+    if stream.color_space != "unknown":
+      echo &"     - color space: {stream.color_space}"
+    if stream.color_primaries != "unknown":
+      echo &"     - color primaries: {stream.color_primaries}"
+    if stream.bitrate != 0:
+      echo &"     - bitrate: {stream.bitrate}"
+    if stream.lang != "":
+      echo &"     - lang: {stream.lang}"
 
-  for i, stream in enumerate(As):
+  for i, stream in enumerate(reversed(As)):
     if i == 0:
       echo " - audio:"
-    echo &"""   - track {i}:
+    echo &"""
+   - track {i}:
      - codec: {stream.codec}
      - samplerate: {stream.sampleRate}
-     - channels: {stream.channels}
-     - duration: {stream.duration}
-     - bitrate: {stream.bitrate}
-     - lang: {stream.lang}"""
-  for i, stream in enumerate(Ss):
+     - channels: {stream.channels}"""
+    if stream.duration != "N/A":
+      echo &"     - duration: {stream.duration}"
+    if stream.bitrate != 0:
+      echo &"     - bitrate: {stream.bitrate}"
+    if stream.lang != "":
+      echo &"     - lang: {stream.lang}"
+  for i, stream in enumerate(reversed(Ss)):
     if i == 0:
       echo " - subtitle:"
-    echo &"""   - track {i}:
-      - codec: {stream.codec}
-      - lang: {stream.lang}"""
+    echo &"""
+   - track {i}:
+     - codec: {stream.codec}"""
+    if stream.lang != "":
+      echo &"     - lang: {stream.lang}"
 
-  echo &""" - container:
+  echo &"""
+ - container:
    - duration: {container.duration}
-   - bitrate: {container.bitrate}"""
+   - bitrate: {container.bitrate}
+"""
 
 proc display_stream_json(input: string, streams: seq[Stream]) =
   var
@@ -129,13 +148,13 @@ proc display_stream_json(input: string, streams: seq[Stream]) =
     "{input}": {lbrac}
         "type": "media",
         "video": ["""
-  for i, stream in enumerate(Vs):
+  for i, stream in enumerate(reversed(Vs)):
     echo &"""            {lbrac}
                 "codec": "{stream.codec}",
                 "fps": "{stream.fps}",
                 "resolution": [{stream.width}, {stream.height}],
                 "aspect_ratio": [16, 9],
-                "pixel_aspect_ratio": "1:1",
+                "pixel_aspect_ratio": "{stream.sar}",
                 "duration": "{stream.duration}",
                 "pix_fmt": "{stream.pix_fmt}",
                 "color_range": "{stream.color_range}",
@@ -152,7 +171,7 @@ proc display_stream_json(input: string, streams: seq[Stream]) =
       stdout.write ","
 
   echo "        ],\n        \"audio\": ["
-  for i, stream in enumerate(As):
+  for i, stream in enumerate(reversed(As)):
     echo &"""            {lbrac}
                 "codec": "{stream.codec}",
                 "samplerate": {stream.sampleRate},
@@ -166,7 +185,7 @@ proc display_stream_json(input: string, streams: seq[Stream]) =
     else:
       echo ","
   echo "        ],\n        \"subtitle\": ["
-  for i, stream in enumerate(Ss):
+  for i, stream in enumerate(reversed(Ss)):
     echo &"""            {lbrac}
                 "codec": "{stream.codec}",
                 "lang": "{stream.lang}"
@@ -237,7 +256,7 @@ Options:
 
     if line.startswith("["):
       if line == "[FORMAT]":
-        allStreams.add(Stream(kind: ContainerKind, duration: "", bitrate: 0))
+        allStreams.add(Stream(kind: ContainerKind, duration: "N/A", bitrate: 0))
       continue
 
     if line.startswith("TAG:language="):
@@ -249,7 +268,7 @@ Options:
     if not line.startswith("TAG:"):
       foo = line.split("=")
       if len(foo) != 2:
-        error("error! Invalid key value pair")
+        continue
 
       key = foo[0]
       val = foo[1]
@@ -264,16 +283,14 @@ Options:
         allStreams.add(Stream(kind: AudioKind, codec: codec_name, lang: ""))
       elif val == "subtitle":
         allStreams.add(Stream(kind: SubtitleKind, codec: codec_name, lang: ""))
+      elif val == "data":
+        allStreams.add(Stream(kind: DataKind, codec: codec_name))
 
     if len(allStreams) > 0:
       if key == "bit_rate" and val != "N/A":
-        echo val
         allStreams[^1].bitrate = parseUInt(val)
       if key == "duration":
-        if val == "N/A":
-          allStreams[^1].duration = "0" 
-        else:
-          allStreams[^1].duration = val
+        allStreams[^1].duration = val
       if key == "lang":
         allStreams[^1].lang = val
 
