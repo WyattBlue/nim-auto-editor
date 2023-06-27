@@ -3,7 +3,6 @@ import std/strutils
 import std/strformat
 import std/enumerate
 import algorithm
-# import math (for gcd)
 # import std/rationals
 
 const lbrac = "{"
@@ -37,7 +36,7 @@ type
       height: uint64
       fps: string # Rational[int64]
       timebase: string
-      aspect_ratio: string
+      dar: string
       sar: string
       pix_fmt: string
       color_range: string
@@ -82,7 +81,7 @@ proc display_stream(input: string, streams: seq[Stream]) =
      - fps: {stream.fps}
      - timebase: {stream.timebase}
      - resolution: {stream.width}x{stream.height}
-     - aspect ratio: {stream.aspect_ratio}
+     - aspect ratio: {stream.dar}
      - pixel aspect ratio: {stream.sar}
      - pix_fmt: {stream.pix_fmt}"""
     if stream.duration != "N/A":
@@ -218,8 +217,6 @@ proc info(args: seq[string]) =
 
 Options:
   --json                            Export info in JSON format
-  --has-vfr, --include-vfr          Display the number of Variable Frame Rate
-                                    (VFR) frames
   --ffprobe-location                Point to your custom ffprobe file
   -h, --help                        Show info about this program or option
                                     then exit
@@ -240,10 +237,14 @@ Options:
   if p.input == "":
     error("Retrieve information and properties about media files")
 
-  let ffout = execProcess(p.ff_loc,
-    args=["-v", "-8", "-show_streams", "-show_format", p.input],
-    options={poUsePath}
-  )
+  var ffout: string
+  try:
+    ffout = execProcess(p.ff_loc,
+      args=["-v", "-8", "-show_streams", "-show_format", p.input],
+      options={poUsePath}
+    )
+  except OSError:
+    error(&"Invalid ffprobe location: {p.ff_loc}")
   var
     foo: seq[string]
     key: string
@@ -305,7 +306,7 @@ Options:
         if key == "sample_aspect_ratio" and val != "N/A":
           allStreams[^1].sar = val
         if key == "display_aspect_ratio":
-          allStreams[^1].aspect_ratio = val
+          allStreams[^1].dar = val
         if key == "time_base":
           allStreams[^1].timebase = val
 

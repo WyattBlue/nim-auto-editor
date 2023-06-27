@@ -181,7 +181,7 @@ proc read(filename: string): WavContainer =
         error(&"Unsupported bytes per sample: {bytes_per_sample}")
 
       if format_tag == 0x0003 and (not (bytes_per_sample == 4 or bytes_per_sample == 8)):
-        error(&"Unsupported bytes_per_sample: {bytes_per_sample}")
+        error(&"Unsupported bytes per sample: {bytes_per_sample}")
 
       return WavContainer(
         start:uint64(stream.getPosition()), size:n_samples,
