@@ -235,7 +235,8 @@ Options:
     i += 1
 
   if p.input == "":
-    error("Retrieve information and properties about media files")
+    echo "Retrieve information and properties about media files"
+    system.quit(1)
 
   var ffout: string
   try:
