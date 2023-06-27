@@ -3,6 +3,7 @@ import std/strutils
 import std/strformat
 import std/enumerate
 import algorithm
+# import math (for gcd)
 # import std/rationals
 
 const lbrac = "{"
@@ -247,7 +248,7 @@ Options:
     foo: seq[string]
     key: string
     val: string
-    codec_name: string
+    codec: string
     allStreams: seq[Stream]
 
   for line in splitLines(ffout):
@@ -274,17 +275,17 @@ Options:
       val = foo[1]
 
     if key == "codec_name":
-      codec_name = val
+      codec = val
 
     if key == "codec_type":
       if val == "video":
-        allStreams.add(Stream(kind: VideoKind, codec: codec_name, lang: ""))
+        allStreams.add(Stream(kind: VideoKind, codec: codec, lang: "", sar: "1:1"))
       elif val == "audio":
-        allStreams.add(Stream(kind: AudioKind, codec: codec_name, lang: ""))
+        allStreams.add(Stream(kind: AudioKind, codec: codec, lang: ""))
       elif val == "subtitle":
-        allStreams.add(Stream(kind: SubtitleKind, codec: codec_name, lang: ""))
-      elif val == "data":
-        allStreams.add(Stream(kind: DataKind, codec: codec_name))
+        allStreams.add(Stream(kind: SubtitleKind, codec: codec, lang: ""))
+      else:
+        allStreams.add(Stream(kind: DataKind, codec: codec))
 
     if len(allStreams) > 0:
       if key == "bit_rate" and val != "N/A":
@@ -301,7 +302,7 @@ Options:
           allStreams[^1].height = parseUInt(val)
         if key == "avg_frame_rate":
           allStreams[^1].fps = val
-        if key == "sample_aspect_ratio":
+        if key == "sample_aspect_ratio" and val != "N/A":
           allStreams[^1].sar = val
         if key == "display_aspect_ratio":
           allStreams[^1].aspect_ratio = val
