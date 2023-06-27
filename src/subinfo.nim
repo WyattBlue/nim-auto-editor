@@ -3,7 +3,7 @@ import std/strutils
 import std/strformat
 import std/enumerate
 import algorithm
-# import std/rationals
+import std/rationals
 
 const lbrac = "{"
 const rbrac = "}"
@@ -11,6 +11,20 @@ const rbrac = "}"
 proc error(msg: string) =
   stderr.writeLine(&"Error! {msg}")
   system.quit(1)
+
+func parseRational(val: string): Rational[int] =
+  let hmm = val.split(":")
+
+  if len(hmm) != 2:
+    return 0//1
+
+  try:
+    let
+      num = parseInt(hmm[0])
+      den = parseInt(hmm[1])
+    return num // den
+  except CatchableError:
+    return 0//1
 
 type
   Args = object
@@ -36,8 +50,8 @@ type
       height: uint64
       fps: string # Rational[int64]
       timebase: string
-      dar: string
-      sar: string
+      dar: Rational[int]
+      sar: Rational[int]
       pix_fmt: string
       color_range: string
       color_space: string
@@ -82,8 +96,8 @@ proc display_stream(input: string, streams: seq[Stream]) =
      - fps: {stream.fps}
      - timebase: {stream.timebase}
      - resolution: {stream.width}x{stream.height}
-     - aspect ratio: {stream.dar}
-     - pixel aspect ratio: {stream.sar}
+     - aspect ratio: {stream.dar.num}:{stream.dar.den}
+     - pixel aspect ratio: {stream.sar.num}:{stream.sar.den}
      - pix_fmt: {stream.pix_fmt}"""
     if stream.duration != "N/A":
       echo &"     - duration: {stream.duration}"
@@ -156,8 +170,8 @@ proc display_stream_json(input: string, streams: seq[Stream]) =
                 "codec": "{stream.codec}",
                 "fps": "{stream.fps}",
                 "resolution": [{stream.width}, {stream.height}],
-                "aspect_ratio": [16, 9],
-                "pixel_aspect_ratio": "{stream.sar}",
+                "dar": [{stream.dar.num}, {stream.dar.den}],
+                "sar": [{stream.sar.num}, {stream.sar.den}],
                 "duration": "{stream.duration}",
                 "pix_fmt": "{stream.pix_fmt}",
                 "color_range": "{stream.color_range}",
@@ -285,7 +299,7 @@ Options:
     if key == "codec_type":
       if val == "video":
         allStreams.add(
-          Stream(kind: VideoKind, codec: codec, lang: "", sar: "1:1", color_transfer: "unknown")
+          Stream(kind: VideoKind, codec: codec, lang: "", dar: 0//1, sar: 1//1, color_transfer: "unknown")
         )
       elif val == "audio":
         allStreams.add(Stream(kind: AudioKind, codec: codec, lang: ""))
@@ -310,9 +324,9 @@ Options:
         if key == "avg_frame_rate":
           allStreams[^1].fps = val
         if key == "sample_aspect_ratio" and val != "N/A":
-          allStreams[^1].sar = val
-        if key == "display_aspect_ratio":
-          allStreams[^1].dar = val
+          allStreams[^1].sar = parseRational(val)
+        if key == "display_aspect_ratio" and val != "N/A":
+          allStreams[^1].dar = parseRational(val)
         if key == "time_base":
           allStreams[^1].timebase = val
 
@@ -340,4 +354,5 @@ Options:
     display_stream_json(p.input, allStreams)
   else:
     display_stream(p.input, allStreams)
+
 export info
