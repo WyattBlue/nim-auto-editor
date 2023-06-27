@@ -41,6 +41,7 @@ type
       pix_fmt: string
       color_range: string
       color_space: string
+      color_transfer: string
       color_primaries: string
     of AudioKind:
       sampleRate: uint64
@@ -90,6 +91,8 @@ proc display_stream(input: string, streams: seq[Stream]) =
       echo &"     - color range: {stream.color_range}"
     if stream.color_space != "unknown":
       echo &"     - color space: {stream.color_space}"
+    if stream.color_transfer != "unknown":
+      echo &"     - color transfer: {stream.color_transfer}"
     if stream.color_primaries != "unknown":
       echo &"     - color primaries: {stream.color_primaries}"
     if stream.bitrate != 0:
@@ -160,7 +163,7 @@ proc display_stream_json(input: string, streams: seq[Stream]) =
                 "color_range": "{stream.color_range}",
                 "color_space": "{stream.color_space}",
                 "color_primaries": "{stream.color_primaries}",
-                "color_transfer": "",
+                "color_transfer": "{stream.color_transfer}",
                 "timebase": "{stream.timebase}",
                 "bitrate": {stream.bitrate},
                 "lang": "{stream.lang}"
@@ -281,7 +284,9 @@ Options:
 
     if key == "codec_type":
       if val == "video":
-        allStreams.add(Stream(kind: VideoKind, codec: codec, lang: "", sar: "1:1"))
+        allStreams.add(
+          Stream(kind: VideoKind, codec: codec, lang: "", sar: "1:1", color_transfer: "unknown")
+        )
       elif val == "audio":
         allStreams.add(Stream(kind: AudioKind, codec: codec, lang: ""))
       elif val == "subtitle":
@@ -317,6 +322,8 @@ Options:
           allStreams[^1].color_range = val
         if key == "color_space":
           allStreams[^1].color_space = val
+        if key == "color_transfer":
+          allStreams[^1].color_transfer = val
         if key == "color_primaries":
           allStreams[^1].color_primaries = val
 
