@@ -12,6 +12,17 @@ proc error(msg: string) =
   stderr.writeLine(&"Error! {msg}")
   system.quit(1)
 
+func jsonEscape(val: string): string =
+  var buf = ""
+  for c in val:
+    if c == '"':
+      buf &= "\\\""
+    elif c == '\\':
+      buf &= "\\\\"
+    else:
+      buf &= c
+  return buf
+
 func parseRational(val: string): Rational[int] =
   let hmm = val.split(":")
 
@@ -48,7 +59,7 @@ type
     of VideoKind:
       width: uint64
       height: uint64
-      fps: string # Rational[int64]
+      fps: string
       timebase: string
       dar: Rational[int]
       sar: Rational[int]
@@ -162,7 +173,7 @@ proc display_stream_json(input: string, streams: seq[Stream]) =
       Ss.add(temp)
 
   echo &"""{lbrac}
-    "{input}": {lbrac}
+    "{jsonEscape(input)}": {lbrac}
         "type": "media",
         "video": ["""
   for i, stream in enumerate(reversed(Vs)):
