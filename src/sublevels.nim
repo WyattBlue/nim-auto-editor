@@ -258,9 +258,9 @@ proc levels(osargs: seq[string]) =
 
   if defined(windows):
     var i = 0
-    var buf = "\r\n@start"
+    var buf = "\r\n@start\r\n"
     for t in thres:
-      buf &= &"{t:.20f}"
+      buf &= &"{t:.20f}\r\n"
       i += 1
       if i > 4000:
         stdout.writeLine(buf)
