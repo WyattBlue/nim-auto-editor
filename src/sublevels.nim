@@ -256,11 +256,25 @@ proc levels(osargs: seq[string]) =
     for lo in local_maxs:
       thres.add(lo / max_volume)
 
-  echo "\n@start"
-  for t in thres:
-    echo &"{t:.20f}"
-  echo ""
-
+  if defined(windows):
+    var i = 0
+    var buf = "\r\n@start"
+    for t in thres:
+      buf &= &"{t:.20f}"
+      i += 1
+      if i > 4000:
+        stdout.writeLine(buf)
+        stdout.flushFile()
+        buf = ""
+        i = 0
+    
+    stdout.writeLine(buf)
+    stdout.flushFile()
+  else:
+    echo "\n@start"
+    for t in thres:
+      echo &"{t:.20f}"
+    echo ""
 
   mm.close()
   removeDir(dir)
