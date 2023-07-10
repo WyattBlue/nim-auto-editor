@@ -235,7 +235,7 @@ proc info(args: seq[string]) =
   var
     i = 1
     arg: string
-    p: Args = Args(input:"", json: false, ff_loc:"ffprobe")
+    p: Args = Args(input: "", json: false, ff_loc: "ffprobe")
 
   while i < len(args):
     arg = args[i]
@@ -269,8 +269,8 @@ Options:
   var ffout: string
   try:
     ffout = execProcess(p.ff_loc,
-      args=["-v", "-8", "-show_streams", "-show_format", p.input],
-      options={poUsePath}
+      args = ["-v", "-8", "-show_streams", "-show_format", p.input],
+      options = {poUsePath}
     )
   except OSError:
     error(&"Invalid ffprobe location: {p.ff_loc}")
@@ -310,7 +310,8 @@ Options:
     if key == "codec_type":
       if val == "video":
         allStreams.add(
-          Stream(kind: VideoKind, codec: codec, lang: "", dar: 0//1, sar: 1//1, color_transfer: "unknown")
+          Stream(kind: VideoKind, codec: codec, lang: "", dar: 0//1, sar: 1//1,
+              color_transfer: "unknown")
         )
       elif val == "audio":
         allStreams.add(Stream(kind: AudioKind, codec: codec, lang: ""))

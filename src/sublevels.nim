@@ -49,7 +49,7 @@ func parseRational(val: string): Rational[int] =
 
 proc vanparse(args: seq[string]): Args =
   var
-    myArgs = Args(myInput:"", ffLoc:"ffmpeg", timeBase:0//1, stream:0)
+    myArgs = Args(myInput: "", ffLoc: "ffmpeg", timeBase: 0//1, stream: 0)
     arg: string
     i = 1
 
@@ -101,7 +101,7 @@ Options:
 
 
 proc read(filename: string): WavContainer =
-  let stream = newFileStream(filename, mode=fmRead)
+  let stream = newFileStream(filename, mode = fmRead)
   defer: stream.close()
 
   var
@@ -113,7 +113,8 @@ proc read(filename: string): WavContainer =
     error(&"File format {repr(file_sig)} not supported.")
 
   discard stream.readData(heading.addr, 12)
-  if unlikely(heading != ['\xFF', '\xFF', '\xFF', '\xFF', 'W', 'A', 'V', 'E', 'd', 's', '6', '4']):
+  if unlikely(heading != ['\xFF', '\xFF', '\xFF', '\xFF', 'W', 'A', 'V', 'E',
+      'd', 's', '6', '4']):
     error(&"Invalid heading for rf64 chunk: {repr(heading)}")
 
   var
@@ -179,7 +180,8 @@ proc read(filename: string): WavContainer =
         discard stream.readData(raw_guid.addr, 16)
         bytes_read += 22
 
-        if raw_guid[4 .. ^1] == ['\x00', '\x00', '\x10', '\x00', '\x80', '\x00', '\x00', '\xAA', '\x00', '\x38', '\x9B', '\x71']:
+        if raw_guid[4 .. ^1] == ['\x00', '\x00', '\x10', '\x00', '\x80', '\x00',
+            '\x00', '\xAA', '\x00', '\x38', '\x9B', '\x71']:
           format_tag = cast[uint16](raw_guid[0])
 
       if unlikely(format_tag != 0x0001 and format_tag != 0x0003):
@@ -197,16 +199,18 @@ proc read(filename: string): WavContainer =
       bytes_per_sample = block_align div channels
       n_samples = data_size div bytes_per_sample
 
-      if bytes_per_sample == 3 or bytes_per_sample == 5 or bytes_per_sample == 7 or bytes_per_sample == 9:
+      if bytes_per_sample == 3 or bytes_per_sample == 5 or bytes_per_sample ==
+          7 or bytes_per_sample == 9:
         error(&"Unsupported bytes per sample: {bytes_per_sample}")
 
-      if format_tag == 0x0003 and (not (bytes_per_sample == 4 or bytes_per_sample == 8)):
+      if format_tag == 0x0003 and (not (bytes_per_sample == 4 or
+          bytes_per_sample == 8)):
         error(&"Unsupported bytes per sample: {bytes_per_sample}")
 
       return WavContainer(
-        start:uint64(stream.getPosition()), size:n_samples,
-        bytes_per_sample:bytes_per_sample, block_align:block_align,
-        channels:channels, sr:sr
+        start: uint64(stream.getPosition()), size: n_samples,
+        bytes_per_sample: bytes_per_sample, block_align: block_align,
+        channels: channels, sr: sr
       )
     else:
       # Skip unknown chunk
@@ -227,16 +231,18 @@ proc levels(osargs: seq[string]) =
 
 
   discard execProcess(args.ffLoc,
-    args=["-hide_banner", "-y", "-i", myInput, "-map", &"0:a:{args.stream}", "-rf64", "always", temp_file],
-    options={poUsePath}
+    args = ["-hide_banner", "-y", "-i", myInput, "-map", &"0:a:{args.stream}",
+        "-rf64", "always", temp_file],
+    options = {poUsePath}
   )
 
   var
     wav: WavContainer = read(temp_file)
-    mm = memfiles.open(temp_file, mode=fmRead)
+    mm = memfiles.open(temp_file, mode = fmRead)
     thres: seq[float64] = @[]
 
-  let samp_per_ticks = uint64((int(wav.sr) / timeBase * int(wav.channels)).toInt())
+  let samp_per_ticks = uint64((int(wav.sr) / timeBase * int(
+      wav.channels)).toInt())
 
   if wav.bytes_per_sample != 2:
     raise newException(IOError, "Expects int16 only")
@@ -287,7 +293,7 @@ proc levels(osargs: seq[string]) =
         stdout.flushFile()
         buf = ""
         i = 0
-    
+
     stdout.writeLine(buf)
     stdout.flushFile()
   else:
