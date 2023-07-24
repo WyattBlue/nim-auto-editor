@@ -5,6 +5,8 @@ import std/enumerate
 import algorithm
 import std/rationals
 
+from std/parseutils import parseFloat
+
 const lbrac = "{"
 const rbrac = "}"
 
