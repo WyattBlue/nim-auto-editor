@@ -51,7 +51,7 @@ type
     DataKind,
 
   Stream = ref object
-    duration: string
+    duration: float
     bitrate: uint64
     codec: string
     lang: string
@@ -110,7 +110,7 @@ proc display_stream(input: string, streams: seq[Stream]) =
      - aspect ratio: {stream.dar.num}:{stream.dar.den}
      - pixel aspect ratio: {stream.sar.num}:{stream.sar.den}
      - pix_fmt: {stream.pix_fmt}"""
-    if stream.duration != "N/A":
+    if stream.duration != 0.0:
       echo &"     - duration: {stream.duration}"
     if stream.color_range != "unknown":
       echo &"     - color range: {stream.color_range}"
@@ -133,7 +133,7 @@ proc display_stream(input: string, streams: seq[Stream]) =
      - codec: {stream.codec}
      - samplerate: {stream.sampleRate}
      - channels: {stream.channels}"""
-    if stream.duration != "N/A":
+    if stream.duration != 0.0:
       echo &"     - duration: {stream.duration}"
     if stream.bitrate != 0:
       echo &"     - bitrate: {stream.bitrate}"
@@ -183,7 +183,7 @@ proc display_stream_json(input: string, streams: seq[Stream]) =
                 "resolution": [{stream.width}, {stream.height}],
                 "dar": [{stream.dar.num}, {stream.dar.den}],
                 "sar": [{stream.sar.num}, {stream.sar.den}],
-                "duration": "{stream.duration}",
+                "duration": {stream.duration},
                 "pix_fmt": "{stream.pix_fmt}",
                 "color_range": "{stream.color_range}",
                 "color_space": "{stream.color_space}",
@@ -204,7 +204,7 @@ proc display_stream_json(input: string, streams: seq[Stream]) =
                 "codec": "{stream.codec}",
                 "samplerate": {stream.sampleRate},
                 "channels": {stream.channels},
-                "duration": "{stream.duration}",
+                "duration": {stream.duration},
                 "bitrate": {stream.bitrate},
                 "lang": "{stream.lang}"
             {rbrac}"""
@@ -224,7 +224,7 @@ proc display_stream_json(input: string, streams: seq[Stream]) =
       echo ","
   echo &"""        ],
         "container": {lbrac}
-            "duration": "{container.duration}",
+            "duration": {container.duration},
             "bitrate": {container.bitrate}
         {rbrac}
     {rbrac}
@@ -287,7 +287,7 @@ Options:
 
     if line.startswith("["):
       if line == "[FORMAT]":
-        allStreams.add(Stream(kind: ContainerKind, duration: "N/A", bitrate: 0))
+        allStreams.add(Stream(duration: 0.0, kind: ContainerKind, bitrate: 0))
       continue
 
     if line.startswith("TAG:language="):
@@ -314,17 +314,17 @@ Options:
               color_transfer: "unknown")
         )
       elif val == "audio":
-        allStreams.add(Stream(kind: AudioKind, codec: codec, lang: ""))
+        allStreams.add(Stream(duration: 0.0, kind: AudioKind, codec: codec, lang: ""))
       elif val == "subtitle":
-        allStreams.add(Stream(kind: SubtitleKind, codec: codec, lang: ""))
+        allStreams.add(Stream(duration: 0.0, kind: SubtitleKind, codec: codec, lang: ""))
       else:
-        allStreams.add(Stream(kind: DataKind, codec: codec))
+        allStreams.add(Stream(duration: 0.0, kind: DataKind, codec: codec))
 
     if len(allStreams) > 0:
       if key == "bit_rate" and val != "N/A":
         allStreams[^1].bitrate = parseUInt(val)
       if key == "duration":
-        allStreams[^1].duration = val
+        allStreams[^1].duration = parseFloat(val)
       if key == "lang":
         allStreams[^1].lang = val
 
