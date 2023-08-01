@@ -1,8 +1,10 @@
 import os
 import std/strformat
+import osproc
 
 from subinfo import info
 from sublevels import levels
+from wavfile import WavContainer, read
 
 let osargs = os.commandLineParams()
 
@@ -16,13 +18,25 @@ Run:
 To get the list of options."""
   system.quit(1)
 
-if osargs[0] == "info":
-  info(osargs)
-  system.quit(0)
+case osargs[0]:
+  of "info":
+    info(osargs)
+    system.quit(0)
+  of "levels":
+    levels(osargs)
+    system.quit(0)
 
-if osargs[0] == "levels":
-  levels(osargs)
-  system.quit(0)
+let myInput = osargs[0]
 
-stderr.writeLine(&"Unknown subcommand: {osargs[0]}")
-system.quit(1)
+const tempFile = "out.wav"
+
+discard execProcess("ffmpeg",
+  args = ["-hide_banner", "-y", "-i", myInput, "-map", "0:a:0", "-rf64", "always", tempFile],
+  options = {poUsePath}
+)
+
+let con = read(tempFile)
+echo &"sr: {con}"
+
+echo &"file: {myInput}"
+system.quit(0)

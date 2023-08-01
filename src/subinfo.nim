@@ -1,5 +1,5 @@
 import osproc
-import std/strutils
+import std/strutils except parseFloat
 import std/strformat
 import std/enumerate
 import algorithm
@@ -326,7 +326,7 @@ Options:
       if key == "bit_rate" and val != "N/A":
         allStreams[^1].bitrate = parseUInt(val)
       if key == "duration":
-        allStreams[^1].duration = parseFloat(val)
+        discard parseFloat(val, allStreams[^1].duration, 0)
       if key == "lang":
         allStreams[^1].lang = val
 
