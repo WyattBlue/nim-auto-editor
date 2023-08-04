@@ -1,10 +1,10 @@
-import os
-import osproc
-import strutils
 import std/memfiles
-import std/tempfiles
-import std/strformat
+import std/os
+import std/osproc
 import std/rationals
+import std/strformat
+import std/strutils
+import std/tempfiles
 
 import wavfile
 
@@ -89,31 +89,13 @@ Options:
   return myArgs
 
 
-proc levels(osargs: seq[string]) =
-  let
-    args = vanparse(osargs)
-    myInput = args.myInput
-    timeBase = args.timeBase
-    dir = createTempDir("tmp", "")
-    temp_file = joinPath(dir, "out.wav")
-
-
-  discard execProcess(args.ffLoc,
-    args = ["-hide_banner", "-y", "-i", myInput, "-map", &"0:a:{args.stream}",
-        "-rf64", "always", temp_file],
-    options = {poUsePath}
-  )
-
+proc getAudioThreshold(tempFile: string, timeBase: Rational[int]): seq[float64] =
   var
-    wav: WavContainer = read(temp_file)
-    mm = memfiles.open(temp_file, mode = fmRead)
+    wav: WavContainer = read(tempFile)
+    mm = memfiles.open(tempFile, mode = fmRead)
     thres: seq[float64] = @[]
 
-  let samp_per_ticks = uint64((int(wav.sr) / timeBase * int(
-      wav.channels)).toInt())
-
-  if wav.bytes_per_sample != 2:
-    raise newException(IOError, "Expects int16 only")
+  let samp_per_ticks = uint64((int(wav.sr) / timeBase * int(wav.channels)).toInt())
 
   var
     samp: int16
@@ -150,27 +132,37 @@ proc levels(osargs: seq[string]) =
     for lo in local_maxs:
       thres.add(lo / max_volume)
 
-  if defined(windows):
-    var i = 0
-    var buf = "\r\n@start\r\n"
-    for t in thres:
-      buf &= &"{t:.20f}\r\n"
-      i += 1
-      if i > 4000:
-        stdout.writeLine(buf)
-        stdout.flushFile()
-        buf = ""
-        i = 0
-
-    stdout.writeLine(buf)
-    stdout.flushFile()
-  else:
-    echo "\n@start"
-    for t in thres:
-      echo &"{t:.20f}"
-    echo ""
-
   mm.close()
+  return thres
+
+
+proc levels(osargs: seq[string]) =
+  let
+    args = vanparse(osargs)
+    dir = createTempDir("tmp", "")
+    tempFile = joinPath(dir, "out.wav")
+
+  discard execProcess(args.ffLoc,
+    args = ["-hide_banner", "-y", "-i", args.myInput, "-map", &"0:a:{args.stream}",
+        "-rf64", "always", tempFile],
+    options = {poUsePath}
+  )
+
+  var i = 0
+  var buf = "\n@start\n"
+  for t in getAudioThreshold(tempFile, args.timeBase):
+    buf &= &"{t:.20f}\n"
+    i += 1
+    if i > 4000:
+      stdout.write(buf)
+      stdout.flushFile()
+      buf = ""
+      i = 0
+
+  buf &= "\n"
+  stdout.write(buf)
+  stdout.flushFile()
+
   removeDir(dir)
 
-export levels
+export levels, getAudioThreshold

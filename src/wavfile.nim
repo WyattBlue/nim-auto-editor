@@ -1,6 +1,6 @@
-import strutils
 import std/streams
 import std/strformat
+import std/strutils
 
 type
   WavContainer* = object
@@ -118,6 +118,9 @@ proc read(filename: string): WavContainer =
       fake_size = stream.readUint32()
       bytes_per_sample = block_align div channels
       n_samples = data_size div bytes_per_sample
+
+      if unlikely(bytes_per_sample != 2):
+        error(&"Bytes per sample: expected int16 only")
 
       if bytes_per_sample == 3 or bytes_per_sample == 5 or bytes_per_sample ==
           7 or bytes_per_sample == 9:

@@ -1,12 +1,14 @@
-import os
+import std/cmdline
+import std/os
+import std/osproc
+import std/rationals
 import std/strformat
-import osproc
+import std/tempfiles
 
-from subinfo import info
-from sublevels import levels
-from wavfile import WavContainer, read
+import subinfo
+import sublevels
 
-let osargs = os.commandLineParams()
+let osargs = cmdline.commandLineParams()
 
 if len(osargs) == 0:
   echo """
@@ -26,17 +28,30 @@ case osargs[0]:
     levels(osargs)
     system.quit(0)
 
-let myInput = osargs[0]
-
-const tempFile = "out.wav"
+let
+  myInput = osargs[0]
+  dir = createTempDir("tmp", "")
+  tempFile = joinPath(dir, "out.wav")
 
 discard execProcess("ffmpeg",
   args = ["-hide_banner", "-y", "-i", myInput, "-map", "0:a:0", "-rf64", "always", tempFile],
   options = {poUsePath}
 )
 
-let con = read(tempFile)
-echo &"sr: {con}"
+let levels = getAudioThreshold(tempFile, 30//1)
+
+var chunks: seq[(int, int, float)]
+var start = 0
+for j in 1 .. len(levels) - 1:
+  if (levels[j] > 0.04) != (levels[j - 1] > 0.04):
+    chunks.add(
+      (start, j, (if levels[j - 1] > 0.04: 1.0 else: 0.0))
+    )
+    start = j
+chunks.add((start, len(levels), (if levels[len(levels) - 1] > 0.04: 1.0 else: 0.0)))
 
 echo &"file: {myInput}"
+echo &"chunks: {chunks}"
+
+removeDir(dir)
 system.quit(0)
