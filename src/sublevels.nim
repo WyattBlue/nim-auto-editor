@@ -95,7 +95,8 @@ proc getAudioThreshold(tempFile: string, timeBase: Rational[int]): seq[float64] 
     mm = memfiles.open(tempFile, mode = fmRead)
     thres: seq[float64] = @[]
 
-  let samp_per_ticks = uint64((int(wav.sr) / timeBase * int(wav.channels)).toInt())
+  let samp_per_ticks = uint64((int(wav.sr) / timeBase * int(
+      wav.channels)).toInt())
 
   var
     samp: int16
@@ -143,8 +144,8 @@ proc levels(osargs: seq[string]) =
     tempFile = joinPath(dir, "out.wav")
 
   discard execProcess(args.ffLoc,
-    args = ["-hide_banner", "-y", "-i", args.myInput, "-map", &"0:a:{args.stream}",
-        "-rf64", "always", tempFile],
+    args = ["-hide_banner", "-y", "-i", args.myInput, "-map",
+        &"0:a:{args.stream}", "-rf64", "always", tempFile],
     options = {poUsePath}
   )
 

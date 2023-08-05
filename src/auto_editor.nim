@@ -34,7 +34,8 @@ let
   tempFile = joinPath(dir, "out.wav")
 
 discard execProcess("ffmpeg",
-  args = ["-hide_banner", "-y", "-i", myInput, "-map", "0:a:0", "-rf64", "always", tempFile],
+  args = ["-hide_banner", "-y", "-i", myInput, "-map", "0:a:0", "-rf64",
+      "always", tempFile],
   options = {poUsePath}
 )
 
@@ -48,7 +49,8 @@ for j in 1 .. len(levels) - 1:
       (start, j, (if levels[j - 1] > 0.04: 1.0 else: 0.0))
     )
     start = j
-chunks.add((start, len(levels), (if levels[len(levels) - 1] > 0.04: 1.0 else: 0.0)))
+chunks.add((start, len(levels), (if levels[len(levels) - 1] >
+    0.04: 1.0 else: 0.0)))
 
 echo &"file: {myInput}"
 echo &"chunks: {chunks}"
