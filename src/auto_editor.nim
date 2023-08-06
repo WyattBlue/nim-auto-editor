@@ -7,6 +7,7 @@ import std/tempfiles
 
 import subinfo
 import sublevels
+import util
 
 let osargs = cmdline.commandLineParams()
 
@@ -32,6 +33,7 @@ let
   myInput = osargs[0]
   dir = createTempDir("tmp", "")
   tempFile = joinPath(dir, "out.wav")
+  log = initLog(dir)
 
 discard execProcess("ffmpeg",
   args = ["-hide_banner", "-y", "-i", myInput, "-map", "0:a:0", "-rf64",
@@ -39,7 +41,7 @@ discard execProcess("ffmpeg",
   options = {poUsePath}
 )
 
-let levels = getAudioThreshold(tempFile, 30//1)
+let levels = getAudioThreshold(tempFile, 30//1, log)
 
 var chunks: seq[(int, int, float)]
 var start = 0
@@ -52,8 +54,6 @@ for j in 1 .. len(levels) - 1:
 chunks.add((start, len(levels), (if levels[len(levels) - 1] >
     0.04: 1.0 else: 0.0)))
 
-echo &"file: {myInput}"
 echo &"chunks: {chunks}"
 
-removeDir(dir)
-system.quit(0)
+log.endProgram()

@@ -2,8 +2,9 @@ import std/osproc
 import std/strutils except parseFloat
 import std/strformat
 import std/rationals
-
 from std/parseutils import parseFloat
+
+import util
 
 type
   StreamKind = enum
@@ -55,11 +56,7 @@ func parseRational(val: string): Rational[int] =
   except CatchableError:
     return 0//1
 
-proc error(msg: string) =
-  stderr.writeLine(&"Error! {msg}")
-  system.quit(1)
-
-proc getAllStreams(ffLoc: string, input: string): seq[Stream] =
+proc getAllStreams(ffLoc: string, input: string, log: Log): seq[Stream] =
   var ffout: string
   try:
     ffout = execProcess(ffLoc,
@@ -67,7 +64,7 @@ proc getAllStreams(ffLoc: string, input: string): seq[Stream] =
       options = {poUsePath}
     )
   except OSError:
-    error(&"Invalid ffprobe location: {ffLoc}")
+    log.error(&"Invalid ffprobe location: {ffLoc}")
   var
     foo: seq[string]
     key: string
@@ -154,7 +151,7 @@ proc getAllStreams(ffLoc: string, input: string): seq[Stream] =
           allStreams[^1].channels = parseUInt(val)
 
   if len(allStreams) == 0 or allStreams[^1].kind != ContainerKind:
-    error("Invalid media type")
+    log.error("Invalid media type")
 
   return allStreams
 

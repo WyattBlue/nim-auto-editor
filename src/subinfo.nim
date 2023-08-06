@@ -5,6 +5,7 @@ import std/strutils
 import std/rationals
 
 import ffwrapper
+import util
 
 const lbrac = "{"
 const rbrac = "}"
@@ -214,7 +215,7 @@ Options:
     echo "Retrieve information and properties about media files"
     system.quit(1)
 
-  let allStreams = getAllStreams(p.ff_loc, p.input)
+  let allStreams = getAllStreams(p.ff_loc, p.input, initLog())
 
   if p.json:
     display_stream_json(p.input, allStreams)

@@ -6,6 +6,7 @@ import std/strformat
 import std/strutils
 import std/tempfiles
 
+import util
 import wavfile
 
 type
@@ -14,10 +15,6 @@ type
     ffLoc: string
     timeBase: Rational[int]
     stream: int
-
-proc error(msg: string) =
-  stderr.writeLine(&"Error! {msg}")
-  system.quit(1)
 
 func parseRational(val: string): Rational[int] =
   let hmm = val.split("/", 1)
@@ -38,6 +35,7 @@ func parseRational(val: string): Rational[int] =
 
 proc vanparse(args: seq[string]): Args =
   var
+    log = Log()
     myArgs = Args(myInput: "", ffLoc: "ffmpeg", timeBase: 0//1, stream: 0)
     arg: string
     i = 1
@@ -66,32 +64,33 @@ Options:
       i += 1
     elif arg == "--edit":
       if not args[i+1].startswith("audio:"):
-        error("`--edit` only supports audio method")
+        log.error("`--edit` only supports audio method")
 
       myArgs.stream = parseInt(args[i+1][6 .. ^1])
       i += 1
     elif arg == "--timebase" or arg == "-tb":
       myArgs.timeBase = parseRational(args[i+1])
       if myArgs.timeBase == 0//1:
-        error("Invalid timebase")
+        log.error("Invalid timebase")
       i += 1
     elif myArgs.myInput != "":
-      error("Only one file allowed")
+      log.error("Only one file allowed")
     else:
       myArgs.myInput = arg
 
     i += 1
 
   if myArgs.myInput == "":
-    error("Input file required")
+    log.error("Input file required")
   if myArgs.timeBase == 0//1:
-    error("timebase must be set!")
+    log.error("timebase must be set!")
   return myArgs
 
 
-proc getAudioThreshold(tempFile: string, timeBase: Rational[int]): seq[float64] =
+proc getAudioThreshold(tempFile: string, timeBase: Rational[int],
+    log: Log): seq[float64] =
   var
-    wav: WavContainer = read(tempFile)
+    wav: WavContainer = read(tempFile, log)
     mm = memfiles.open(tempFile, mode = fmRead)
     thres: seq[float64] = @[]
 
@@ -142,6 +141,7 @@ proc levels(osargs: seq[string]) =
     args = vanparse(osargs)
     dir = createTempDir("tmp", "")
     tempFile = joinPath(dir, "out.wav")
+    log = initLog(dir)
 
   discard execProcess(args.ffLoc,
     args = ["-hide_banner", "-y", "-i", args.myInput, "-map",
@@ -151,7 +151,7 @@ proc levels(osargs: seq[string]) =
 
   var i = 0
   var buf = "\n@start\n"
-  for t in getAudioThreshold(tempFile, args.timeBase):
+  for t in getAudioThreshold(tempFile, args.timeBase, log):
     buf &= &"{t:.20f}\n"
     i += 1
     if i > 4000:

@@ -2,6 +2,8 @@ import std/streams
 import std/strformat
 import std/strutils
 
+import util
+
 type
   WavContainer* = object
     start*: uint64
@@ -11,12 +13,8 @@ type
     channels*: uint16
     sr*: uint32
 
-proc error(msg: string) =
-  stderr.writeLine(&"Error! {msg}")
-  system.quit(1)
 
-
-proc read(filename: string): WavContainer =
+proc read(filename: string, log: Log): WavContainer =
   let stream = newFileStream(filename, mode = fmRead)
   defer: stream.close()
 
@@ -26,12 +24,12 @@ proc read(filename: string): WavContainer =
 
   discard stream.readData(file_sig.addr, 4)
   if unlikely(file_sig != ['R', 'F', '6', '4']):
-    error(&"File format {repr(file_sig)} not supported.")
+    log.error(&"File format {repr(file_sig)} not supported.")
 
   discard stream.readData(heading.addr, 12)
   if unlikely(heading != ['\xFF', '\xFF', '\xFF', '\xFF', 'W', 'A', 'V', 'E',
       'd', 's', '6', '4']):
-    error(&"Invalid heading for rf64 chunk: {repr(heading)}")
+    log.error(&"Invalid heading for rf64 chunk: {repr(heading)}")
 
   var
     chunk_size = stream.readUint32()
@@ -71,15 +69,15 @@ proc read(filename: string): WavContainer =
     discard stream.readData(chunk_id.addr, 4)
 
     if unlikely(len(chunk_id) == 0):
-      error("Unexpected end of file.")
+      log.error("Unexpected end of file.")
     if unlikely(len(chunk_id) < 4 and not fmt_chunk_received):
-      error(&"Incomplete chunk ID: {repr(chunk_id)}")
+      log.error(&"Incomplete chunk ID: {repr(chunk_id)}")
 
     if chunk_id == ['f', 'm', 't', ' ']:
       fmt_chunk_received = true
       discard stream.readData(fmt_size.addr, 4)
       if unlikely(fmt_size < 16):
-        error("Binary structure of wave file is not compliant")
+        log.error("Binary structure of wave file is not compliant")
 
       format_tag = stream.readUint16()
       channels = stream.readUint16()
@@ -93,7 +91,7 @@ proc read(filename: string): WavContainer =
         let ext_chunk_size = stream.readUint16()
         bytes_read += 2
         if unlikely(ext_chunk_size < 22):
-          error("Binary structure of wave file is not compliant")
+          log.error("Binary structure of wave file is not compliant")
 
         stream.setPosition(stream.getPosition() + 6)
         var raw_guid: array[16, char]
@@ -105,7 +103,7 @@ proc read(filename: string): WavContainer =
           format_tag = cast[uint16](raw_guid[0])
 
       if unlikely(format_tag != 0x0001 and format_tag != 0x0003):
-        error(&"Encountered unknown format tag: {format_tag}, while reading fmt chunk.")
+        log.error(&"Encountered unknown format tag: {format_tag}, while reading fmt chunk.")
 
       # move file pointer to next chunk
       if fmt_size > bytes_read:
@@ -113,22 +111,22 @@ proc read(filename: string): WavContainer =
 
     elif chunk_id == ['d', 'a', 't', 'a']:
       if unlikely(not fmt_chunk_received):
-        error("No fmt chunk before data")
+        log.error("No fmt chunk before data")
 
       fake_size = stream.readUint32()
       bytes_per_sample = block_align div channels
       n_samples = data_size div bytes_per_sample
 
       if unlikely(bytes_per_sample != 2):
-        error(&"Bytes per sample: expected int16 only")
+        log.error(&"Bytes per sample: expected int16 only")
 
       if bytes_per_sample == 3 or bytes_per_sample == 5 or bytes_per_sample ==
           7 or bytes_per_sample == 9:
-        error(&"Unsupported bytes per sample: {bytes_per_sample}")
+        log.error(&"Unsupported bytes per sample: {bytes_per_sample}")
 
       if format_tag == 0x0003 and (not (bytes_per_sample == 4 or
           bytes_per_sample == 8)):
-        error(&"Unsupported bytes per sample: {bytes_per_sample}")
+        log.error(&"Unsupported bytes per sample: {bytes_per_sample}")
 
       return WavContainer(
         start: uint64(stream.getPosition()), size: n_samples,
@@ -139,8 +137,8 @@ proc read(filename: string): WavContainer =
       # Skip unknown chunk
       fake_size = stream.readUint32()
       if unlikely(fake_size == 0):
-        error("Unknown chunk")
+        log.error("Unknown chunk")
       stream.setPosition(stream.getPosition() + int(fake_size))
-  error(&"No data chunk! {chunk_id}")
+  log.error(&"No data chunk! {chunk_id}")
 
 export WavContainer, read
