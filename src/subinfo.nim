@@ -90,7 +90,7 @@ proc display_stream(vids: seq[FileInfo]) =
 
 proc display_stream_json(vids: seq[FileInfo]) =
   echo "{"
-  for vid in vids:
+  for j, vid in enumerate(vids):
     echo &"""    "{jsonEscape(vid.path)}": {lbrac}
         "type": "media",
         "video": ["""
@@ -135,7 +135,7 @@ proc display_stream_json(vids: seq[FileInfo]) =
             "duration": {vid.duration},
             "bitrate": {vid.bitrate}
         {rbrac}
-    {rbrac}"""
+    {rbrac}{(if j == len(vids) - 1: "" else: ",")}"""
   echo "}"
 
 proc info(args: seq[string]) =
