@@ -1,5 +1,4 @@
-import std/strformat
-import std/os
+import std/[strformat, os]
 
 type
   Log* = object

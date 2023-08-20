@@ -1,10 +1,5 @@
-import std/memfiles
-import std/os
-import std/osproc
-import std/rationals
-import std/strformat
-import std/strutils
-import std/tempfiles
+import std/[memfiles, tempfiles, os, osproc]
+import std/[rationals, strformat, strutils]
 
 import util
 import wavfile

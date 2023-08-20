@@ -1,11 +1,5 @@
-import std/cmdline
-import std/os
-import std/osproc
-import std/rationals
-import std/strformat
-import std/tempfiles
-import std/enumerate
-import std/sequtils
+import std/[cmdline, tempfiles, os, osproc]
+import std/[enumerate, rationals, sequtils, strformat]
 
 import subinfo
 import sublevels

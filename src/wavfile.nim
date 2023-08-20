@@ -1,6 +1,4 @@
-import std/streams
-import std/strformat
-import std/strutils
+import std/[streams, strformat, strutils]
 
 import util
 

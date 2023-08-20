@@ -1,8 +1,5 @@
-import std/algorithm
-import std/enumerate
-import std/strformat
-import std/strutils
-import std/rationals
+import std/[algorithm, enumerate, rationals]
+import std/[strformat, strutils]
 
 import ffwrapper
 import util

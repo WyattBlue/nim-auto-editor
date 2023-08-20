@@ -1,7 +1,4 @@
-import std/osproc
-import std/strutils except parseFloat
-import std/strformat
-import std/rationals
+import std/[osproc, strformat, strutils, rationals]
 from std/parseutils import parseFloat
 
 import util
