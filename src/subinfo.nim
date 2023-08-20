@@ -171,9 +171,6 @@ Options:
   if len(p.input) == 0:
     log.error("No input file selected")
 
-    #echo "Retrieve information and properties about media files"
-    #system.quit(1)
-
   var allFiles: seq[FileInfo] = @[]
   for file in p.input:
     allFiles.add(initFileInfo(p.ffLoc, file, log))

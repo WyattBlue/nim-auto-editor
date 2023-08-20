@@ -1,5 +1,5 @@
 import std/[cmdline, tempfiles, os, osproc]
-import std/[enumerate, rationals, sequtils, strformat]
+import std/[enumerate, math, rationals, sequtils, strformat]
 
 import subinfo
 import sublevels
@@ -15,20 +15,22 @@ Run:
     auto-editor --help
 
 To get the list of options."""
-  system.quit(1)
+  quit(1)
 
 case osargs[0]:
   of "info":
     info(osargs)
-    system.quit(0)
+    quit(0)
   of "levels":
     levels(osargs)
-    system.quit(0)
+    quit(0)
 
 let
   myInput = osargs[0]
+  spl = splitFile(myInput)
+  myOutput = joinPath(spl.dir, spl.name & "_ALTERED" & spl.ext)
   dir = createTempDir("tmp", "")
-  tempFile = joinPath(dir, "out.wav")
+  tempFile = dir.joinPath("out.wav")
   log = initLog(dir)
 
 discard execProcess("ffmpeg",
@@ -104,15 +106,43 @@ var chunks: seq[(int, int, float)]
 var start = 0
 for j in 1 ..< len(hasLoud):
   if hasLoud[j] != hasLoud[j - 1]:
-    chunks.add(
-      (start, j, (if hasLoud[j - 1]: 1.0 else: 0.0))
-    )
+    if hasLoud[j - 1]:
+      chunks.add((start, j, 1.0))
     start = j
 
-chunks.add(
-  (start, len(hasLoud), (if hasLoud[^1]: 1.0 else: 0.0))
+if hasLoud[^1]:
+  chunks.add((start, len(hasLoud), 1.0))
+
+func toTimecode(v: int): string =
+  let fSecs = toFloat(v / (30//1))
+  let iSecs = toInt(fSecs)
+  var hours: int
+  var (minutes, secs) = divmod(iSecs, 60)
+  (hours, minutes) = divmod(minutes, 60)
+  let realSecs = toFloat(secs) + (fSecs - toFloat(iSecs))
+
+  return &"{hours:02d}:{minutes:02d}:{realSecs:06.3f}"
+
+
+let concatFile = dir.joinPath("concat.txt")
+let f = open(concatFile, fmWrite)
+for i, chunk in enumerate(chunks):
+  let hmm = dir.joinPath(&"{i}.mp4")
+  f.writeLine(&"file '{hmm}'")
+
+f.close()
+
+for total, chunk in enumerate(chunks):
+  discard execProcess("ffmpeg",
+    args = [
+    "-hide_banner", "-y", "-i", myInput, "-ss", toTimecode(chunk[0]), "-to",
+    toTimecode(chunk[1]), dir.joinPath(&"{total}.mp4")
+    ],
+    options = {poUsePath}
+  )
+
+discard execProcess("ffmpeg",
+  args = ["-hide_banner", "-y", "-f", "concat", "-safe", "0", "-i", concatFile, "-c", "copy", myOutput],
+  options = {poUsePath}
 )
-
-echo &"chunks: {chunks}"
-
 log.endProgram()
