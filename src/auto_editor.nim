@@ -1,9 +1,18 @@
 import std/[cmdline, tempfiles, os, osproc]
 import std/[enumerate, math, rationals, sequtils, strformat]
 
+import ffwrapper
 import subinfo
 import sublevels
 import util
+import bar
+
+type
+  Exports {.pure.} = enum
+    exNormal
+    exSS
+    lossless
+
 
 let osargs = cmdline.commandLineParams()
 
@@ -25,21 +34,71 @@ case osargs[0]:
     levels(osargs)
     quit(0)
 
+
+type Args = object
+  input: string = ""
+  output: string = ""
+  `export`: Exports = exNormal
+
+proc vanparse(osargs: seq[string]): Args =
+  var i = 0
+  var arg: string
+  var args = Args()
+
+  while i < len(osargs):
+    arg = osargs[i]
+
+    if arg == "--export":
+      if osargs[i + 1] == "lossless":
+        args.`export` = lossless
+      elif osargs[i + 1] == "ss":
+        args.`export` = exSS
+      else:
+        echo &"Invalid `--export` value: {osargs[i + 1]}"
+        quit(1)
+      i += 1
+    elif arg == "-o" or arg == "--output":
+      args.output = osargs[i + 1]
+      i += 1
+    elif args.input == "":
+      args.input = arg
+    else:
+      echo &"Invalid option: {arg}"
+      quit(1)
+    i += 1
+
+  if args.input == "":
+    echo "Input required"
+    quit(1)
+
+  if args.output == "":
+    let spl = splitFile(args.input)
+    args.output = joinPath(spl.dir, spl.name & "_ALTERED" & spl.ext)
+
+  return args
+
+
 let
-  myInput = osargs[0]
-  spl = splitFile(myInput)
-  myOutput = joinPath(spl.dir, spl.name & "_ALTERED" & spl.ext)
+  args = vanparse(osargs)
   dir = createTempDir("tmp", "")
   tempFile = dir.joinPath("out.wav")
   log = initLog(dir)
+  fileInfo = initFileInfo("ffprobe", args.input, log)
+
+if fileExists(args.output):
+  removeFile(args.output)
+
+if len(fileInfo.a) == 0:
+  log.error("Needs at least one audio stream")
 
 discard execProcess("ffmpeg",
-  args = ["-hide_banner", "-y", "-i", myInput, "-map", "0:a:0", "-rf64",
+  args = ["-hide_banner", "-y", "-i", args.input, "-map", "0:a:0", "-rf64",
       "always", tempFile],
   options = {poUsePath}
 )
 
-let levels = getAudioThreshold(tempFile, 30//1, log)
+let tb = (if len(fileInfo.v) > 0: fileInfo.v[0].fps else: 30//1)
+let levels = getAudioThreshold(tempFile, tb, log)
 
 var hasLoud: seq[bool] = @[]
 for j in levels:
@@ -113,8 +172,8 @@ for j in 1 ..< len(hasLoud):
 if hasLoud[^1]:
   chunks.add((start, len(hasLoud), 1.0))
 
-func toTimecode(v: int): string =
-  let fSecs = toFloat(v / (30//1))
+func toTimecode(v: int, tb: Rational[int]): string =
+  let fSecs = toFloat(v / tb)
   let iSecs = toInt(fSecs)
   var hours: int
   var (minutes, secs) = divmod(iSecs, 60)
@@ -123,26 +182,68 @@ func toTimecode(v: int): string =
 
   return &"{hours:02d}:{minutes:02d}:{realSecs:06.3f}"
 
+func toSec(v: int, tb: Rational[int]): string =
+  let fSecs = toFloat(v / tb)
+  return &"{fSecs:.3f}"
+
 
 let concatFile = dir.joinPath("concat.txt")
-let f = open(concatFile, fmWrite)
-for i, chunk in enumerate(chunks):
-  let hmm = dir.joinPath(&"{i}.mp4")
-  f.writeLine(&"file '{hmm}'")
 
-f.close()
+if args.`export` == lossless or args.`export` == exSS:
+  let f = open(concatFile, fmWrite)
+  for i, chunk in enumerate(chunks):
+    let hmm = dir.joinPath(&"{i}.mp4")
+    f.writeLine(&"file '{hmm}'")
 
-for total, chunk in enumerate(chunks):
+  f.close()
+
+if args.`export` == lossless:
+  let bar = initBar(chunks.len)
+  for i, chunk in enumerate(chunks):
+    bar.tick(i+1)
+    discard execProcess("ffmpeg",
+      args = [
+      "-hide_banner", "-y", "-copyts", "-ss", toTimecode(chunk[0], tb), "-i", args.input, "-to",
+      toTimecode(chunk[1], tb), "-map", "0", "-c", "copy", dir.joinPath(&"{i}.mp4")
+      ],
+      options = {poUsePath}
+    )
+
   discard execProcess("ffmpeg",
-    args = [
-    "-hide_banner", "-y", "-i", myInput, "-ss", toTimecode(chunk[0]), "-to",
-    toTimecode(chunk[1]), dir.joinPath(&"{total}.mp4")
-    ],
+    args = ["-hide_banner", "-y", "-f", "concat", "-safe", "0", "-i", concatFile, "-c", "copy", args.output],
+    options = {poUsePath}
+  )
+elif args.`export` == exSS:
+  let bar = initBar(chunks.len)
+  for i, chunk in enumerate(chunks):
+    bar.tick(i+1)
+    discard execProcess("ffmpeg",
+      args = [
+      "-hide_banner", "-y", "-i", args.input,
+      "-ss", toTimecode(chunk[0], tb), "-to", toTimecode(chunk[1], tb), dir.joinPath(&"{i}.mp4")
+      ],
+      options = {poUsePath}
+    )
+
+  discard execProcess("ffmpeg",
+    args = ["-hide_banner", "-y", "-f", "concat", "-safe", "0", "-i", concatFile, args.output],
+    options = {poUsePath}
+  )
+else:
+  var select = ""
+
+  for i, chunk in enumerate(chunks):
+    select &= &"between(t,{toSec(chunk[0],tb)},{toSec(chunk[1],tb)})"
+
+    if i != len(chunks) - 1:
+      select &= "+"
+
+  discard execProcess("ffmpeg",
+    args = ["-hide_banner", "-y", "-i", args.input,
+      "-vf", &"select='{select}',setpts=N/FRAME_RATE/TB",
+      "-af", &"aselect='{select}',asetpts=N/SR/TB", args.output],
     options = {poUsePath}
   )
 
-discard execProcess("ffmpeg",
-  args = ["-hide_banner", "-y", "-f", "concat", "-safe", "0", "-i", concatFile, "-c", "copy", myOutput],
-  options = {poUsePath}
-)
+discard execProcess("open", args=[args.output], options={poUsePath})
 log.endProgram()

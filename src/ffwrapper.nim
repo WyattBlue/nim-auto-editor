@@ -11,7 +11,7 @@ type
     lang*: string = ""
     width*: uint64
     height*: uint64
-    fps*: string
+    fps*: Rational[int] = 0//1
     timebase*: string
     dar*: Rational[int] = 0//1
     sar*: Rational[int] = 1//1
@@ -61,16 +61,27 @@ type
 
 
 func parseRational(val: string): Rational[int] =
-  let hmm = val.split(":")
+  var
+    c: int = 0
+    num = ""
+    den = ""
+    numSet = false
 
-  if len(hmm) != 2:
+  if val.len > 100:
     return 0//1
 
+  while c < val.len:
+    if not numSet and val[c] == ':' or val[c] == '/':
+      numSet = true
+    else:
+      if numSet:
+        den &= val[c]
+      else:
+        num &= val[c]
+    c += 1
+
   try:
-    let
-      num = parseInt(hmm[0])
-      den = parseInt(hmm[1])
-    return num // den
+    return parseInt(num) // (if den == "": 1 else: parseInt(den))
   except CatchableError:
     return 0//1
 
@@ -159,8 +170,8 @@ proc initFileInfo(ffLoc: string, input: string, log: Log): FileInfo =
         vs[^1].width = parseUInt(val)
       if key == "height":
         vs[^1].height = parseUInt(val)
-      if key == "avg_frame_rate":
-        vs[^1].fps = val
+      if key == "avg_frame_rate" and val != "N/A":
+        vs[^1].fps = parseRational(val)
       if key == "sample_aspect_ratio" and val != "N/A":
         vs[^1].sar = parseRational(val)
       if key == "display_aspect_ratio" and val != "N/A":

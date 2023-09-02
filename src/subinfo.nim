@@ -34,7 +34,7 @@ proc display_stream(vids: seq[FileInfo]) =
       echo &"""
    - track {i}:
      - codec: {stream.codec}
-     - fps: {stream.fps}
+     - fps: {stream.fps.num}/{stream.fps.den}
      - timebase: {stream.timebase}
      - resolution: {stream.width}x{stream.height}
      - aspect ratio: {stream.dar.num}:{stream.dar.den}
@@ -94,7 +94,7 @@ proc display_stream_json(vids: seq[FileInfo]) =
     for i, stream in enumerate(reversed(vid.v)):
       echo &"""            {lbrac}
                 "codec": "{stream.codec}",
-                "fps": "{stream.fps}",
+                "fps": "{stream.fps.num}/{stream.fps.den}",
                 "timebase": "{stream.timebase}",
                 "resolution": [{stream.width}, {stream.height}],
                 "dar": [{stream.dar.num}, {stream.dar.den}],
