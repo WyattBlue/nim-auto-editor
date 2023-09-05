@@ -7,13 +7,6 @@ import sublevels
 import util
 import bar
 
-type
-  Exports {.pure.} = enum
-    exNormal
-    exSS
-    lossless
-
-
 let osargs = cmdline.commandLineParams()
 
 if len(osargs) == 0:
@@ -35,10 +28,16 @@ case osargs[0]:
     quit(0)
 
 
-type Args = object
-  input: string = ""
-  output: string = ""
-  `export`: Exports = exNormal
+type
+  Exports {.pure.} = enum
+    exNormal
+    exSS
+
+  Args = object
+    input: string = ""
+    output: string = ""
+    `export`: Exports = exNormal
+    noOpen: bool = false
 
 proc vanparse(osargs: seq[string]): Args =
   var i = 0
@@ -49,8 +48,8 @@ proc vanparse(osargs: seq[string]): Args =
     arg = osargs[i]
 
     if arg == "--export":
-      if osargs[i + 1] == "lossless":
-        args.`export` = lossless
+      if osargs[i + 1] == "normal":
+        args.`export` = exNormal
       elif osargs[i + 1] == "ss":
         args.`export` = exSS
       else:
@@ -60,6 +59,8 @@ proc vanparse(osargs: seq[string]): Args =
     elif arg == "-o" or arg == "--output":
       args.output = osargs[i + 1]
       i += 1
+    elif arg == "--no-open":
+      args.noOpen = true
     elif args.input == "":
       args.input = arg
     else:
@@ -187,63 +188,46 @@ func toSec(v: int, tb: Rational[int]): string =
   return &"{fSecs:.3f}"
 
 
-let concatFile = dir.joinPath("concat.txt")
+case args.`export`:
+  of exSS:
+    let concatFile = dir.joinPath("concat.txt")
+    let f = open(concatFile, fmWrite)
+    for i, chunk in enumerate(chunks):
+      let hmm = dir.joinPath(&"{i}.mp4")
+      f.writeLine(&"file '{hmm}'")
 
-if args.`export` == lossless or args.`export` == exSS:
-  let f = open(concatFile, fmWrite)
-  for i, chunk in enumerate(chunks):
-    let hmm = dir.joinPath(&"{i}.mp4")
-    f.writeLine(&"file '{hmm}'")
+    f.close()
+    let bar = initBar(chunks.len)
+    for i, chunk in enumerate(chunks):
+      bar.tick(i+1)
+      discard execProcess("ffmpeg",
+        args = [
+        "-hide_banner", "-y", "-i", args.input,
+        "-ss", toTimecode(chunk[0], tb), "-to", toTimecode(chunk[1], tb), dir.joinPath(&"{i}.mp4")
+        ],
+        options = {poUsePath}
+      )
 
-  f.close()
-
-if args.`export` == lossless:
-  let bar = initBar(chunks.len)
-  for i, chunk in enumerate(chunks):
-    bar.tick(i+1)
     discard execProcess("ffmpeg",
-      args = [
-      "-hide_banner", "-y", "-copyts", "-ss", toTimecode(chunk[0], tb), "-i", args.input, "-to",
-      toTimecode(chunk[1], tb), "-map", "0", "-c", "copy", dir.joinPath(&"{i}.mp4")
-      ],
+      args = ["-hide_banner", "-y", "-f", "concat", "-safe", "0", "-i", concatFile, args.output],
+      options = {poUsePath}
+    )
+  of exNormal:
+    var select = ""
+
+    for i, chunk in enumerate(chunks):
+      select &= &"between(t,{toSec(chunk[0],tb)},{toSec(chunk[1],tb)})"
+
+      if i != len(chunks) - 1:
+        select &= "+"
+
+    discard execProcess("ffmpeg",
+      args = ["-hide_banner", "-y", "-i", args.input,
+        "-vf", &"select='{select}',setpts=N/FRAME_RATE/TB",
+        "-af", &"aselect='{select}',asetpts=N/SR/TB", args.output],
       options = {poUsePath}
     )
 
-  discard execProcess("ffmpeg",
-    args = ["-hide_banner", "-y", "-f", "concat", "-safe", "0", "-i", concatFile, "-c", "copy", args.output],
-    options = {poUsePath}
-  )
-elif args.`export` == exSS:
-  let bar = initBar(chunks.len)
-  for i, chunk in enumerate(chunks):
-    bar.tick(i+1)
-    discard execProcess("ffmpeg",
-      args = [
-      "-hide_banner", "-y", "-i", args.input,
-      "-ss", toTimecode(chunk[0], tb), "-to", toTimecode(chunk[1], tb), dir.joinPath(&"{i}.mp4")
-      ],
-      options = {poUsePath}
-    )
-
-  discard execProcess("ffmpeg",
-    args = ["-hide_banner", "-y", "-f", "concat", "-safe", "0", "-i", concatFile, args.output],
-    options = {poUsePath}
-  )
-else:
-  var select = ""
-
-  for i, chunk in enumerate(chunks):
-    select &= &"between(t,{toSec(chunk[0],tb)},{toSec(chunk[1],tb)})"
-
-    if i != len(chunks) - 1:
-      select &= "+"
-
-  discard execProcess("ffmpeg",
-    args = ["-hide_banner", "-y", "-i", args.input,
-      "-vf", &"select='{select}',setpts=N/FRAME_RATE/TB",
-      "-af", &"aselect='{select}',asetpts=N/SR/TB", args.output],
-    options = {poUsePath}
-  )
-
-discard execProcess("open", args=[args.output], options={poUsePath})
+if not args.noOpen:
+  discard execProcess("open", args=[args.output], options={poUsePath})
 log.endProgram()
