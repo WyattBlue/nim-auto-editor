@@ -1,5 +1,5 @@
 import std/[cmdline, tempfiles, os, osproc]
-import std/[enumerate, math, rationals, sequtils, strformat]
+import std/[enumerate, math, rationals, sequtils, strformat, strutils]
 
 import ffwrapper
 import subinfo
@@ -20,6 +20,20 @@ To get the list of options."""
   quit(1)
 
 case osargs[0]:
+  of "--help":
+    echo """
+Usage: [file] [options]
+
+Options:
+  -m, --margin LENGTH         Set sections near "loud" as "loud" too if
+                              section is less than LENGTH away.
+                              Default value is "0.2s"
+  -o, --output FILE           Set the path of the new output file
+  --export EXPORT             Choose which export method to use. Choices
+                              are "default" or "ss"
+  --no-open                   Do not open the output file after editing
+                              is done
+"""
   of "info":
     info(osargs)
     quit(0)
@@ -36,6 +50,7 @@ type
   Args = object
     input: string = ""
     output: string = ""
+    margin: string = "0.2s"
     `export`: Exports = exNormal
     noOpen: bool = false
 
@@ -47,8 +62,11 @@ proc vanparse(osargs: seq[string]): Args =
   while i < len(osargs):
     arg = osargs[i]
 
-    if arg == "--export":
-      if osargs[i + 1] == "normal":
+    if arg == "--margin":
+      args.margin = osargs[i + 1]
+      i += 1
+    elif arg == "--export":
+      if osargs[i + 1] == "default":
         args.`export` = exNormal
       elif osargs[i + 1] == "ss":
         args.`export` = exSS
@@ -129,7 +147,6 @@ removeSmall(hasLoud, 3, true, false)
 # Apply mincut of 6
 removeSmall(hasLoud, 6, false, true)
 
-# Apply margin of 0.2s 0.2s
 proc mutMargin(arr: var seq[bool], startM, endM: int) =
   var startIndex, endIndex: seq[int]
   let arrLen = len(arr)
@@ -159,7 +176,51 @@ proc mutMargin(arr: var seq[bool], startM, endM: int) =
       let index = max(i + endM, 0) ..< i
       arr[index] = repeat(false, index.len)
 
-mutMargin(hasLoud, 6, 6)
+
+func parseMargin(val: string, tb: Rational[int]): (int, int) {.raises: ValueError.} =
+  var
+    a, b, state, cSeen: int = 0
+    num: float
+    window = ""
+
+  for c in val & ",":
+    if state == 0:
+      if c in "0123456789.-":
+        window &= c
+      else:
+        num = parseFloat(window)
+        window = ""
+        state = 1
+
+    if state == 1:
+      if c != ',':
+        window &= c
+      else:
+        cSeen += 1
+        state = 0
+        if window in ["s", "sec", "secs", "second", "seconds"]:
+          b = toInt round(num * toFloat(tb))
+        elif window == "":
+          b = toInt num
+        else:
+          raise newException(ValueError, &"Invalid unit: {window}")
+
+        window = ""
+        if cSeen == 1:
+          a = b
+        if cSeen == 3:
+          raise newException(ValueError, "Too many parameters for margin")
+
+  return (a, b)
+
+var startMargin, endMargin: int
+try:
+  (startMargin, endMargin) = parseMargin(args.margin, tb)
+except ValueError:
+  let e = getCurrentExceptionMsg()
+  log.error(e)
+
+mutMargin(hasLoud, startMargin, endMargin)
 
 
 var chunks: seq[(int, int, float)]
@@ -202,14 +263,15 @@ case args.`export`:
       bar.tick(i+1)
       discard execProcess("ffmpeg",
         args = [
-        "-hide_banner", "-y", "-i", args.input,
-        "-ss", toTimecode(chunk[0], tb), "-to", toTimecode(chunk[1], tb), dir.joinPath(&"{i}.mp4")
+        "-hide_banner", "-y", "-i", args.input, "-ss", toTimecode(chunk[0], tb),
+            "-to", toTimecode(chunk[1], tb), dir.joinPath(&"{i}.mp4")
         ],
         options = {poUsePath}
       )
 
     discard execProcess("ffmpeg",
-      args = ["-hide_banner", "-y", "-f", "concat", "-safe", "0", "-i", concatFile, args.output],
+      args = ["-hide_banner", "-y", "-f", "concat", "-safe", "0", "-i",
+          concatFile, args.output],
       options = {poUsePath}
     )
   of exNormal:
@@ -229,5 +291,6 @@ case args.`export`:
     )
 
 if not args.noOpen:
-  discard execProcess("open", args=[args.output], options={poUsePath})
+  discard execProcess((if defined(windows): "start" else: "open"),
+  args = [args.output], options = {poUsePath})
 log.endProgram()
