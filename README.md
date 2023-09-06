@@ -12,9 +12,18 @@ auto-editor path/to/your/video.mp4
 
 The only dependencies you need are ffmpeg and ffprobe.
 
-## How to Compile
+## Why Nim?
+Nim produces a much tinier standalone binary than Python w/ pyinstaller. Nim is faster and has a better type checker.
+
+## How to Compile from Source
+You will need [the Nim compiler](https://nim-lang.org/) and nimble.
 
 ```
-cd src/
-nim c -d:danger auto_editor
+nimble build -d:danger
 ```
+
+## Todos
+ - Feature parity with Python [auto-editor](https://github.com/WyattBlue/auto-editor)
+ - Man pages
+ - Tests
+ - CI/CL
