@@ -5,7 +5,6 @@ import ffwrapper
 import subinfo
 import sublevels
 import util
-import bar
 
 let osargs = cmdline.commandLineParams()
 
@@ -177,7 +176,8 @@ proc mutMargin(arr: var seq[bool], startM, endM: int) =
       arr[index] = repeat(false, index.len)
 
 
-func parseMargin(val: string, tb: Rational[int]): (int, int) {.raises: ValueError.} =
+func parseMargin(val: string, tb: Rational[int]): (int,
+    int) {.raises: ValueError.} =
   var
     a, b, state, cSeen: int = 0
     num: float
@@ -258,16 +258,15 @@ case args.`export`:
       f.writeLine(&"file '{hmm}'")
 
     f.close()
-    let bar = initBar(chunks.len)
+
+    var myCmd: seq[string] = @["-hide_banner", "-y", "-i", args.input]
+
     for i, chunk in enumerate(chunks):
-      bar.tick(i+1)
-      discard execProcess("ffmpeg",
-        args = [
-        "-hide_banner", "-y", "-i", args.input, "-ss", toTimecode(chunk[0], tb),
-            "-to", toTimecode(chunk[1], tb), dir.joinPath(&"{i}.mp4")
-        ],
-        options = {poUsePath}
-      )
+      myCmd.add([
+        "-ss", toTimecode(chunk[0], tb),
+        "-to", toTimecode(chunk[1], tb), dir.joinPath(&"{i}.mp4")
+      ])
+    discard execProcess("ffmpeg", args = myCmd, options = {poUsePath})
 
     discard execProcess("ffmpeg",
       args = ["-hide_banner", "-y", "-f", "concat", "-safe", "0", "-i",
