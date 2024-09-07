@@ -1,0 +1,29 @@
+name: build
+on:
+  release:
+    types: [created]
+  push:
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Nim
+        uses: iffy/install-nim@v5
+        with:
+          version: binary:stable
+      - name: Docs
+        run: |
+          ./compile_ffmpeg.sh
+          make
+          ./auto-editor info example.mp4
+
