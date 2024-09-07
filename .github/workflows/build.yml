@@ -25,9 +25,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential pkg-config yasm git
+      - name: Build FFmpeg
+        run: ./compile_ffmpeg.sh
+      - name: Compile
+        run: make
       - name: Test
-        run: |
-          ./compile_ffmpeg.sh
-          make
-          ./auto-editor info example.mp4
+        run: ./auto-editor info example.mp4
 
