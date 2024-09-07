@@ -21,7 +21,11 @@ jobs:
         uses: iffy/install-nim@v5
         with:
           version: binary:stable
-      - name: Docs
+      - name: Setup
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config yasm git
+      - name: Test
         run: |
           ./compile_ffmpeg.sh
           make

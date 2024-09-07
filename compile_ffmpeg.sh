@@ -5,7 +5,7 @@ mkdir -p ffmpeg_sources ffmpeg_build
 
 # Download FFmpeg source
 cd ffmpeg_sources
-git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg
+git clone https://git.ffmpeg.org/ffmpeg.git ffmpeg --depth 1
 
 # Configure and compile FFmpeg
 cd ffmpeg

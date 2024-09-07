@@ -1,4 +1,4 @@
-FFMPEG_PREFIX = $(HOME)/ffmpeg_build
+FFMPEG_PREFIX = ./ffmpeg_build
 FFMPEG_INCLUDE = $(FFMPEG_PREFIX)/include
 FFMPEG_LIB = $(FFMPEG_PREFIX)/lib
 
