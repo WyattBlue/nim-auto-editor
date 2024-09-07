@@ -1,5 +1,6 @@
-auto_editor
 auto-editor
+*.dylib
+*.o
 .DS_Store
-*.exe
-*.mp4
+ffmpeg_build
+ffmpeg_sources
