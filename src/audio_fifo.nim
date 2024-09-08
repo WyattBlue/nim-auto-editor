@@ -15,7 +15,7 @@ proc newAudioFifo*(sampleFormat: AVSampleFormat, channels: cint): AudioFifo =
   if result.fifo == nil:
     raise newException(IOError, "Failed to allocate AudioFifo")
 
-proc `=destroy`*(fifo: var AudioFifo) =
+proc finalizeAudioFifo(fifo: AudioFifo) =
   if fifo.fifo != nil:
     av_audio_fifo_free(fifo.fifo)
     fifo.fifo = nil
