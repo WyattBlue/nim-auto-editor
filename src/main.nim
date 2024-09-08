@@ -4,6 +4,8 @@ import std/enumerate
 import std/json
 import ffmpeg
 import media
+import levels
+import av
 
 
 proc genericTrack(lang: string, bitrate: int) =
@@ -24,7 +26,8 @@ proc printYamlInfo(fileInfo: MediaInfo) =
     echo fmt"     - resolution: {v.width}x{v.height}"
     # echo fmt"     - aspect ratio: {v.aspectRatio}"
     echo fmt"     - pixel aspect ratio: {v.sar}"
-    echo fmt"     - duration: {v.duration:.1f}"
+    if v.duration != 0.0:
+      echo fmt"     - duration: {v.duration:.1f}"
     echo fmt"     - pix fmt: {v.pix_fmt}"
     echo fmt"     - color range: {v.color_range}"
     echo fmt"     - color space: {v.color_space}"
@@ -41,7 +44,8 @@ proc printYamlInfo(fileInfo: MediaInfo) =
     echo fmt"     - codec: {a.codec}"
     echo fmt"     - layout: {a.layout}"
     echo fmt"     - samplerate: {a.samplerate}"
-    echo fmt"     - duration: {a.duration:.1f}"
+    if a.duration != 0.0:
+      echo fmt"     - duration: {a.duration:.1f}"
     genericTrack(a.lang, a.bitrate)
 
   if fileInfo.s.len > 0:
@@ -52,7 +56,8 @@ proc printYamlInfo(fileInfo: MediaInfo) =
     genericTrack(s.lang, s.bitrate)
 
   echo " - container:"
-  echo fmt"   - duration: {fileInfo.duration:.1f}"
+  if fileInfo.duration != 0.0:
+    echo fmt"   - duration: {fileInfo.duration:.1f}"
   echo fmt"   - bitrate: {fileInfo.bitrate}"
 
 proc printJsonInfo(fileInfo: MediaInfo) =
@@ -88,7 +93,14 @@ judge making cuts.
 """
     quit(0)
 
-  if paramCount() < 2 or paramStr(1) != "info":
+  if paramCount() < 2:
+    quit(1)
+
+  if paramStr(1) == "levels":
+    levels.main(paramStr(2))
+    quit(0)
+  elif paramStr(1) != "info":
+    echo "unknown subcommand"
     quit(1)
 
   let inputFile = paramStr(2)
@@ -99,19 +111,9 @@ judge making cuts.
   else:
     isJson = false
 
-  var formatContext: ptr AVFormatContext
-
-  if avformat_open_input(addr formatContext, inputFile.cstring, nil, nil) != 0:
-    echo "Could not open input file: ", inputFile
-    quit(1)
-
-  if avformat_find_stream_info(formatContext, nil) < 0:
-    echo "Could not find stream information"
-    avformat_close_input(addr formatContext)
-    quit(1)
-
-  let MediaInfo = initMediaInfo(formatContext, inputFile)
-  avformat_close_input(addr formatContext)
+  var container = av.open(inputFile)
+  let MediaInfo = initMediaInfo(container.formatContext, inputFile)
+  container.close()
 
   if isJson:
     printJsonInfo(MediaInfo)

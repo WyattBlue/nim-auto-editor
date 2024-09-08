@@ -144,7 +144,7 @@ const
   AVMEDIA_TYPE_AUDIO* = AVMediaType(1)
   AVMEDIA_TYPE_SUBTITLE* = AVMediaType(2)
   AV_TIME_BASE* = 1000000
-
+  AV_NOPTS_VALUE* = -9223372036854775807'i64 - 1
 
 # Procedure declarations remain the same
 proc avformat_open_input*(ps: ptr ptr AVFormatContext, filename: cstring, fmt: pointer, options: pointer): cint {.importc, header: "<libavformat/avformat.h>".}
@@ -160,3 +160,28 @@ proc av_get_channel_layout_string*(buf: cstring, buf_size: cint, nb_channels: ci
 proc av_get_pix_fmt_name*(pix_fmt: AVPixelFormat): cstring {.importc, cdecl.}
 proc av_dict_get*(m: ptr AVDictionary, key: cstring, prev: ptr AVDictionaryEntry, flags: cint): ptr AVDictionaryEntry {.importc, header: "<libavutil/dict.h>".}
 proc av_channel_layout_describe*(ch_layout: ptr AVChannelLayout, buf: cstring, buf_size: csize_t): cint {.importc, header: "<libavutil/channel_layout.h>".}
+
+#proc av_read_frame*(s: ptr AVFormatContext, pkt: ptr AVPacket): cint {.importc, cdecl.}
+#proc av_packet_unref*(pkt: ptr AVPacket) {.importc, cdecl.}
+
+# FIFO
+type
+  AVAudioFifo* {.importc, header: "<libavutil/audio_fifo.h>".} = object
+
+  AVSampleFormat* {.importc, header: "<libavutil/samplefmt.h>".} = enum
+    AV_SAMPLE_FMT_NONE = -1,
+    AV_SAMPLE_FMT_U8,
+    AV_SAMPLE_FMT_S16,
+    AV_SAMPLE_FMT_S32,
+    AV_SAMPLE_FMT_FLT,
+    AV_SAMPLE_FMT_DBL,
+    # ... add other sample formats as needed
+
+# Audio FIFO function declarations
+proc av_audio_fifo_alloc*(sample_fmt: AVSampleFormat, channels: cint, nb_samples: cint): ptr AVAudioFifo {.importc, cdecl.}
+proc av_audio_fifo_free*(af: ptr AVAudioFifo) {.importc, cdecl.}
+proc av_audio_fifo_write*(af: ptr AVAudioFifo, data: pointer, nb_samples: cint): cint {.importc, cdecl.}
+proc av_audio_fifo_read*(af: ptr AVAudioFifo, data: pointer, nb_samples: cint): cint {.importc, cdecl.}
+proc av_audio_fifo_size*(af: ptr AVAudioFifo): cint {.importc, cdecl.}
+proc av_audio_fifo_drain*(af: ptr AVAudioFifo, nb_samples: cint): cint {.importc, cdecl.}
+proc av_audio_fifo_reset*(af: ptr AVAudioFifo) {.importc, cdecl.}

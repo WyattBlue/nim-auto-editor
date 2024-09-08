@@ -77,12 +77,16 @@ proc make_sane_timebase(fps: AVRational): string =
 
 proc initMediaInfo(formatContext: ptr AVFormatContext, path: string): MediaInfo =
   result.path = path
-  result.duration = float(formatContext.duration) / AV_TIME_BASE
-  result.bitrate = formatContext.bit_rate
   result.v = @[]
   result.a = @[]
   result.s = @[]
   result.d = @[]
+
+  result.bitrate = formatContext.bit_rate
+  if formatContext.duration != AV_NOPTS_VALUE:
+    result.duration = float64(formatContext.duration) / AV_TIME_BASE
+  else:
+    result.duration =  0.0
 
   var lang: string
   for i in 0 ..< formatContext.nb_streams.int:
@@ -97,9 +101,15 @@ proc initMediaInfo(formatContext: ptr AVFormatContext, path: string): MediaInfo 
     else:
       lang = "und"
 
+    var duration: float64
+    if stream.duration == AV_NOPTS_VALUE:
+      duration = 0.0
+    else:
+      duration = float(stream.duration) * av_q2d(stream.time_base)
+
     if codecParameters.codec_type == AVMEDIA_TYPE_VIDEO:
       result.v.add(VideoStream(
-        duration: float(stream.duration) * av_q2d(stream.time_base),
+        duration: duration,
         bitrate: codecContext.bit_rate,
         codec: $avcodec_get_name(codecContext.codec_id),
         lang: lang,
@@ -119,7 +129,7 @@ proc initMediaInfo(formatContext: ptr AVFormatContext, path: string): MediaInfo 
       discard av_channel_layout_describe(addr codecContext.ch_layout, cast[cstring](addr layout[0]), sizeof(layout).csize_t)
 
       result.a.add(AudioStream(
-        duration: float(stream.duration) * av_q2d(stream.time_base),
+        duration: duration,
         bitrate: codecContext.bit_rate,
         codec: $avcodec_get_name(codecContext.codec_id),
         lang: lang,
@@ -128,7 +138,7 @@ proc initMediaInfo(formatContext: ptr AVFormatContext, path: string): MediaInfo 
       ))
     elif codecParameters.codec_type == AVMEDIA_TYPE_SUBTITLE:
       result.s.add(SubtitleStream(
-        duration: float(stream.duration) * av_q2d(stream.time_base),
+        duration: duration,
         bitrate: codecContext.bit_rate,
         codec: $avcodec_get_name(codecContext.codec_id),
         lang: lang,
