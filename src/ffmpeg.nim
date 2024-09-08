@@ -1,7 +1,5 @@
-import os
-
-{.passC: "-I" & getEnv("HOME") & "/ffmpeg_build/include".}
-{.passL: "-L" & getEnv("HOME") & "/ffmpeg_build/lib -lavformat -lavcodec -lavutil".}
+{.passC: "-I./ffmpeg_build/include".}
+{.passL: "-L./ffmpeg_build/lib -lavformat -lavcodec -lavutil -lswresample".}
 
 type
   AVMediaType* = cint

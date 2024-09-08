@@ -1,18 +1,10 @@
-FFMPEG_PREFIX = ./ffmpeg_build
-FFMPEG_INCLUDE = $(FFMPEG_PREFIX)/include
-FFMPEG_LIB = $(FFMPEG_PREFIX)/lib
-
 TARGET = auto-editor
-NIM_SRC = src/main.nim
+ALL_SRCS = $(wildcard src/*.nim)
 
 all: $(TARGET)
 
-$(TARGET): $(NIM_SRC) src/ffmpeg.nim
-	nim c -d:debug --out:$(TARGET) \
-		--passC:"-I$(FFMPEG_INCLUDE)" \
-		--passL:"-L$(FFMPEG_LIB) -lavformat -lavcodec -lavutil -lswresample" \
-		--passC:"-Wno-implicit-function-declaration" \
-		$(NIM_SRC)
+$(TARGET): $(ALL_SRCS)
+	nim c -d:danger --out:$(TARGET) src/main.nim
 ifeq ($(shell uname),Darwin)
 	strip -ur $(TARGET) && du --si -A $(TARGET)
 else
