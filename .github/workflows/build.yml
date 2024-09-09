@@ -26,7 +26,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential pkg-config yasm git
       - name: Build FFmpeg
-        run: ./compile_ffmpeg.sh
+        run: make setup
       - name: Compile
         run: make
       - name: Test

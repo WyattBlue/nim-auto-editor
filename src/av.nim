@@ -2,7 +2,7 @@ import ffmpeg
 import sequtils
 
 type
-  Stream* = ref object of RootObj
+  Stream* = ref object
     index*: int
     codecContext*: ptr AVCodecContext
     timeBase*: AVRational

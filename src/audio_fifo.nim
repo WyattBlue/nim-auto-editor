@@ -20,14 +20,14 @@ proc finalizeAudioFifo(fifo: AudioFifo) =
     av_audio_fifo_free(fifo.fifo)
     fifo.fifo = nil
 
-proc write*(fifo: AudioFifo, data: pointer, size: cint): cint =
-  result = av_audio_fifo_write(fifo.fifo, data, size)
-  if result < 0:
+proc write*(fifo: AudioFifo, data: pointer, size: cint): void =
+  let ret = av_audio_fifo_write(fifo.fifo, data, size)
+  if ret < 0:
     raise newException(IOError, "Failed to write to AudioFifo")
 
-proc read*(fifo: AudioFifo, data: pointer, size: cint): cint =
-  result = av_audio_fifo_read(fifo.fifo, data, size)
-  if result < 0:
+proc read*(fifo: AudioFifo, data: pointer, size: cint): void =
+  let ret = av_audio_fifo_read(fifo.fifo, data, size)
+  if ret < 0:
     raise newException(IOError, "Failed to read from AudioFifo")
 
 proc samples*(fifo: AudioFifo): cint =

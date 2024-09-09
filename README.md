@@ -11,6 +11,6 @@ Nim produces a much tinier standalone binary than Python w/ pyinstaller. Nim is 
 You will need [the Nim compiler](https://nim-lang.org/), a Unix environment, and `make`.
 
 ```
-./compile_ffmpeg.sh
+make setup
 make
 ```
