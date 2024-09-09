@@ -66,6 +66,7 @@ proc main*(inputFile: string) =
           nil, codecContext.ch_layout.nb_channels, frame.nb_samples, codecContext.sample_fmt, 1
         )
         if frame.data[0] != nil:
+          echo frame.nb_samples.int
           fifo.write(frame.data[0], frame.nb_samples)
 
         av_frame_unref(frame)
