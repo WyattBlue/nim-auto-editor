@@ -27,7 +27,8 @@ proc newStream(streamPtr: ptr AVStream): Stream =
 proc open*(filename: string): InputContainer =
   result = InputContainer()
 
-  if avformat_open_input(addr result.formatContext, filename.cstring, nil, nil) != 0:
+  if avformat_open_input(addr result.formatContext, filename.cstring, nil,
+      nil) != 0:
     raise newException(IOError, "Could not open input file: " & filename)
 
   if avformat_find_stream_info(result.formatContext, nil) < 0:

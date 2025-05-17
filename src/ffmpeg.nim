@@ -21,7 +21,8 @@ type
     key*: cstring
     value*: cstring
 
-  AVChannelLayout* {.importc, header: "<libavutil/channel_layout.h>", bycopy.} = object
+  AVChannelLayout* {.importc, header: "<libavutil/channel_layout.h>",
+      bycopy.} = object
     order*: cint
     nb_channels*: cint
     u*: AVChannelLayoutMask
@@ -96,7 +97,8 @@ type
     trailing_padding*: cint
     seek_preroll*: cint
 
-  AVSampleFormat* {.importc: "enum AVSampleFormat", header: "<libavutil/samplefmt.h>".} = enum
+  AVSampleFormat* {.importc: "enum AVSampleFormat",
+      header: "<libavutil/samplefmt.h>".} = enum
     AV_SAMPLE_FMT_NONE = -1,
     AV_SAMPLE_FMT_U8,
     AV_SAMPLE_FMT_S16,
@@ -151,19 +153,35 @@ const
   AV_NOPTS_VALUE* = -9223372036854775807'i64 - 1
 
 # Procedure declarations remain the same
-proc avformat_open_input*(ps: ptr ptr AVFormatContext, filename: cstring, fmt: pointer, options: pointer): cint {.importc, header: "<libavformat/avformat.h>".}
-proc avformat_find_stream_info*(ic: ptr AVFormatContext, options: pointer): cint {.importc, header: "<libavformat/avformat.h>".}
-proc avformat_close_input*(s: ptr ptr AVFormatContext) {.importc, header: "<libavformat/avformat.h>".}
-proc av_mul_q*(b: AVRational, c: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
-proc av_q2d*(a: AVRational): cdouble {.importc, header: "<libavutil/rational.h>".}
-proc avcodec_parameters_to_context*(codec_ctx: ptr AVCodecContext, par: ptr AVCodecParameters): cint {.importc, header: "<libavcodec/avcodec.h>".}
-proc avcodec_alloc_context3*(codec: pointer): ptr AVCodecContext {.importc, header: "<libavcodec/avcodec.h>".}
-proc avcodec_free_context*(avctx: ptr ptr AVCodecContext) {.importc, header: "<libavcodec/avcodec.h>".}
-proc avcodec_get_name*(id: AVCodecID): cstring {.importc, header: "<libavcodec/avcodec.h>".}
-proc av_get_channel_layout_string*(buf: cstring, buf_size: cint, nb_channels: cint, channel_layout: uint64): cstring {.importc, header: "<libavutil/channel_layout.h>".}
+proc avformat_open_input*(ps: ptr ptr AVFormatContext, filename: cstring,
+    fmt: pointer, options: pointer): cint {.importc,
+    header: "<libavformat/avformat.h>".}
+proc avformat_find_stream_info*(ic: ptr AVFormatContext,
+    options: pointer): cint {.importc, header: "<libavformat/avformat.h>".}
+proc avformat_close_input*(s: ptr ptr AVFormatContext) {.importc,
+    header: "<libavformat/avformat.h>".}
+proc av_mul_q*(b: AVRational, c: AVRational): AVRational {.importc,
+    header: "<libavutil/rational.h>".}
+proc av_q2d*(a: AVRational): cdouble {.importc,
+    header: "<libavutil/rational.h>".}
+proc avcodec_parameters_to_context*(codec_ctx: ptr AVCodecContext,
+    par: ptr AVCodecParameters): cint {.importc,
+    header: "<libavcodec/avcodec.h>".}
+proc avcodec_alloc_context3*(codec: pointer): ptr AVCodecContext {.importc,
+    header: "<libavcodec/avcodec.h>".}
+proc avcodec_free_context*(avctx: ptr ptr AVCodecContext) {.importc,
+    header: "<libavcodec/avcodec.h>".}
+proc avcodec_get_name*(id: AVCodecID): cstring {.importc,
+    header: "<libavcodec/avcodec.h>".}
+proc av_get_channel_layout_string*(buf: cstring, buf_size: cint,
+    nb_channels: cint, channel_layout: uint64): cstring {.importc,
+    header: "<libavutil/channel_layout.h>".}
 proc av_get_pix_fmt_name*(pix_fmt: AVPixelFormat): cstring {.importc, cdecl.}
-proc av_dict_get*(m: ptr AVDictionary, key: cstring, prev: ptr AVDictionaryEntry, flags: cint): ptr AVDictionaryEntry {.importc, header: "<libavutil/dict.h>".}
-proc av_channel_layout_describe*(ch_layout: ptr AVChannelLayout, buf: cstring, buf_size: csize_t): cint {.importc, header: "<libavutil/channel_layout.h>".}
+proc av_dict_get*(m: ptr AVDictionary, key: cstring,
+    prev: ptr AVDictionaryEntry, flags: cint): ptr AVDictionaryEntry {.importc,
+    header: "<libavutil/dict.h>".}
+proc av_channel_layout_describe*(ch_layout: ptr AVChannelLayout, buf: cstring,
+    buf_size: csize_t): cint {.importc, header: "<libavutil/channel_layout.h>".}
 
 type AVCodec* {.importc, header: "<libavcodec/codec.h>", bycopy.} = object
   capabilities*: cint
@@ -171,22 +189,23 @@ type AVCodec* {.importc, header: "<libavcodec/codec.h>", bycopy.} = object
 
 type
   AVPacket* {.importc, header: "<libavcodec/packet.h>", bycopy.} = object
-    buf*: pointer           # reference counted buffer holding the data
-    pts*: int64             # presentation timestamp in time_base units
-    dts*: int64             # decompression timestamp in time_base units
-    data*: ptr uint8        # data pointer
-    size*: cint             # size of data in bytes
-    stream_index*: cint     # stream index this packet belongs to
+    buf*: pointer          # reference counted buffer holding the data
+    pts*: int64            # presentation timestamp in time_base units
+    dts*: int64            # decompression timestamp in time_base units
+    data*: ptr uint8       # data pointer
+    size*: cint            # size of data in bytes
+    stream_index*: cint    # stream index this packet belongs to
     flags*: cint
-    side_data*: pointer     # pointer to array of side data
-    side_data_elems*: cint  # number of side data elements
-    duration*: int64        # duration of this packet in time_base units, 0 if unknown
-    pos*: int64             # byte position in stream, -1 if unknown
-    opaque*: pointer        # time when packet is created
-    opaque_ref*: pointer    # reference to opaque
-    time_base*: AVRational  # time base of the packet
+    side_data*: pointer    # pointer to array of side data
+    side_data_elems*: cint # number of side data elements
+    duration*: int64       # duration of this packet in time_base units, 0 if unknown
+    pos*: int64            # byte position in stream, -1 if unknown
+    opaque*: pointer       # time when packet is created
+    opaque_ref*: pointer   # reference to opaque
+    time_base*: AVRational # time base of the packet
 
-  AVFrame* {.importc: "AVFrame", header: "<libavutil/frame.h>", bycopy.} = object
+  AVFrame* {.importc: "AVFrame", header: "<libavutil/frame.h>",
+      bycopy.} = object
     data*: array[8, ptr uint8]
     linesize*: array[8, cint]
     extended_data*: ptr ptr uint8
@@ -233,7 +252,8 @@ type
     crop_right*: csize_t
     # private_ref*: ptr AVBufferRef
 
-  AVPictureType* {.importc: "enum AVPictureType", header: "<libavutil/avutil.h>".} = enum
+  AVPictureType* {.importc: "enum AVPictureType",
+      header: "<libavutil/avutil.h>".} = enum
     AV_PICTURE_TYPE_NONE = 0,
     AV_PICTURE_TYPE_I,
     AV_PICTURE_TYPE_P,
@@ -248,13 +268,15 @@ type
   #   data*: ptr uint8
   #   size*: cint
 
-  AVFrameSideData* {.importc: "AVFrameSideData", header: "<libavutil/frame.h>", bycopy.} = object
+  AVFrameSideData* {.importc: "AVFrameSideData", header: "<libavutil/frame.h>",
+      bycopy.} = object
     `type`*: AVFrameSideDataType
     data*: ptr uint8
     size*: cint
     metadata*: ptr AVDictionary
 
-  AVFrameSideDataType* {.importc: "enum AVFrameSideDataType", header: "<libavutil/frame.h>".} = enum
+  AVFrameSideDataType* {.importc: "enum AVFrameSideDataType",
+      header: "<libavutil/frame.h>".} = enum
     AV_FRAME_DATA_PANSCAN,
     AV_FRAME_DATA_A53_CC,
     AV_FRAME_DATA_STEREO3D,
@@ -285,27 +307,42 @@ type
     AV_FRAME_DATA_DYNAMIC_HDR_VIVID
 
 # Packets
-proc av_packet_alloc*(): ptr AVPacket {.importc, header: "<libavcodec/packet.h>".}
-proc av_packet_free*(pkt: ptr ptr AVPacket) {.importc, header: "<libavcodec/packet.h>".}
-proc av_init_packet*(pkt: ptr AVPacket) {.importc, header: "<libavcodec/packet.h>".}
+proc av_packet_alloc*(): ptr AVPacket {.importc,
+    header: "<libavcodec/packet.h>".}
+proc av_packet_free*(pkt: ptr ptr AVPacket) {.importc,
+    header: "<libavcodec/packet.h>".}
+proc av_init_packet*(pkt: ptr AVPacket) {.importc,
+    header: "<libavcodec/packet.h>".}
 proc av_packet_unref*(pkt: ptr AVPacket) {.importc, cdecl.}
-proc av_packet_ref*(dst: ptr AVPacket, src: ptr AVPacket): cint {.importc, header: "<libavcodec/packet.h>".}
+proc av_packet_ref*(dst: ptr AVPacket, src: ptr AVPacket): cint {.importc,
+    header: "<libavcodec/packet.h>".}
 
 # Frames
-proc avcodec_send_packet*(avctx: ptr AVCodecContext, avpkt: ptr AVPacket): cint {.importc, header: "<libavcodec/avcodec.h>".}
-proc avcodec_receive_frame*(avctx: ptr AVCodecContext, frame: ptr AVFrame): cint {.importc, header: "<libavcodec/avcodec.h>".}
+proc avcodec_send_packet*(avctx: ptr AVCodecContext,
+    avpkt: ptr AVPacket): cint {.importc, header: "<libavcodec/avcodec.h>".}
+proc avcodec_receive_frame*(avctx: ptr AVCodecContext,
+    frame: ptr AVFrame): cint {.importc, header: "<libavcodec/avcodec.h>".}
 proc av_read_frame*(s: ptr AVFormatContext, pkt: ptr AVPacket): cint {.importc, cdecl.}
 proc av_frame_alloc*(): ptr AVFrame {.importc, header: "<libavutil/frame.h>".}
-proc av_frame_free*(frame: ptr ptr AVFrame) {.importc, header: "<libavutil/frame.h>".}
-proc av_frame_unref*(frame: ptr AVFrame) {.importc, header: "<libavutil/frame.h>".}
-proc av_frame_get_buffer*(frame: ptr AVFrame, align: cint): cint {.importc, header: "<libavutil/frame.h>".}
-proc av_frame_is_writable*(frame: ptr AVFrame): cint {.importc, header: "<libavutil/frame.h>".}
-proc av_frame_make_writable*(frame: ptr AVFrame): cint {.importc, header: "<libavutil/frame.h>".}
+proc av_frame_free*(frame: ptr ptr AVFrame) {.importc,
+    header: "<libavutil/frame.h>".}
+proc av_frame_unref*(frame: ptr AVFrame) {.importc,
+    header: "<libavutil/frame.h>".}
+proc av_frame_get_buffer*(frame: ptr AVFrame, align: cint): cint {.importc,
+    header: "<libavutil/frame.h>".}
+proc av_frame_is_writable*(frame: ptr AVFrame): cint {.importc,
+    header: "<libavutil/frame.h>".}
+proc av_frame_make_writable*(frame: ptr AVFrame): cint {.importc,
+    header: "<libavutil/frame.h>".}
 
 # Codec
-proc avcodec_find_decoder*(codec_id: AVCodecID): ptr AVCodec {.importc, header: "<libavcodec/avcodec.h>".}
-proc avcodec_open2*(avctx: ptr AVCodecContext, codec: ptr AVCodec, options: ptr ptr AVDictionary): cint {.importc, header: "<libavcodec/avcodec.h>".}
-proc avcodec_close*(avctx: ptr AVCodecContext): cint {.importc, header: "<libavcodec/avcodec.h>".}
+proc avcodec_find_decoder*(codec_id: AVCodecID): ptr AVCodec {.importc,
+    header: "<libavcodec/avcodec.h>".}
+proc avcodec_open2*(avctx: ptr AVCodecContext, codec: ptr AVCodec,
+    options: ptr ptr AVDictionary): cint {.importc,
+    header: "<libavcodec/avcodec.h>".}
+proc avcodec_close*(avctx: ptr AVCodecContext): cint {.importc,
+    header: "<libavcodec/avcodec.h>".}
 
 # Error
 proc AVERROR*(e: cint): cint {.inline.} = (-e)
@@ -317,13 +354,22 @@ type
   AVAudioFifo* {.importc, header: "<libavutil/audio_fifo.h>".} = object
 
 # Audio FIFO function declarations
-proc av_audio_fifo_alloc*(sample_fmt: AVSampleFormat, channels: cint, nb_samples: cint): ptr AVAudioFifo {.importc, cdecl, header: "<libavutil/audio_fifo.h>".}
+proc av_audio_fifo_alloc*(sample_fmt: AVSampleFormat, channels: cint,
+    nb_samples: cint): ptr AVAudioFifo {.importc, cdecl,
+    header: "<libavutil/audio_fifo.h>".}
 proc av_audio_fifo_free*(af: ptr AVAudioFifo) {.importc, cdecl.}
-proc av_audio_fifo_write*(af: ptr AVAudioFifo, data: pointer, nb_samples: cint): cint {.importc, cdecl, header: "<libavutil/audio_fifo.h>".}
-proc av_audio_fifo_read*(af: ptr AVAudioFifo, data: pointer, nb_samples: cint): cint {.importc, cdecl, header: "<libavutil/audio_fifo.h>".}
+proc av_audio_fifo_write*(af: ptr AVAudioFifo, data: pointer,
+    nb_samples: cint): cint {.importc, cdecl,
+    header: "<libavutil/audio_fifo.h>".}
+proc av_audio_fifo_read*(af: ptr AVAudioFifo, data: pointer,
+    nb_samples: cint): cint {.importc, cdecl,
+    header: "<libavutil/audio_fifo.h>".}
 proc av_audio_fifo_size*(af: ptr AVAudioFifo): cint {.importc, cdecl.}
-proc av_audio_fifo_drain*(af: ptr AVAudioFifo, nb_samples: cint): cint {.importc, cdecl.}
+proc av_audio_fifo_drain*(af: ptr AVAudioFifo,
+    nb_samples: cint): cint {.importc, cdecl.}
 proc av_audio_fifo_reset*(af: ptr AVAudioFifo) {.importc, cdecl.}
 
 proc av_get_bytes_per_sample*(sample_fmt: AVSampleFormat): cint {.importc, cdecl.}
-proc av_samples_get_buffer_size*(linesize: ptr cint, nb_channels: cint, nb_samples: cint, sample_fmt: AVSampleFormat, align: cint): cint {.importc, header: "<libavutil/samplefmt.h>".}
+proc av_samples_get_buffer_size*(linesize: ptr cint, nb_channels: cint,
+    nb_samples: cint, sample_fmt: AVSampleFormat, align: cint): cint {.importc,
+    header: "<libavutil/samplefmt.h>".}

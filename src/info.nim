@@ -65,14 +65,18 @@ proc printJsonInfo(fileInfo: MediaInfo) =
 
   for v in fileInfo.v:
     varr.add(
-      %* {"codec": v.codec, "fps": v.avg_rate.fracToHuman, "resolution": [v.width, v.height], "timebase": v.timebase, "bitrate": v.bitrate, "lang": v.lang}
+      %* {"codec": v.codec, "fps": v.avg_rate.fracToHuman, "resolution": [
+          v.width, v.height], "timebase": v.timebase, "bitrate": v.bitrate,
+          "lang": v.lang}
     )
 
   for a in fileInfo.a:
-    aarr.add( %* {"codec": a.codec, "layout": a.layout, "samplerate": a.sampleRate, "duration": a.duration, "bitrate": a.bitrate, "lang": a.lang})
+    aarr.add( %* {"codec": a.codec, "layout": a.layout,
+        "samplerate": a.sampleRate, "duration": a.duration,
+        "bitrate": a.bitrate, "lang": a.lang})
 
   for s in fileInfo.s:
-    sarr.add(%* s)
+    sarr.add( %* s)
 
   var content = %* {
     "type": "media",

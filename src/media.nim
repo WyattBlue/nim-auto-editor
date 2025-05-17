@@ -75,7 +75,8 @@ proc make_sane_timebase(fps: AVRational): string =
 
   return $fps.num & "/" & $fps.den
 
-proc initMediaInfo(formatContext: ptr AVFormatContext, path: string): MediaInfo =
+proc initMediaInfo(formatContext: ptr AVFormatContext,
+    path: string): MediaInfo =
   result.path = path
   result.v = @[]
   result.a = @[]
@@ -86,7 +87,7 @@ proc initMediaInfo(formatContext: ptr AVFormatContext, path: string): MediaInfo 
   if formatContext.duration != AV_NOPTS_VALUE:
     result.duration = float64(formatContext.duration) / AV_TIME_BASE
   else:
-    result.duration =  0.0
+    result.duration = 0.0
 
   var lang: string
   for i in 0 ..< formatContext.nb_streams.int:
@@ -95,7 +96,8 @@ proc initMediaInfo(formatContext: ptr AVFormatContext, path: string): MediaInfo 
     var codecContext = avcodec_alloc_context3(nil)
     discard avcodec_parameters_to_context(codecContext, codecParameters)
 
-    var entry = av_dict_get(cast[ptr AVDictionary](stream.metadata), "language", nil, 0)
+    var entry = av_dict_get(cast[ptr AVDictionary](stream.metadata), "language",
+        nil, 0)
     if entry != nil:
       lang = $entry.value
     else:
@@ -126,7 +128,8 @@ proc initMediaInfo(formatContext: ptr AVFormatContext, path: string): MediaInfo 
       ))
     elif codecParameters.codec_type == AVMEDIA_TYPE_AUDIO:
       var layout: array[64, char]
-      discard av_channel_layout_describe(addr codecContext.ch_layout, cast[cstring](addr layout[0]), sizeof(layout).csize_t)
+      discard av_channel_layout_describe(addr codecContext.ch_layout, cast[
+          cstring](addr layout[0]), sizeof(layout).csize_t)
 
       result.a.add(AudioStream(
         duration: duration,

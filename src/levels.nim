@@ -30,13 +30,15 @@ proc main*(inputFile: string) =
   defer: discard avcodec_close(codecContext)
 
   # Create an AudioFifo
-  var fifo = newAudioFifo(codecContext.sample_fmt, codecContext.ch_layout.nb_channels)
+  var fifo = newAudioFifo(codecContext.sample_fmt,
+      codecContext.ch_layout.nb_channels)
   if fifo == nil:
     echo "Failed to create AudioFifo."
     quit(1)
 
   # Allocate a buffer for reading audio samples
-  let bufferSize = 1024 * codecContext.ch_layout.nb_channels * av_get_bytes_per_sample(codecContext.sample_fmt)
+  let bufferSize = 1024 * codecContext.ch_layout.nb_channels *
+      av_get_bytes_per_sample(codecContext.sample_fmt)
   var buffer = newSeq[uint8](bufferSize)
 
   # Read some audio data and write it to the FIFO
@@ -63,7 +65,8 @@ proc main*(inputFile: string) =
           break
 
         let dataSize = av_samples_get_buffer_size(
-          nil, codecContext.ch_layout.nb_channels, frame.nb_samples, codecContext.sample_fmt, 1
+          nil, codecContext.ch_layout.nb_channels, frame.nb_samples,
+          codecContext.sample_fmt, 1
         )
         if frame.data[0] != nil:
           echo frame.nb_samples.int
@@ -81,7 +84,8 @@ proc main*(inputFile: string) =
   var totalSamplesRead = 0
   while fifo.samples > 0:
     let samplesToRead = min(1024, fifo.samples)
-    let bytesToRead = samplesToRead * codecContext.ch_layout.nb_channels * av_get_bytes_per_sample(AVSampleFormat(codecContext.sample_fmt))
+    let bytesToRead = samplesToRead * codecContext.ch_layout.nb_channels *
+        av_get_bytes_per_sample(AVSampleFormat(codecContext.sample_fmt))
     if buffer.len > 0:
       fifo.read(addr buffer[0], samplesToRead)
       totalSamplesRead += samplesToRead
