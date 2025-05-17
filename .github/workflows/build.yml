@@ -24,11 +24,11 @@ jobs:
       - name: Setup
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config yasm git
+          sudo apt-get install -y build-essential pkg-config nasm git
       - name: Build FFmpeg
-        run: make setup
+        run: nimble makeffmpeg
       - name: Compile
-        run: make
+        run: nimble make
       - name: Test
         run: ./auto-editor info example.mp4
 

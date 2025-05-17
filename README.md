@@ -5,12 +5,12 @@ This is Auto-Editor, written in the Nim programming language.
 ---
 
 ## Why Nim?
-Nim produces a much tinier standalone binary than Python w/ pyinstaller. Nim is faster and has a better type checker.
+Nim produces a much smaller standalone binary than Python or pyinstaller. Nim is also faster thanks to its static typing.
 
 ## Building
-You will need [the Nim compiler](https://nim-lang.org/), a Unix environment, and `make`.
+You will need [the Nim compiler](https://nim-lang.org/), a Unix environment.
 
 ```
-make setup
-make
+nimble makeffmpeg
+nimble make
 ```
