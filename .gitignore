@@ -4,3 +4,4 @@ auto-editor
 .DS_Store
 ffmpeg_build
 ffmpeg_sources
+.vscode
