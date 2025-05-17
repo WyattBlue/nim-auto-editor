@@ -18,6 +18,10 @@ task make, "Export the project":
 
 import os
 
+task cleanff, "Remove":
+  rmDir("ffmpeg_sources")
+  rmDir("ffmpeg_build")
+
 task makeFFmpeg, "Build FFmpeg from source":
   # Create directories
   mkDir("ffmpeg_sources")
@@ -47,6 +51,8 @@ task makeFFmpeg, "Build FFmpeg from source":
               --disable-indevs \
               --disable-outdevs \
               --disable-xlib \
+              --disable-encoder=avui,dca,mlp,opus,s302m,sonic,sonic_ls,truehd,vorbis \
+              --disable-decoder=sonic \
               --disable-autodetect
   """
 
