@@ -22,7 +22,7 @@ task cleanff, "Remove":
   rmDir("ffmpeg_sources")
   rmDir("ffmpeg_build")
 
-task makeFFmpeg, "Build FFmpeg from source":
+task makeff, "Build FFmpeg from source":
   # Create directories
   mkDir("ffmpeg_sources")
   mkDir("ffmpeg_build")

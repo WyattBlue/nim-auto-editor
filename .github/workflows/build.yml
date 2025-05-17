@@ -35,7 +35,7 @@ jobs:
             brew install nasm
           fi
       - name: Build FFmpeg
-        run: nimble makeffmpeg
+        run: nimble makeff
       - name: Compile
         run: nimble make
       - name: Test
