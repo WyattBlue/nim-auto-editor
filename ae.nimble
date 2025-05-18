@@ -69,3 +69,8 @@ task makeff, "Build FFmpeg from source":
     exec "make -j4" # Default to 4 cores
 
   exec "make install"
+
+task windows, "Cross-compile to Windows (requires mingw-w64)":
+  echo "Cross-compiling for Windows (64-bit)..."
+  # Use the MinGW cross-compiler explicitly
+  exec "nim c -d:danger --os:windows --cpu:amd64 --cc:gcc --gcc.exe:x86_64-w64-mingw32-gcc --gcc.linkerexe:x86_64-w64-mingw32-gcc --passL:-static --out:auto-editor.exe src/main.nim"

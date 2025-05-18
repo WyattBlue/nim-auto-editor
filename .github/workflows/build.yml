@@ -40,4 +40,24 @@ jobs:
         run: nimble make
       - name: Test
         run: ./auto-editor info example.mp4
+  cross-compile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Nim
+        uses: iffy/install-nim@v5
+        with:
+          version: binary:stable
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install mingw-w64
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mingw-w64 mingw-w64-tools mingw-w64-x86-64-dev
+          sudo apt-get install -y build-essential pkg-config nasm git
+      - name: Build FFmpeg
+        run: nimble makeff
+      - name: Compile
+        run: nimble windows
 
