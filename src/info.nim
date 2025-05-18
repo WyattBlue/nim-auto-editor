@@ -28,6 +28,7 @@ func aspectRatio(width, height: int): tuple[w, h: int] =
 
 proc printYamlInfo(fileInfo: MediaInfo) =
   echo fileInfo.path, ":"
+  echo fmt" - recommendedTimebase: {fileInfo.recommendedTimebase}"
 
   if fileInfo.v.len > 0:
     echo fmt" - video:"
@@ -74,7 +75,8 @@ proc printYamlInfo(fileInfo: MediaInfo) =
     echo fmt"   - duration: {fileInfo.duration:.1f}"
   echo fmt"   - bitrate: {fileInfo.bitrate}"
 
-proc printJsonInfo(fileInfo: MediaInfo) =
+
+func getJsonInfo(fileInfo: MediaInfo): JsonNode =
   var
     varr: seq[JsonNode] = @[]
     aarr: seq[JsonNode] = @[]
@@ -87,6 +89,13 @@ proc printJsonInfo(fileInfo: MediaInfo) =
       "fps": v.avg_rate.fracToHuman,
       "resolution": [v.width, v.height],
       "aspect_ratio": [ratioWidth, ratioHeight],
+      "pixel_aspect_ratio": v.sar,
+      "duration": v.duration,
+      "pix_fmt": v.pix_fmt,
+      "color_range": v.color_range,
+      "color_space": v.color_space,
+      "color_primaries": v.color_primaries,
+      "color_transfer": v.color_trc,
       "timebase": v.timebase,
       "bitrate": v.bitrate,
       "lang": v.lang
@@ -111,8 +120,7 @@ proc printJsonInfo(fileInfo: MediaInfo) =
       "bitrate": fileInfo.bitrate
     }
   }
-  var j = %* {fileInfo.path: content}
-  echo pretty(j)
+  result = %* {fileInfo.path: content}
 
 
 proc main*(args: seq[string]) =
@@ -133,6 +141,6 @@ proc main*(args: seq[string]) =
   container.close()
 
   if isJson:
-    printJsonInfo(MediaInfo)
+    echo pretty(getJsonInfo(MediaInfo))
   else:
     printYamlInfo(MediaInfo)
