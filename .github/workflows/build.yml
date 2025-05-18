@@ -60,4 +60,8 @@ jobs:
         run: nimble makeffwin
       - name: Compile
         run: nimble windows
-
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: win-auto-editor
+          path: auto-editor.exe
