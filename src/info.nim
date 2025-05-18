@@ -11,17 +11,34 @@ proc genericTrack(lang: string, bitrate: int) =
     echo fmt"     - lang: {lang}"
 
 
+func aspectRatio(width, height: int): tuple[w, h: int] =
+  if height == 0:
+    return (0, 0)
+
+  func gcd(a, b: int): int =
+    var
+      x = a
+      y = b
+    while y != 0:
+      (x, y) = (y, x mod y)
+    return x
+
+  let c = gcd(width, height)
+  return (width div c, height div c)
+
 proc printYamlInfo(fileInfo: MediaInfo) =
   echo fileInfo.path, ":"
 
   if fileInfo.v.len > 0:
     echo fmt" - video:"
   for track, v in enumerate(fileInfo.v):
+    let (ratioWidth, ratioHeight) = aspectRatio(v.width, v.height)
+
     echo fmt"   - track {track}:"
     echo fmt"     - codec: {v.codec}"
     echo fmt"     - fps: {v.avg_rate.num}/{v.avg_rate.den}"
     echo fmt"     - resolution: {v.width}x{v.height}"
-    # echo fmt"     - aspect ratio: {v.aspectRatio}"
+    echo fmt"     - aspect ratio: {ratioWidth}:{ratioHeight}"
     echo fmt"     - pixel aspect ratio: {v.sar}"
     if v.duration != 0.0:
       echo fmt"     - duration: {v.duration:.1f}"
@@ -64,11 +81,16 @@ proc printJsonInfo(fileInfo: MediaInfo) =
     sarr: seq[JsonNode] = @[]
 
   for v in fileInfo.v:
-    varr.add(
-      %* {"codec": v.codec, "fps": v.avg_rate.fracToHuman, "resolution": [
-          v.width, v.height], "timebase": v.timebase, "bitrate": v.bitrate,
-          "lang": v.lang}
-    )
+    let (ratioWidth, ratioHeight) = aspectRatio(v.width, v.height)
+    varr.add( %* {
+      "codec": v.codec,
+      "fps": v.avg_rate.fracToHuman,
+      "resolution": [v.width, v.height],
+      "aspect_ratio": [ratioWidth, ratioHeight],
+      "timebase": v.timebase,
+      "bitrate": v.bitrate,
+      "lang": v.lang
+    })
 
   for a in fileInfo.a:
     aarr.add( %* {"codec": a.codec, "layout": a.layout,

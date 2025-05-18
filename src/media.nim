@@ -12,7 +12,6 @@ type
     height*: cint
     avg_rate*: AVRational
     timebase*: string
-    # dar*: Rational[int] = 0//1
     sar*: string
     pix_fmt*: string
     color_range*: int
