@@ -70,7 +70,67 @@ task makeff, "Build FFmpeg from source":
 
   exec "make install"
 
+task makeffwin, "Build FFmpeg for Windows cross-compilation":
+  # Create directories
+  mkDir("ffmpeg_sources_win")
+  mkDir("ffmpeg_build_win")
+
+  # Clone FFmpeg source
+  cd "ffmpeg_sources_win"
+  if not dirExists("ffmpeg"):
+    exec "git clone -b n7.1.1 --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg"
+
+  # Configure and build FFmpeg with MinGW
+  cd "ffmpeg"
+
+  exec """./configure --prefix="../../ffmpeg_build_win" \
+    --pkg-config-flags="--static" \
+    --extra-cflags="-I../../ffmpeg_build_win/include" \
+    --extra-ldflags="-L../../ffmpeg_build_win/lib" \
+    --extra-libs="-lpthread -lm" \
+    --enable-version3 \
+    --enable-static \
+    --disable-shared \
+    --disable-ffplay \
+    --disable-ffprobe \
+    --disable-doc \
+    --disable-network \
+    --disable-indevs \
+    --disable-outdevs \
+    --disable-xlib \
+    --disable-encoder=avui,dca,mlp,opus,s302m,sonic,sonic_ls,truehd,vorbis \
+    --disable-decoder=sonic \
+    --disable-autodetect \
+    --arch=x86_64 \
+    --target-os=mingw32 \
+    --cross-prefix=x86_64-w64-mingw32- \
+    --enable-cross-compile
+  """
+
+  # Build with multiple cores
+  when defined(linux):
+    exec "make -j$(nproc)"
+  else:
+    exec "make -j4" # Default to 4 cores
+
+  exec "make install"
+
 task windows, "Cross-compile to Windows (requires mingw-w64)":
   echo "Cross-compiling for Windows (64-bit)..."
-  # Use the MinGW cross-compiler explicitly
-  exec "nim c -d:danger --os:windows --cpu:amd64 --cc:gcc --gcc.exe:x86_64-w64-mingw32-gcc --gcc.linkerexe:x86_64-w64-mingw32-gcc --passL:-static --out:auto-editor.exe src/main.nim"
+  # First, make sure FFmpeg is built for Windows
+  if not dirExists("ffmpeg_build_win"):
+    echo "FFmpeg for Windows not found. Run 'nimble makeffwin' first."
+  else:
+    # Use the MinGW cross-compiler explicitly
+    let ffmpegLibDir = getCurrentDir() / "ffmpeg_build_win" / "lib"
+    let ffmpegIncludeDir = getCurrentDir() / "ffmpeg_build_win" / "include"
+    
+    # Fix: Pass each library separately
+    exec "nim c -d:danger --os:windows --cpu:amd64 --cc:gcc " &
+         "--gcc.exe:x86_64-w64-mingw32-gcc " &
+         "--gcc.linkerexe:x86_64-w64-mingw32-gcc " &
+         "--passC:-I" & ffmpegIncludeDir & " " &
+         "--passL:-L" & ffmpegLibDir & " " &
+         "--passL:-lbcrypt " &  # Add Windows Bcrypt library
+         "--passL:-static " &
+         "--out:auto-editor.exe src/main.nim"
