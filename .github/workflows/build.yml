@@ -16,7 +16,13 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+          - os: macos-13
+            arch: x86_64
+          - os: macos-latest
+            arch: arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,7 +37,7 @@ jobs:
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
             sudo apt-get update
             sudo apt-get install -y build-essential pkg-config nasm git
-          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+          elif [ "${{ matrix.os }}" = "macos-13" ]; then
             brew install nasm
           fi
       - name: Build FFmpeg
@@ -43,7 +49,7 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-auto-editor
+          name: auto-editor-${{ matrix.os }}-${{ matrix.arch }}
           path: auto-editor
   cross-compile:
     runs-on: ubuntu-latest
@@ -68,5 +74,5 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: win-auto-editor
+          name: auto-editor-win-amd64
           path: auto-editor.exe
