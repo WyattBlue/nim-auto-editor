@@ -19,11 +19,33 @@ task make, "Export the project":
   exec "nim c -d:danger --out:auto-editor src/main.nim"
   when defined(macosx):
     exec "strip -ur auto-editor"
+  when defined(linux):
+    exec "strip -s auto-editor"
 
 
 task cleanff, "Remove":
   rmDir("ffmpeg_sources")
   rmDir("ffmpeg_build")
+
+
+let commonFlags = """
+  --enable-version3 \
+  --enable-static \
+  --disable-shared \
+  --disable-ffplay \
+  --disable-ffprobe \
+  --disable-doc \
+  --disable-network \
+  --disable-indevs \
+  --disable-outdevs \
+  --disable-xlib \
+  --disable-filters \
+  --disable-encoders \
+  --disable-muxers \
+  --disable-encoder=avui,dca,mlp,opus,s302m,sonic,sonic_ls,truehd,vorbis \
+  --disable-decoder=sonic \
+  --disable-autodetect
+"""
 
 task makeff, "Build FFmpeg from source":
   # Create directories
@@ -38,41 +60,18 @@ task makeff, "Build FFmpeg from source":
   # Configure and build FFmpeg
   cd "ffmpeg"
 
-  let configureCmd = """
-  ./configure --prefix="../../ffmpeg_build" \
+  exec """./configure --prefix="../../ffmpeg_build" \
     --pkg-config-flags="--static" \
     --extra-cflags="-I../../ffmpeg_build/include" \
     --extra-ldflags="-L../../ffmpeg_build/lib" \
-    --extra-libs="-lpthread -lm" \
-    --enable-version3 \
-    --enable-static \
-    --disable-shared \
-    --disable-ffplay \
-    --disable-ffprobe \
-    --disable-doc \
-    --disable-network \
-    --disable-indevs \
-    --disable-outdevs \
-    --disable-xlib \
-    --disable-filters \
-    --disable-encoders \
-    --disable-muxers \
-    --disable-encoder=avui,dca,mlp,opus,s302m,sonic,sonic_ls,truehd,vorbis \
-    --disable-decoder=sonic \
-    --disable-autodetect
-  """
+    --extra-libs="-lpthread -lm" \""" & "\n" & commonFlags
 
-  exec configureCmd
-
-  # Detect number of CPU cores for parallel build
   when defined(macosx):
     exec "make -j$(sysctl -n hw.ncpu)"
   elif defined(linux):
     exec "make -j$(nproc)"
-  elif defined(windows):
-    exec "make -j%NUMBER_OF_PROCESSORS%"
   else:
-    exec "make -j4" # Default to 4 cores
+    exec "make -j4"
 
   exec "make install"
 
@@ -89,32 +88,15 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
   # Configure and build FFmpeg with MinGW
   cd "ffmpeg"
 
-  exec """./configure --prefix="../../ffmpeg_build" \
+  exec ("""./configure --prefix="../../ffmpeg_build" \
     --pkg-config-flags="--static" \
     --extra-cflags="-I../../ffmpeg_build/include" \
     --extra-ldflags="-L../../ffmpeg_build/lib" \
     --extra-libs="-lpthread -lm" \
-    --enable-version3 \
-    --enable-static \
-    --disable-shared \
-    --disable-ffplay \
-    --disable-ffprobe \
-    --disable-doc \
-    --disable-network \
-    --disable-indevs \
-    --disable-outdevs \
-    --disable-xlib \
-    --disable-filters \
-    --disable-encoders \
-    --disable-muxers \
-    --disable-encoder=avui,dca,mlp,opus,s302m,sonic,sonic_ls,truehd,vorbis \
-    --disable-decoder=sonic \
-    --disable-autodetect \
     --arch=x86_64 \
     --target-os=mingw32 \
     --cross-prefix=x86_64-w64-mingw32- \
-    --enable-cross-compile
-  """
+    --enable-cross-compile \""" & "\n" & commonFlags)
 
   # Build with multiple cores
   when defined(linux):
