@@ -40,6 +40,11 @@ jobs:
         run: nimble make
       - name: Test
         run: ./auto-editor info example.mp4
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-auto-editor
+          path: auto-editor
   cross-compile:
     runs-on: ubuntu-latest
     steps:
