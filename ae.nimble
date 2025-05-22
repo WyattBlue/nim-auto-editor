@@ -56,6 +56,7 @@ task makeff, "Build FFmpeg from source":
     --disable-xlib \
     --disable-filters \
     --disable-encoders \
+    --disable-muxers \
     --disable-encoder=avui,dca,mlp,opus,s302m,sonic,sonic_ls,truehd,vorbis \
     --disable-decoder=sonic \
     --disable-autodetect
@@ -105,6 +106,7 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
     --disable-xlib \
     --disable-filters \
     --disable-encoders \
+    --disable-muxers \
     --disable-encoder=avui,dca,mlp,opus,s302m,sonic,sonic_ls,truehd,vorbis \
     --disable-decoder=sonic \
     --disable-autodetect \
