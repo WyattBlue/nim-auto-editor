@@ -1,5 +1,5 @@
 # Package
-version = "0.1.0"
+version = "0.2.0"
 author = "WyattBlue"
 description = "Auto-Editor: Efficient media analysis and rendering"
 license = "Unlicense"
@@ -10,13 +10,16 @@ bin = @["main=auto-editor"]
 requires "nim >= 2.2.2"
 
 # Tasks
+import os
+
 task build, "Build the project in debug mode":
   exec "nim c -d:debug --out:auto-editor src/main.nim"
 
 task make, "Export the project":
-  exec "nim c -d:danger --passL:-s --out:auto-editor src/main.nim"
+  exec "nim c -d:danger --out:auto-editor src/main.nim"
+  when defined(macosx):
+    exec "strip -ur auto-editor"
 
-import os
 
 task cleanff, "Remove":
   rmDir("ffmpeg_sources")
@@ -72,21 +75,21 @@ task makeff, "Build FFmpeg from source":
 
 task makeffwin, "Build FFmpeg for Windows cross-compilation":
   # Create directories
-  mkDir("ffmpeg_sources_win")
-  mkDir("ffmpeg_build_win")
+  mkDir("ffmpeg_sources")
+  mkDir("ffmpeg_build")
 
   # Clone FFmpeg source
-  cd "ffmpeg_sources_win"
+  cd "ffmpeg_sources"
   if not dirExists("ffmpeg"):
     exec "git clone -b n7.1.1 --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg"
 
   # Configure and build FFmpeg with MinGW
   cd "ffmpeg"
 
-  exec """./configure --prefix="../../ffmpeg_build_win" \
+  exec """./configure --prefix="../../ffmpeg_build" \
     --pkg-config-flags="--static" \
-    --extra-cflags="-I../../ffmpeg_build_win/include" \
-    --extra-ldflags="-L../../ffmpeg_build_win/lib" \
+    --extra-cflags="-I../../ffmpeg_build/include" \
+    --extra-ldflags="-L../../ffmpeg_build/lib" \
     --extra-libs="-lpthread -lm" \
     --enable-version3 \
     --enable-static \
@@ -118,19 +121,12 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
 task windows, "Cross-compile to Windows (requires mingw-w64)":
   echo "Cross-compiling for Windows (64-bit)..."
   # First, make sure FFmpeg is built for Windows
-  if not dirExists("ffmpeg_build_win"):
+  if not dirExists("ffmpeg_build"):
     echo "FFmpeg for Windows not found. Run 'nimble makeffwin' first."
   else:
-    # Use the MinGW cross-compiler explicitly
-    let ffmpegLibDir = getCurrentDir() / "ffmpeg_build_win" / "lib"
-    let ffmpegIncludeDir = getCurrentDir() / "ffmpeg_build_win" / "include"
-    
-    # Fix: Pass each library separately
     exec "nim c -d:danger --os:windows --cpu:amd64 --cc:gcc " &
          "--gcc.exe:x86_64-w64-mingw32-gcc " &
          "--gcc.linkerexe:x86_64-w64-mingw32-gcc " &
-         "--passC:-I" & ffmpegIncludeDir & " " &
-         "--passL:-L" & ffmpegLibDir & " " &
          "--passL:-lbcrypt " &  # Add Windows Bcrypt library
          "--passL:-static " &
          "--out:auto-editor.exe src/main.nim"
