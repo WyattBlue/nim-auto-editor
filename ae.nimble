@@ -40,23 +40,25 @@ task makeff, "Build FFmpeg from source":
 
   let configureCmd = """
   ./configure --prefix="../../ffmpeg_build" \
-              --pkg-config-flags="--static" \
-              --extra-cflags="-I../../ffmpeg_build/include" \
-              --extra-ldflags="-L../../ffmpeg_build/lib" \
-              --extra-libs="-lpthread -lm" \
-              --enable-version3 \
-              --enable-static \
-              --disable-shared \
-              --disable-ffplay \
-              --disable-ffprobe \
-              --disable-doc \
-              --disable-network \
-              --disable-indevs \
-              --disable-outdevs \
-              --disable-xlib \
-              --disable-encoder=avui,dca,mlp,opus,s302m,sonic,sonic_ls,truehd,vorbis \
-              --disable-decoder=sonic \
-              --disable-autodetect
+    --pkg-config-flags="--static" \
+    --extra-cflags="-I../../ffmpeg_build/include" \
+    --extra-ldflags="-L../../ffmpeg_build/lib" \
+    --extra-libs="-lpthread -lm" \
+    --enable-version3 \
+    --enable-static \
+    --disable-shared \
+    --disable-ffplay \
+    --disable-ffprobe \
+    --disable-doc \
+    --disable-network \
+    --disable-indevs \
+    --disable-outdevs \
+    --disable-xlib \
+    --disable-filters \
+    --disable-encoders \
+    --disable-encoder=avui,dca,mlp,opus,s302m,sonic,sonic_ls,truehd,vorbis \
+    --disable-decoder=sonic \
+    --disable-autodetect
   """
 
   exec configureCmd
@@ -101,6 +103,8 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
     --disable-indevs \
     --disable-outdevs \
     --disable-xlib \
+    --disable-filters \
+    --disable-encoders \
     --disable-encoder=avui,dca,mlp,opus,s302m,sonic,sonic_ls,truehd,vorbis \
     --disable-decoder=sonic \
     --disable-autodetect \
