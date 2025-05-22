@@ -2,6 +2,7 @@ import std/os
 import std/parseopt
 import std/strformat
 import std/posix_utils
+import std/terminal
 
 import levels
 import info
@@ -14,7 +15,7 @@ type mainArgs = object
   debug: bool = false
 
 proc error(msg: string) =
-  stderr.write(fmt"\033[31;40mError! {msg}\033[0m\n")
+  stderr.styledWriteLine(fgRed, bgBlack, fmt"Error! {msg}", resetStyle)
   quit(1)
 
 
