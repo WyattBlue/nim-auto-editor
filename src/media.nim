@@ -42,7 +42,6 @@ type
   MediaInfo* = object
     path*: string
     duration*: float
-    description*: string
     bitrate*: int64
     recommendedTimebase*: string
     v*: seq[VideoStream]
@@ -102,10 +101,6 @@ proc initMediaInfo(formatContext: ptr AVFormatContext,
       lang = $entry.value
     else:
       lang = "und"
-
-    entry = av_dict_get(cast[ptr AVDictionary](formatContext.metadata), "description", nil, 0)
-    if entry != nil:
-      result.description = $entry.value
 
     var duration: float64
     if stream.duration == AV_NOPTS_VALUE:

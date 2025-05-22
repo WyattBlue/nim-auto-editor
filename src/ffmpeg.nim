@@ -178,9 +178,12 @@ proc av_get_channel_layout_string*(buf: cstring, buf_size: cint,
     nb_channels: cint, channel_layout: uint64): cstring {.importc,
     header: "<libavutil/channel_layout.h>".}
 proc av_get_pix_fmt_name*(pix_fmt: AVPixelFormat): cstring {.importc, cdecl.}
+
+# https://www.ffmpeg.org/doxygen/7.0/group__lavu__dict.html#gae67f143237b2cb2936c9b147aa6dfde3
 proc av_dict_get*(m: ptr AVDictionary, key: cstring,
     prev: ptr AVDictionaryEntry, flags: cint): ptr AVDictionaryEntry {.importc,
     header: "<libavutil/dict.h>".}
+
 proc av_channel_layout_describe*(ch_layout: ptr AVChannelLayout, buf: cstring,
     buf_size: csize_t): cint {.importc, header: "<libavutil/channel_layout.h>".}
 
