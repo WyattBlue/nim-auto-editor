@@ -1,6 +1,7 @@
 import std/os
 import std/parseopt
 import std/strformat
+import std/posix_utils
 
 import levels
 import info
@@ -18,17 +19,7 @@ proc error(msg: string) =
 
 
 const version* = "0.1.0"
-var osName: string
 var cpuArchitecture: string
-
-when defined(windows):
-  osName = "Windows"
-elif defined(linux):
-  osName = "Linux"
-elif defined(macosx):
-  osName = "Darwin"
-else:
-  osName = "Unknown"
 
 when defined(amd64):
   cpuArchitecture = "amd64"
@@ -82,7 +73,11 @@ judge making cuts.
     quit(0)
 
   if args.debug:
-    echo "OS: ", osName, " ", cpuArchitecture
+    when defined(windows):
+      echo "OS: Windows ", cpuArchitecture
+    else:
+      let plat = uname()
+      echo "OS: ", plat.sysname, " ", plat.release, " ", plat.machine
     echo "Auto-Editor: ", version
     quit(0)
 
