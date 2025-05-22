@@ -6,6 +6,7 @@ import std/terminal
 
 import levels
 import info
+import desc
 
 
 type mainArgs = object
@@ -50,6 +51,9 @@ judge making cuts.
     quit(0)
   elif paramStr(1) == "info":
     info.main(commandLineParams()[1..^1])
+    quit(0)
+  elif paramStr(1) == "desc":
+    desc.main(commandLineParams()[1..^1])
     quit(0)
 
   var args = mainArgs()

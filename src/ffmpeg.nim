@@ -51,6 +51,7 @@ type
     flags*: cint
     probesize*: int64
     max_analyze_duration*: int64
+    metadata*: ptr AVDictionary
 
     # ... other fields omitted for brevity
 
