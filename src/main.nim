@@ -1,39 +1,16 @@
 import std/os
 import std/parseopt
-import std/strformat
 import std/posix_utils
-import std/terminal
+import std/strformat
 
-import levels
-import info
 import desc
+import info
+import levels
+import edit
+import log
 
 
-type mainArgs = object
-  input: string
-  help: bool = false
-  version: bool = false
-  debug: bool = false
-
-proc error(msg: string) =
-  stderr.styledWriteLine(fgRed, bgBlack, fmt"Error! {msg}", resetStyle)
-  quit(1)
-
-
-const version* = "0.1.0"
-var cpuArchitecture: string
-
-when defined(amd64):
-  cpuArchitecture = "amd64"
-elif defined(i386):
-  cpuArchitecture = "i386"
-elif defined(arm64):
-  cpuArchitecture = "arm64"
-elif defined(arm):
-  cpuArchitecture = "arm"
-else:
-  cpuArchitecture = "unknown"
-
+const version* = "0.2.0"
 
 proc main() =
   if paramCount() < 1:
@@ -57,21 +34,43 @@ judge making cuts.
     quit(0)
 
   var args = mainArgs()
+  var expecting: string = ""
+
   for kind, key, val in getopt():
     case kind
     of cmdArgument:
-      args.input = key
-    of cmdLongOption, cmdShortOption:
-      if key == "help":
-        args.help = true
-      elif key == "version":
+      case expecting
+      of "":
+        args.input = key
+      of "output":
+        args.output = key
+      of "export":
+        args.`export` = key
+      expecting = ""
+
+    of cmdLongOption:
+      if key == "version":
         args.version = true
       elif key == "debug":
         args.debug = true
+      elif key == "export":
+        expecting = "export"
+      elif key == "output":
+        expecting = "output"
+      else:
+        error(fmt"Unknown option: {key}")
+    of cmdShortOption:
+      if key == "V":
+        args.version = true
+      elif key == "o":
+        expecting = "output"
       else:
         error(fmt"Unknown option: {key}")
     of cmdEnd:
       discard
+
+  if expecting != "":
+    error(fmt"--{expecting} needs argument.")
 
   if args.version:
     echo version
@@ -79,12 +78,25 @@ judge making cuts.
 
   if args.debug:
     when defined(windows):
+      var cpuArchitecture: string
+      when defined(amd64):
+        cpuArchitecture = "amd64"
+      elif defined(i386):
+        cpuArchitecture = "i386"
+      elif defined(arm64):
+        cpuArchitecture = "arm64"
+      elif defined(arm):
+        cpuArchitecture = "arm"
+      else:
+        cpuArchitecture = "unknown"
       echo "OS: Windows ", cpuArchitecture
     else:
       let plat = uname()
       echo "OS: ", plat.sysname, " ", plat.release, " ", plat.machine
     echo "Auto-Editor: ", version
     quit(0)
+
+  edit_media(args)
 
 when isMainModule:
   main()
