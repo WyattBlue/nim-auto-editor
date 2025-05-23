@@ -1,5 +1,5 @@
 import ffmpeg
-import sequtils
+import std/sequtils
 
 type
   Stream* = ref object

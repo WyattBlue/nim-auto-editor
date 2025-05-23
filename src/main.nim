@@ -92,7 +92,7 @@ judge making cuts.
     echo "Auto-Editor: ", version
     quit(0)
 
-  edit_media(args)
+  editMedia(args)
 
 when isMainModule:
   main()
