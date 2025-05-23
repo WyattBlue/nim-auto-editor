@@ -2,7 +2,10 @@ import av
 import std/json
 import std/enumerate
 import std/[strformat, strutils]
+import std/parseopt
+
 import media
+import log
 
 proc genericTrack(lang: string, bitrate: int) =
   if bitrate != 0:
@@ -109,7 +112,7 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
   for s in fileInfo.s:
     sarr.add( %* s)
 
-  var content = %* {
+  result = %* {
     "type": "media",
     "recommendedTimebase": fileInfo.recommendedTimebase,
     "video": varr,
@@ -120,7 +123,6 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
       "bitrate": fileInfo.bitrate
     }
   }
-  result = %* {fileInfo.path: content}
 
 
 proc main*(args: seq[string]) =
@@ -128,19 +130,42 @@ proc main*(args: seq[string]) =
     echo "Retrieve information and properties about media files"
     quit(0)
 
-  let inputFile = args[0]
+  var isJson = false
+  var inputFiles: seq[string] = @[]
 
-  var isJson: bool
-  if args.len >= 2 and args[1] == "--json":
-    isJson = true
-  else:
-    isJson = false
+  for kind, key, val in getopt(args):
+    case kind
+    of cmdArgument:
+      inputFiles.add(key)
+    of cmdLongOption:
+      if key == "json":
+        isJson = true
+      else:
+        error(fmt"Unknown option: {key}")
+    of cmdShortOption:
+      error(fmt"Unknown option: {key}")
+    of cmdEnd:
+      discard
 
-  var container = av.open(inputFile)
-  let MediaInfo = initMediaInfo(container.formatContext, inputFile)
-  container.close()
+  var fileInfo: JsonNode = %* {}
+  for inputFile in inputFiles:
+    try:
+      var container = av.open(inputFile)
+      let mediaInfo = initMediaInfo(container.formatContext, inputFile)
+      container.close()
+
+      if isJson:
+        fileInfo[inputFile] = getJsonInfo(mediaInfo)
+      else:
+        printYamlInfo(mediaInfo)
+        echo ""
+
+    except IOError:
+      if isJson:
+        fileInfo[inputFile] = %* {"type": "invalid"}
+      else:
+        echo inputFile & ""
+        echo " - Invalid\n"
 
   if isJson:
-    echo pretty(getJsonInfo(MediaInfo))
-  else:
-    printYamlInfo(MediaInfo)
+    echo pretty(fileInfo)
