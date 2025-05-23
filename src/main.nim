@@ -5,7 +5,6 @@ import std/strformat
 
 import desc
 import info
-import levels
 import edit
 import log
 
@@ -23,10 +22,7 @@ judge making cuts.
 """
     quit(0)
 
-  if paramStr(1) == "levels":
-    levels.main(paramStr(2))
-    quit(0)
-  elif paramStr(1) == "info":
+  if paramStr(1) == "info":
     info.main(commandLineParams()[1..^1])
     quit(0)
   elif paramStr(1) == "desc":
