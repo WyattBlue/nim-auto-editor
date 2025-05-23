@@ -115,6 +115,11 @@ task windows, "Cross-compile to Windows (requires mingw-w64)":
     exec "nim c -d:danger --os:windows --cpu:amd64 --cc:gcc " &
          "--gcc.exe:x86_64-w64-mingw32-gcc " &
          "--gcc.linkerexe:x86_64-w64-mingw32-gcc " &
-         "--passL:-lbcrypt " &  # Add Windows Bcrypt library
-         "--passL:-static " &
-         "--out:auto-editor.exe src/main.nim"
+         "--passL:-lbcrypt " & # Add Windows Bcrypt library
+      "--passL:-static " &
+      "--out:auto-editor.exe src/main.nim"
+
+
+task grabWinBin, "Get the windows binary":
+  exec "curl -L -O https://github.com/WyattBlue/nim-auto-editor/releases/download/0.1.0/auto-editor.exe"
+
