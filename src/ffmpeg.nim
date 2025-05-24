@@ -15,6 +15,30 @@ type
     num*: cint
     den*: cint
 
+proc av_mul_q*(b: AVRational, c: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
+proc av_div_q*(b: AVRational, c: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
+proc av_add_q*(b: AVRational, c: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
+proc av_sub_q*(b: AVRational, c: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
+proc av_q2d*(a: AVRational): cdouble {.importc,
+    header: "<libavutil/rational.h>".}
+
+# Operator overloads
+proc `+`*(a, b: AVRational): AVRational =
+  av_add_q(a, b)
+
+proc `-`*(a, b: AVRational): AVRational =
+  av_sub_q(a, b)
+
+proc `*`*(a, b: AVRational): AVRational =
+  av_mul_q(a, b)
+
+proc `/`*(a, b: AVRational): AVRational =
+  av_div_q(a, b)
+
+converter toDouble*(r: AVRational): cdouble =
+  av_q2d(r)
+
+type
   AVDictionary* {.importc, header: "<libavutil/dict.h>".} = object
 
   AVDictionaryEntry* {.importc, header: "<libavutil/dict.h>".} = object
@@ -161,10 +185,6 @@ proc avformat_find_stream_info*(ic: ptr AVFormatContext,
     options: pointer): cint {.importc, header: "<libavformat/avformat.h>".}
 proc avformat_close_input*(s: ptr ptr AVFormatContext) {.importc,
     header: "<libavformat/avformat.h>".}
-proc av_mul_q*(b: AVRational, c: AVRational): AVRational {.importc,
-    header: "<libavutil/rational.h>".}
-proc av_q2d*(a: AVRational): cdouble {.importc,
-    header: "<libavutil/rational.h>".}
 proc avcodec_parameters_to_context*(codec_ctx: ptr AVCodecContext,
     par: ptr AVCodecParameters): cint {.importc,
     header: "<libavcodec/avcodec.h>".}
