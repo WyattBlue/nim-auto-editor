@@ -19,9 +19,6 @@ proc mediaLength*(inputFile: string): float64 =
       break
 
   if audioStreamIndex != -1:
-    let stream = container.streams[audioStreamIndex]
-    var durationSeconds: float64
-
     var time_base: AVRational
     var packet = ffmpeg.av_packet_alloc()
     var biggest_pts: int64
