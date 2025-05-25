@@ -14,6 +14,8 @@ type
     timebase*: string
     sar*: string
     pix_fmt*: string
+
+    # TODO: Switch datatype to whatever ffmpeg uses
     color_range*: int
     color_space*: int
     color_primaries*: int
