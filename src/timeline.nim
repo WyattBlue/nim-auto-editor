@@ -92,8 +92,10 @@ func toNonLinear*(src: ptr string, chunks: seq[(int64, int64, float64)]): v3 =
       offset = int64(float64(chunk[0]) / chunk[2])
 
       if not (vlayer.len > 0 and vlayer[^1].start == start):
-        vlayer.add(Video(src: src, start: start, dur: dur, offset: offset, speed: chunk[2], stream: 0))
-        alayer.add(Audio(src: src, start: start, dur: dur, offset: offset, speed: chunk[2], stream: 0))
+        vlayer.add(Video(src: src, start: start, dur: dur, offset: offset,
+            speed: chunk[2], stream: 0))
+        alayer.add(Audio(src: src, start: start, dur: dur, offset: offset,
+            speed: chunk[2], stream: 0))
       start += dur
       i += 1
 

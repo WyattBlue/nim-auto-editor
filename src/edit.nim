@@ -13,7 +13,7 @@ proc mediaLength*(container: InputContainer): float64 =
   var format_ctx = container.formatContext
   defer: container.close()
 
-  var audioStreamIndex = -1  # Get the first audio stream
+  var audioStreamIndex = -1 # Get the first audio stream
   for i in 0..<format_ctx.nb_streams:
     if format_ctx.streams[i].codecpar.codec_type == ffmpeg.AVMEDIA_TYPE_AUDIO:
       audioStreamIndex = int(i)
@@ -26,9 +26,8 @@ proc mediaLength*(container: InputContainer): float64 =
 
     while ffmpeg.av_read_frame(format_ctx, packet) >= 0:
       if packet.stream_index == audioStreamIndex:
-        if packet.pts != ffmpeg.AV_NOPTS_VALUE:
-          if packet.pts > biggest_pts:
-            biggest_pts = packet.pts
+        if packet.pts != ffmpeg.AV_NOPTS_VALUE and packet.pts > biggest_pts:
+          biggest_pts = packet.pts
 
       ffmpeg.av_packet_unref(packet)
 

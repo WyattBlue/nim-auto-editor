@@ -15,10 +15,14 @@ type
     num*: cint
     den*: cint
 
-proc av_mul_q*(b: AVRational, c: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
-proc av_div_q*(b: AVRational, c: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
-proc av_add_q*(b: AVRational, c: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
-proc av_sub_q*(b: AVRational, c: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
+proc av_mul_q*(b: AVRational, c: AVRational): AVRational {.importc,
+    header: "<libavutil/rational.h>".}
+proc av_div_q*(b: AVRational, c: AVRational): AVRational {.importc,
+    header: "<libavutil/rational.h>".}
+proc av_add_q*(b: AVRational, c: AVRational): AVRational {.importc,
+    header: "<libavutil/rational.h>".}
+proc av_sub_q*(b: AVRational, c: AVRational): AVRational {.importc,
+    header: "<libavutil/rational.h>".}
 proc av_q2d*(a: AVRational): cdouble {.importc,
     header: "<libavutil/rational.h>".}
 
