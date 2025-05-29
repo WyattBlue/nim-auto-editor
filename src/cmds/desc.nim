@@ -1,5 +1,5 @@
-import av
-import ffmpeg
+import ../av
+import ../ffmpeg
 
 proc main*(args: seq[string]) =
   if args.len < 1:

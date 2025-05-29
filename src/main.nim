@@ -3,8 +3,7 @@ import std/parseopt
 import std/posix_utils
 import std/strformat
 
-import desc
-import info
+import cmds/[desc, info]
 import edit
 import log
 
