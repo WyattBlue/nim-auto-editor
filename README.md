@@ -14,3 +14,35 @@ You will need [the Nim compiler](https://nim-lang.org/), a Unix environment.
 nimble makeffmpeg
 nimble make
 ```
+
+## Usage
+
+While most of the intesrting
+```
+auto-editor info example.mp4
+```
+
+Make a timeline, this part is under the most active development.
+```
+auto-editor example.mp4
+```
+
+## Todos
+
+### Subcommands
+- [x] info
+- [x] desc
+- [ ] subdump
+- [ ] levels
+
+### Exporting
+- [ ] Premiere Pro (.xml)
+- [ ] Final Cut Pro (.fcpxml)
+- [ ] DaVinci Resolve
+- [ ] ShotCut (.mlt)
+
+### Editing Methods
+- [x] "none"
+- [ ] audio
+- [ ] motion
+- [ ] subtitle
