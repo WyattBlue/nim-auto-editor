@@ -6,6 +6,7 @@ import av
 import media
 import ffmpeg
 import timeline
+import formats/fcp11
 
 proc mediaLength*(container: InputContainer): float64 =
   # Get the mediaLength in seconds.
@@ -55,25 +56,29 @@ proc editMedia*(args: mainArgs) =
     chunks.add((0'i64, tbLength, 1.0))
 
   var tl: JsonNode
+  var tlV3: v3
   if args.`export` == "v1":
     var tlObj = v1(chunks: chunks, source: args.input)
     tl = %tlObj
   else:
-    var tlV3 = toNonLinear(addr args.input, chunks)
-    tlV3.res = (1920, 1080)
-    tlV3.sr = 48000
-    tlV3.layout = "stereo"
+    tlV3 = toNonLinear(addr args.input, chunks)
     tlV3.tb = tb
     tlV3.background = "#000000"
-
-    if src.v.len > 0:
-      tlV3.res = (src.v[0].width, src.v[0].height)
+    tlV3.res = src.get_res()
+    tlV3.sr = 48000
+    tlV3.layout = "stereo"
     if src.a.len > 0:
       tlV3.sr = src.a[0].sampleRate
       tlV3.layout = src.a[0].layout
+
     tl = %tlV3
 
-  if args.output == "-":
-    echo pretty(tl)
+  if args.`export` == "final-cut-pro":
+    fcp11_write_xml("Auto-Editor Media Group", 11, args.output, false, tlV3)
+  elif args.`export` == "v1" or args.`export` == "v3":
+    if args.output == "-":
+      echo pretty(tl)
+    else:
+      writeFile(args.output, pretty(tl))
   else:
-    writeFile(args.output, pretty(tl))
+    error("Unknown export format")

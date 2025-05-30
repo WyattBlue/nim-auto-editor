@@ -1,5 +1,6 @@
 import std/json
 import std/sequtils
+import std/sets
 from std/math import round
 
 import ffmpeg
@@ -74,6 +75,24 @@ func `%`*(self: v3): JsonNode =
     "a": self.a,
   }
 
+
+func len*(self: v3): int64 =
+  result = 0
+  for clips in self.v:
+    if len(clips) > 0:
+      result = max(result, clips[^1].start + clips[^1].dur)
+  for clips in self.a:
+    if len(clips) > 0:
+      result = max(result, clips[^1].start + clips[^1].dur)
+
+func uniqueSources*(self: v3): HashSet[ptr string] =
+  for vlayer in self.v:
+    for video in vlayer:
+      result.incl(video.src)
+
+  for alayer in self.a:
+    for audio in alayer:
+      result.incl(audio.src)
 
 func toNonLinear*(src: ptr string, chunks: seq[(int64, int64, float64)]): v3 =
   var vlayer: seq[Video] = @[]

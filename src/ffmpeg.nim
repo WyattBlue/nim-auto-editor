@@ -15,6 +15,8 @@ type
     num*: cint
     den*: cint
 
+
+
 proc av_mul_q*(b: AVRational, c: AVRational): AVRational {.importc,
     header: "<libavutil/rational.h>".}
 proc av_div_q*(b: AVRational, c: AVRational): AVRational {.importc,

@@ -50,7 +50,7 @@ proc printYamlInfo(fileInfo: MediaInfo) =
     echo fmt"     - color range: {v.color_range}"
     echo fmt"     - color space: {v.color_space}"
     echo fmt"     - color primaries: {v.color_primaries}"
-    echo fmt"     - color transfer: {v.color_trc}"
+    echo fmt"     - color transfer: {v.color_transfer}"
     echo fmt"     - timebase: {v.timebase}"
     genericTrack(v.lang, v.bitrate)
 
@@ -98,7 +98,7 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
       "color_range": v.color_range,
       "color_space": v.color_space,
       "color_primaries": v.color_primaries,
-      "color_transfer": v.color_trc,
+      "color_transfer": v.color_transfer,
       "timebase": v.timebase,
       "bitrate": v.bitrate,
       "lang": v.lang

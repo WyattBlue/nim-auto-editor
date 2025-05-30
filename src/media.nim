@@ -1,10 +1,12 @@
-import ffmpeg
 import std/strformat
 import std/math
 
+import av
+import ffmpeg
+
 type
   VideoStream* = ref object
-    duration*: float = 0.0
+    duration*: float64 = 0.0
     bitrate*: int64 = 0
     codec*: string
     lang*: string
@@ -15,18 +17,18 @@ type
     sar*: string
     pix_fmt*: string
 
-    # TODO: Switch datatype to whatever ffmpeg uses
-    color_range*: int
-    color_space*: int
-    color_primaries*: int
-    color_trc*: int
+    color_range*: cint
+    color_space*: cint
+    color_primaries*: cint
+    color_transfer*: cint
 
   AudioStream* = ref object
-    duration*: float
+    duration*: float64
     bitrate*: int64
     codec*: string
     lang*: string
     sampleRate*: cint
+    channels*: cint
     layout*: string
 
   SubtitleStream* = ref object
@@ -43,7 +45,7 @@ type
 
   MediaInfo* = object
     path*: string
-    duration*: float
+    duration*: float64
     bitrate*: int64
     recommendedTimebase*: string
     v*: seq[VideoStream]
@@ -51,14 +53,14 @@ type
     s*: seq[SubtitleStream]
     d*: seq[DataStream]
 
-func fracToHuman(a: AVRational): string =
+func fracToHuman*(a: AVRational): string =
   if a.den == 1:
     return fmt"{a.num}"
   else:
     return fmt"{a.num}/{a.den}"
 
-proc round(x: AVRational, places: int): float =
-  round(x.num.float / x.den.float, places)
+proc round(x: AVRational, places: int): float64 =
+  round(x.num.float64 / x.den.float64, places)
 
 proc make_sane_timebase(fps: AVRational): string =
   let tb = round(fps, 2)
@@ -76,7 +78,15 @@ proc make_sane_timebase(fps: AVRational): string =
 
   return $fps.num & "/" & $fps.den
 
-proc initMediaInfo(formatContext: ptr AVFormatContext,
+
+func get_res*(self: MediaInfo): (int64, int64) =
+  if self.v.len > 0:
+    return (self.v[0].width, self.v[0].height)
+  else:
+    return (1920, 1080)
+
+
+proc initMediaInfo*(formatContext: ptr AVFormatContext,
     path: string): MediaInfo =
   result.path = path
   result.v = @[]
@@ -108,7 +118,7 @@ proc initMediaInfo(formatContext: ptr AVFormatContext,
     if stream.duration == AV_NOPTS_VALUE:
       duration = 0.0
     else:
-      duration = float(stream.duration) * av_q2d(stream.time_base)
+      duration = stream.duration.float64 * av_q2d(stream.time_base)
 
     if codecParameters.codec_type == AVMEDIA_TYPE_VIDEO:
       result.v.add(VideoStream(
@@ -122,10 +132,10 @@ proc initMediaInfo(formatContext: ptr AVFormatContext,
         timebase: fmt"{stream.time_base.num}/{stream.time_base.den}",
         sar: fmt"{codecContext.sample_aspect_ratio.num}:{codecContext.sample_aspect_ratio.den}",
         pix_fmt: $av_get_pix_fmt_name(codecContext.pix_fmt),
-        color_range: codecContext.color_range.int,
-        color_space: codecContext.colorspace.int,
-        color_primaries: codecContext.color_primaries.int,
-        color_trc: codecContext.color_trc.int,
+        color_range: codecContext.color_range,
+        color_space: codecContext.colorspace,
+        color_primaries: codecContext.color_primaries,
+        color_transfer: codecContext.color_trc,
       ))
     elif codecParameters.codec_type == AVMEDIA_TYPE_AUDIO:
       var layout: array[64, char]
@@ -139,6 +149,7 @@ proc initMediaInfo(formatContext: ptr AVFormatContext,
         lang: lang,
         sampleRate: codecContext.sample_rate,
         layout: $cast[cstring](addr layout[0]),
+        channels: codecParameters.ch_layout.nb_channels,
       ))
     elif codecParameters.codec_type == AVMEDIA_TYPE_SUBTITLE:
       result.s.add(SubtitleStream(
@@ -155,4 +166,8 @@ proc initMediaInfo(formatContext: ptr AVFormatContext,
   else:
     result.recommendedTimebase = make_sane_timebase(result.v[0].avg_rate)
 
-export fracToHuman, initMediaInfo
+
+proc initMediaInfo*(path: string): MediaInfo =
+  let container = av.open(path)
+  result = initMediaInfo(container.formatContext, path)
+  container.close()
