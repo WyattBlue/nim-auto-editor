@@ -2,6 +2,7 @@ import std/os
 import std/parseopt
 import std/posix_utils
 import std/strformat
+import std/terminal
 
 import cmds/[desc, info]
 import edit
@@ -12,16 +13,16 @@ const version* = "0.2.0"
 
 proc main() =
   if paramCount() < 1:
-    echo """Auto-Editor is an automatic video/audio creator and editor. By default, it
+    if stdin.isatty():
+      echo """Auto-Editor is an automatic video/audio creator and editor. By default, it
 will detect silence and create a new video with those sections cut out. By
 changing some of the options, you can export to a traditional editor like
 Premiere Pro and adjust the edits there, adjust the pacing of the cuts, and
 change the method of editing like using audio loudness and video motion to
 judge making cuts.
 """
-    quit(0)
-
-  if paramStr(1) == "info":
+      quit(0)
+  elif paramStr(1) == "info":
     info.main(commandLineParams()[1..^1])
     quit(0)
   elif paramStr(1) == "desc":

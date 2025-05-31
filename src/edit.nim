@@ -1,6 +1,7 @@
 import std/json
 import std/os
 import std/tables
+import std/terminal
 
 from std/math import round
 
@@ -45,7 +46,7 @@ proc mediaLength*(container: InputContainer): float64 =
 
 
 type StringInterner* = object
-    strings*: Table[string, ptr string]
+  strings*: Table[string, ptr string]
 
 proc newStringInterner*(): StringInterner =
   result.strings = initTable[string, ptr string]()
@@ -134,48 +135,56 @@ proc parseV3(jsonStr: string, interner: var StringInterner): v3 =
       result.a.add(track)
 
 proc editMedia*(args: mainArgs) =
-  let inputExt = splitFile(args.input).ext
-
   var tb: AVRational
   var tl: JsonNode
   var tlV3: v3
-
-  var chunks: seq[(int64, int64, float64)]
   var src: MediaInfo
   var interner = newStringInterner()
+  defer: interner.cleanup()
 
-  if inputExt == ".v3":
-    tlV3 = parseV3(readFile(args.input), interner)
-    tb = tlV3.tb
-  else:
-    var container = av.open(args.input)
-
-    tb = AVRational(num: 30, den: 1)
-
-    # Get the timeline resolution from the first video stream.
-    src = initMediaInfo(container.formatContext, args.input)
-    let length = mediaLength(container)
-    let tbLength = int64(round(tb.cdouble * length))
-
-    if tbLength > 0:
-      chunks.add((0'i64, tbLength, 1.0))
-
-
-  if args.`export` == "v1":
-    var tlObj = v1(chunks: chunks, source: args.input)
-    tl = %tlObj
-  elif tlV3.sr == 0:
-    tlV3 = toNonLinear(addr args.input, chunks)
-    tlV3.tb = tb
-    tlV3.background = "#000000"
-    tlV3.res = src.get_res()
-    tlV3.sr = 48000
-    tlV3.layout = "stereo"
-    if src.a.len > 0:
-      tlV3.sr = src.a[0].sampleRate
-      tlV3.layout = src.a[0].layout
-
+  if not stdin.isatty():
+    let stdinContent = readAll(stdin)
+    tlV3 = parseV3(stdinContent, interner)
     tl = %tlV3
+  else:
+    let inputExt = splitFile(args.input).ext
+    var chunks: seq[(int64, int64, float64)]
+
+    if inputExt == ".v3":
+      tlV3 = parseV3(readFile(args.input), interner)
+      tb = tlV3.tb
+      tl = %tlV3
+    else:
+      var container = av.open(args.input)
+
+      tb = AVRational(num: 30, den: 1)
+
+      # Get the timeline resolution from the first video stream.
+      src = initMediaInfo(container.formatContext, args.input)
+      let length = mediaLength(container)
+      let tbLength = int64(round(tb.cdouble * length))
+
+      if tbLength > 0:
+        chunks.add((0'i64, tbLength, 1.0))
+
+    if args.`export` == "v1":
+      var tlObj = v1(chunks: chunks, source: args.input)
+      tl = %tlObj
+    elif tlV3.sr == 0:
+      tlV3 = toNonLinear(addr args.input, chunks)
+      tlV3.tb = tb
+      tlV3.background = "#000000"
+      tlV3.res = src.get_res()
+      tlV3.sr = 48000
+      tlV3.layout = "stereo"
+      if src.a.len > 0:
+        tlV3.sr = src.a[0].sampleRate
+        tlV3.layout = src.a[0].layout
+
+      tl = %tlV3
+
+  if tl == nil:
+    error("tl json object is nil")
 
   if args.`export` == "final-cut-pro":
     fcp11_write_xml("Auto-Editor Media Group", 11, args.output, false, tlV3)
