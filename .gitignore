@@ -5,3 +5,7 @@ auto-editor
 ffmpeg_build
 ffmpeg_sources
 .vscode
+*.v3
+
+tests/*
+!tests/*.nim

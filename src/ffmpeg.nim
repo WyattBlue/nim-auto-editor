@@ -16,7 +16,6 @@ type
     den*: cint
 
 
-
 proc av_mul_q*(b: AVRational, c: AVRational): AVRational {.importc,
     header: "<libavutil/rational.h>".}
 proc av_div_q*(b: AVRational, c: AVRational): AVRational {.importc,
@@ -27,6 +26,8 @@ proc av_sub_q*(b: AVRational, c: AVRational): AVRational {.importc,
     header: "<libavutil/rational.h>".}
 proc av_q2d*(a: AVRational): cdouble {.importc,
     header: "<libavutil/rational.h>".}
+proc av_parse_ratio*(q: ptr AVRational, str: cstring, max: cint, log_offset: cint, log_ctx: pointer): cint {.importc,
+    header: "<libavutil/parseutils.h>".}
 
 # Operator overloads
 proc `+`*(a, b: AVRational): AVRational =
@@ -43,6 +44,19 @@ proc `/`*(a, b: AVRational): AVRational =
 
 converter toDouble*(r: AVRational): cdouble =
   av_q2d(r)
+
+converter toAVRational*(s: string): AVRational =
+  if s.len == 0:
+    raise newException(ValueError, "Empty string cannot be converted to AVRational")
+
+  var rational: AVRational
+  let ret = av_parse_ratio(addr rational, cstring(s), cint(high(cint)), 0, nil)
+
+  if ret < 0:
+    raise newException(ValueError, "Failed to rational: " & s)
+
+  return rational
+
 
 type
   AVDictionary* {.importc, header: "<libavutil/dict.h>".} = object

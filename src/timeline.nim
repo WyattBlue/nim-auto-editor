@@ -23,9 +23,10 @@ type Video* = object
   stream*: int64
 
 func `%`*(self: Video): JsonNode =
+  let srcStr = if self.src != nil: self.src[] else: ""
   return %* {
     "name": "video",
-    "src": self.src[],
+    "src": srcStr,
     "start": self.start,
     "dur": self.dur,
     "offset": self.offset,
@@ -42,9 +43,10 @@ type Audio* = object
   stream*: int64
 
 func `%`*(self: Audio): JsonNode =
+  let srcStr = if self.src != nil: self.src[] else: ""
   return %* {
     "name": "audio",
-    "src": self.src[],
+    "src": srcStr,
     "start": self.start,
     "dur": self.dur,
     "offset": self.offset,
