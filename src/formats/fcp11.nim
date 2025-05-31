@@ -1,8 +1,8 @@
 import std/strformat
 import std/xmltree
-import std/enumerate
 import std/sets
 import std/os
+import std/algorithm
 
 import ../media
 import ../log
@@ -76,11 +76,10 @@ proc fcp11_write_xml*(groupName: string, version: int, output: string, resolve: 
     var i = 0
     for ptrSrc in tl.uniqueSources:
         let one_src = initMediaInfo(ptrSrc[])
-        echo one_src
 
         if i == 0:
             proj_name = splitFile(one_src.path).name
-            # src_dur = int(one_src.duration * tl.tb)
+            src_dur = int(one_src.duration * tl.tb)
             if resolve:
                 tl_dur = src_dur
 
@@ -117,50 +116,61 @@ proc fcp11_write_xml*(groupName: string, version: int, output: string, resolve: 
     lib.add evt
     fcpxml.add lib
 
+    proc make_clip[T](`ref`: string, clip: T) =
+        let clip_properties = {
+            "name": proj_name,
+            "ref": `ref`,
+            "offset": fraction(clip.start),
+            "duration": fraction(clip.dur),
+            "start": fraction(clip.offset),
+            "tcFormat": "NDF"
+        }.toXmlAttributes
 
-#     def make_clip(ref: str, clip: TlVideo | TlAudio) -> None:
-#         clip_properties = {
-#             "name": proj_name,
-#             "ref": ref,
-#             "offset": fraction(clip.start),
-#             "duration": fraction(clip.dur),
-#             "start": fraction(clip.offset),
-#             "tcFormat": "NDF",
-#         }
-#         asset = SubElement(spine, "asset-clip", clip_properties)
-#         if clip.speed != 1:
-#             # See the "Time Maps" section.
-#             # https://developer.apple.com/documentation/professional_video_applications/fcpxml_reference/story_elements/timemap/
+        let asset = <>asset_clip()
+        asset.attrs = clip_properties
+        spine.add(asset)
 
-#             timemap = SubElement(asset, "timeMap")
-#             SubElement(timemap, "timept", time="0s", value="0s", interp="smooth2")
-#             SubElement(
-#                 timemap,
-#                 "timept",
-#                 time=fraction(int(src_dur // clip.speed)),
-#                 value=fraction(src_dur),
-#                 interp="smooth2",
-#             )
+        if clip.speed != 1:
+            # See the "Time Maps" section.
+            # https://developer.apple.com/documentation/professional_video_applications/fcpxml_reference/story_elements/timemap/
 
-#     if tl.v and tl.v[0]:
-#         clips: Sequence[TlVideo | TlAudio] = cast(Any, tl.v[0])
-#     elif tl.a and tl.a[0]:
-#         clips = tl.a[0]
-#     else:
-#         clips = []
+            let timemap = newElement("timeMap")
+            let timept1 = newElement("timept")
+            timept1.attrs = {"time": "0s", "value": "0s", "interp": "smooth2"}.toXmlAttributes
+            timemap.add(timept1)
 
-#     all_refs: list[str] = ["r2"]
-#     if resolve:
-#         for i in range(1, len(tl.a)):
-#             all_refs.append(f"r{(i + 1) * 2}")
+            let timept2 = newElement("timept")
+            timept2.attrs = {
+                "time": fraction(int(src_dur.float / clip.speed)),
+                "value": fraction(src_dur),
+                "interp": "smooth2"
+            }.toXmlAttributes
+            timemap.add(timept2)
 
-#     for my_ref in reversed(all_refs):
-#         for clip in clips:
-#             make_clip(my_ref, clip)
+            asset.add(timemap)
 
+
+    if tl.v.len > 0 and tl.v[0].len > 0:
+        var all_refs: seq[string] = @["r2"]
+        if resolve:
+            for i in 1 ..< tl.a.len:
+                all_refs.add("r" & $((i + 1) * 2))
+
+        for my_ref in all_refs.reversed:
+            for clip in tl.v[0]:
+                make_clip(my_ref, clip)
+    elif tl.a.len > 0 and tl.a[0].len > 0:
+        var all_refs: seq[string] = @["r2"]
+        if resolve:
+            for i in 1 ..< tl.a.len:
+                all_refs.add("r" & $((i + 1) * 2))
+
+        for my_ref in all_refs.reversed:
+            for clip in tl.a[0]:
+                make_clip(my_ref, clip)
 
     if output == "-":
         echo $fcpxml
     else:
-        let xmlStr = "<?xml version='1.0' encoding='utf-8'?>" & $fcpxml
+        let xmlStr = "<?xml version='1.0' encoding='utf-8'?>\n" & $fcpxml
         writeFile(output, xmlStr)
