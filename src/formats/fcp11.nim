@@ -27,13 +27,13 @@ func get_colorspace(src: MediaInfo): string =
     let s = src.v[0]
     if s.pix_fmt == "rgb24":
         return "sRGB IEC61966-2.1"
-    if s.color_space == 5:  # "bt470bg"
+    if s.color_space == 5: # "bt470bg"
         return "5-1-6 (Rec. 601 PAL)"
-    if s.color_space == 6:  # "smpte170m"
+    if s.color_space == 6: # "smpte170m"
         return "6-1-6 (Rec. 601 NTSC)"
-    if s.color_primaries == 9:  # "bt2020"
+    if s.color_primaries == 9: # "bt2020"
         # See: https://video.stackexchange.com/questions/22059/how-to-identify-hdr-video
-        if s.color_transfer == 16 or s.color_transfer == 18:  # "smpte2084" "arib-std-b67"
+        if s.color_transfer == 16 or s.color_transfer == 18: # "smpte2084" "arib-std-b67"
             return "9-18-9 (Rec. 2020 HLG)"
         return "9-1-9 (Rec. 2020)"
 
@@ -50,7 +50,8 @@ func make_name(src: MediaInfo, tb: AVRational): string =
 func pathToUri(a: string): string =
     return "file://" & a
 
-proc fcp11_write_xml*(groupName: string, version: int, output: string, resolve: bool, tl: v3) =
+proc fcp11_write_xml*(groupName: string, version: int, output: string,
+        resolve: bool, tl: v3) =
     func fraction(val: int): string =
         if val == 0:
             return "0s"
@@ -64,7 +65,7 @@ proc fcp11_write_xml*(groupName: string, version: int, output: string, resolve: 
     else:
         error(&"Unknown final cut pro version: {version}")
 
-    let fcpxml = <>fcpxml(version=verStr)
+    let fcpxml = <>fcpxml(version = verStr)
 
     let resources = newElement("resources")
     fcpxml.add(resources)
@@ -86,28 +87,35 @@ proc fcp11_write_xml*(groupName: string, version: int, output: string, resolve: 
         let id = "r" & $(i * 2 + 1)
         let width = $tl.res[0]
         let height = $tl.res[1]
-        resources.add(<>format(id=id, name=make_name(one_src, tl.tb), frameDuration=fraction(1), width=width, height=height, colorSpace=get_colorspace(one_src)))
+        resources.add(<>format(id = id, name = make_name(one_src, tl.tb),
+                frameDuration = fraction(1), width = width, height = height,
+                colorSpace = get_colorspace(one_src)))
 
         let id2 = "r" & $(i * 2 + 2)
         let hasVideo = (if one_src.v.len > 0: "1" else: "0")
         let hasAudio = (if one_src.a.len > 0: "1" else: "0")
         let audioChannels = (if one_src.a.len == 0: "2" else: $one_src.a[0].channels)
 
-        let r2 = <>asset(id=id2, name=splitFile(one_src.path).name, start="0s", hasVideo=hasVideo, format=id, hasAudio=hasAudio, audioSources="1", audioChannels=audioChannels, duration=fraction(tl_dur))
+        let r2 = <>asset(id = id2, name = splitFile(one_src.path).name,
+                start = "0s", hasVideo = hasVideo, format = id,
+                hasAudio = hasAudio, audioSources = "1",
+                audioChannels = audioChannels, duration = fraction(tl_dur))
 
         let mediaRep = newElement("media-rep")
-        mediaRep.attrs = {"kind": "original-media", "src": one_src.path.absolutePath().pathToUri()}.toXmlAttributes
+        mediaRep.attrs = {"kind": "original-media",
+                "src": one_src.path.absolutePath().pathToUri()}.toXmlAttributes
 
         r2.add mediaRep
         resources.add r2
 
-
         i += 1
 
     let lib = <>library()
-    let evt = <>event(name=group_name)
-    let proj = <>project(name=proj_name)
-    let sequence = <>sequence(format="r1", tcStart="0s", tcFormat="NDF", audioLayout=tl.layout, audioRate=(if tl.sr == 44100: "44.1k" else: "48k"))
+    let evt = <>event(name = group_name)
+    let proj = <>project(name = proj_name)
+    let sequence = <>sequence(format = "r1", tcStart = "0s", tcFormat = "NDF",
+            audioLayout = tl.layout, audioRate = (if tl.sr ==
+            44100: "44.1k" else: "48k"))
     let spine = <>spine()
 
     sequence.add spine
@@ -136,7 +144,8 @@ proc fcp11_write_xml*(groupName: string, version: int, output: string, resolve: 
 
             let timemap = newElement("timeMap")
             let timept1 = newElement("timept")
-            timept1.attrs = {"time": "0s", "value": "0s", "interp": "smooth2"}.toXmlAttributes
+            timept1.attrs = {"time": "0s", "value": "0s",
+                    "interp": "smooth2"}.toXmlAttributes
             timemap.add(timept1)
 
             let timept2 = newElement("timept")

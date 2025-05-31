@@ -26,8 +26,10 @@ proc av_sub_q*(b: AVRational, c: AVRational): AVRational {.importc,
     header: "<libavutil/rational.h>".}
 proc av_q2d*(a: AVRational): cdouble {.importc,
     header: "<libavutil/rational.h>".}
-proc av_parse_ratio*(q: ptr AVRational, str: cstring, max: cint, log_offset: cint, log_ctx: pointer): cint {.importc,
-    header: "<libavutil/parseutils.h>".}
+proc av_parse_ratio*(q: ptr AVRational, str: cstring, max: cint,
+    log_offset: cint, log_ctx: pointer): cint {.importc,
+
+header: "<libavutil/parseutils.h>".}
 
 # Operator overloads
 proc `+`*(a, b: AVRational): AVRational =

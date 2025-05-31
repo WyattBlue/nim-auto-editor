@@ -36,8 +36,8 @@ auto-editor example.mp4
 - [ ] levels
 
 ### Exporting
+- [x] Final Cut Pro (.fcpxml)
 - [ ] Premiere Pro (.xml)
-- [ ] Final Cut Pro (.fcpxml)
 - [ ] DaVinci Resolve
 - [ ] ShotCut (.mlt)
 
