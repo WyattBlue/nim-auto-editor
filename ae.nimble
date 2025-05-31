@@ -116,8 +116,11 @@ task windows, "Cross-compile to Windows (requires mingw-w64)":
          "--gcc.exe:x86_64-w64-mingw32-gcc " &
          "--gcc.linkerexe:x86_64-w64-mingw32-gcc " &
          "--passL:-lbcrypt " & # Add Windows Bcrypt library
-      "--passL:-static " &
-      "--out:auto-editor.exe src/main.nim"
+         "--passL:-static " &
+         "--out:auto-editor.exe src/main.nim"
+    
+    # Strip the Windows binary
+    exec "x86_64-w64-mingw32-strip -s auto-editor.exe"
 
 
 task grabWinBin, "Get the windows binary":
