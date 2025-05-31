@@ -32,10 +32,10 @@ let commonFlags = """
   --enable-version3 \
   --enable-static \
   --disable-shared \
-  --disable-ffplay \
-  --disable-ffprobe \
+  --disable-programs \
   --disable-doc \
   --disable-network \
+  --disable-bsfs \
   --disable-indevs \
   --disable-outdevs \
   --disable-xlib \
