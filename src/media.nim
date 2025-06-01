@@ -1,5 +1,6 @@
 import std/strformat
 import std/math
+import std/hashes
 
 import av
 import ffmpeg
@@ -52,6 +53,13 @@ type
     a*: seq[AudioStream]
     s*: seq[SubtitleStream]
     d*: seq[DataStream]
+
+
+proc hash*(mi: MediaInfo): Hash =
+  hash(mi.path)
+
+proc `==`*(a, b: MediaInfo): bool =
+  a.path == b.path
 
 func fracToHuman*(a: AVRational): string =
   if a.den == 1:

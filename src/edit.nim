@@ -8,7 +8,7 @@ import av
 import media
 import ffmpeg
 import timeline
-import exports/[fcp11, json, shotcut]
+import exports/[fcp7, fcp11, json, shotcut]
 import imports/json
 
 proc mediaLength*(container: InputContainer): float64 =
@@ -74,7 +74,12 @@ proc editMedia*(args: mainArgs) =
       tlV3 = toNonLinear(addr args.input, tb, src, chunks)
 
   const tlName = "Auto-Editor Media Group"
-  if args.`export` == "final-cut-pro":
+
+  if args.`export` == "premiere":
+    fcp7_write_xml(tlName, args.output, false, tlV3)
+  elif args.`export` == "resolve-fcp7":
+    fcp7_write_xml(tlName, args.output, true, tlV3)
+  elif args.`export` == "final-cut-pro":
     fcp11_write_xml(tlName, 11, args.output, false, tlV3)
   elif args.`export` == "resolve":
     fcp11_write_xml(tlName, 10, args.output, true, tlV3)

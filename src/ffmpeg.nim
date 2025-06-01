@@ -16,17 +16,17 @@ type
     num*: cint
     den*: cint
 
-proc av_mul_q*(b: AVRational, c: AVRational): AVRational {.importc,
+proc av_mul_q(b: AVRational, c: AVRational): AVRational {.importc,
     header: "<libavutil/rational.h>".}
-proc av_div_q*(b: AVRational, c: AVRational): AVRational {.importc,
+proc av_div_q(b: AVRational, c: AVRational): AVRational {.importc,
     header: "<libavutil/rational.h>".}
-proc av_add_q*(b: AVRational, c: AVRational): AVRational {.importc,
+proc av_add_q(b: AVRational, c: AVRational): AVRational {.importc,
     header: "<libavutil/rational.h>".}
-proc av_sub_q*(b: AVRational, c: AVRational): AVRational {.importc,
+proc av_sub_q(b: AVRational, c: AVRational): AVRational {.importc,
     header: "<libavutil/rational.h>".}
 proc av_q2d*(a: AVRational): cdouble {.importc,
     header: "<libavutil/rational.h>".}
-proc av_parse_ratio*(q: ptr AVRational, str: cstring, max: cint,
+proc av_parse_ratio(q: ptr AVRational, str: cstring, max: cint,
     log_offset: cint, log_ctx: pointer): cint {.importc,
 
 header: "<libavutil/parseutils.h>".}
@@ -44,11 +44,19 @@ proc `/`*(a, b: AVRational): AVRational =
   av_div_q(a, b)
 
 proc `/`*(a: int64, b: AVRational): AVRational =
-  let aRational = AVRational(num: cint(a), den: 1)
-  av_div_q(aRational, b)
+  AVRational(num: a.cint, den: 1) / b
+
+proc `*`*(a: int64, b: AVRational): AVRational =
+  AVRational(num: a.cint, den: 1) * b
 
 converter toDouble*(r: AVRational): cdouble =
   av_q2d(r)
+
+converter toInt64*(r: AVRational): int64 =
+  (r.num div r.den).int64
+
+converter toAVRational*(num: int): AVRational =
+  AVRational(num: num.cint, den: 1)
 
 converter toAVRational*(s: string): AVRational =
   if s.len == 0:

@@ -1,9 +1,8 @@
-# 0.2.1
+# 0.3.0
 
 ## Major
 
 ## Features
- - Add ability to read "v1" files
- - Strip Windows binaries
+ - Add `premiere` `resolve-fcp7` and `resolve` export formats
 
 ## Fixes
