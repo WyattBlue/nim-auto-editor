@@ -1,6 +1,5 @@
 import std/json
 import std/os
-import std/tables
 import std/terminal
 
 from std/math import round
@@ -10,7 +9,8 @@ import av
 import media
 import ffmpeg
 import timeline
-import formats/fcp11
+import exports/fcp11
+import imports/json
 
 proc mediaLength*(container: InputContainer): float64 =
   # Get the mediaLength in seconds.
@@ -44,95 +44,6 @@ proc mediaLength*(container: InputContainer): float64 =
 
   error("No audio stream found")
 
-
-type StringInterner* = object
-  strings*: Table[string, ptr string]
-
-proc newStringInterner*(): StringInterner =
-  result.strings = initTable[string, ptr string]()
-
-proc intern*(interner: var StringInterner, s: string): ptr string =
-  if s in interner.strings:
-    return interner.strings[s]
-
-  let internedStr = cast[ptr string](alloc0(sizeof(string)))
-  internedStr[] = s
-  interner.strings[s] = internedStr
-  return internedStr
-
-proc cleanup*(interner: var StringInterner) =
-  for ptrStr in interner.strings.values:
-    dealloc(ptrStr)
-  interner.strings.clear()
-
-
-proc parseVideo(node: JsonNode, interner: var StringInterner): Video =
-  result.src = interner.intern(node["src"].getStr())
-  result.start = node["start"].getInt()
-  result.dur = node["dur"].getInt()
-  result.offset = node["offset"].getInt()
-  result.speed = node["speed"].getFloat()
-  result.stream = node["stream"].getInt()
-
-
-proc parseAudio(node: JsonNode, interner: var StringInterner): Audio =
-  result.src = interner.intern(node["src"].getStr())
-  result.start = node["start"].getInt()
-  result.dur = node["dur"].getInt()
-  result.offset = node["offset"].getInt()
-  result.speed = node["speed"].getFloat()
-  result.stream = node["stream"].getInt()
-
-
-proc parseV3(jsonStr: string, interner: var StringInterner): v3 =
-  let jsonNode = parseJson(jsonStr)
-
-  if not jsonNode.hasKey("version") or jsonNode["version"].getStr() != "3":
-    error("Unsupported version")
-
-  var tb: AVRational
-  try:
-    tb = jsonNode["timebase"].getStr()
-  except ValueError as e:
-    error(e.msg)
-
-  result.tb = jsonNode["timebase"].getStr()
-
-  if not jsonNode.hasKey("samplerate") or not jsonNode.hasKey("background"):
-    error("sr/bg bad structure")
-
-  result.sr = jsonNode["samplerate"].getInt()
-  result.background = jsonNode["background"].getStr()
-
-  if not jsonNode.hasKey("resolution") or jsonNode["resolution"].kind != JArray:
-    error("'resolution' has bad structure")
-
-  result.layout = jsonNode["layout"].getStr()
-
-  let resArray = jsonNode["resolution"]
-  if resArray.len >= 2:
-    result.res = (resArray[0].getInt(), resArray[1].getInt())
-  else:
-    result.res = (1920, 1080)
-
-  result.v = @[]
-  if jsonNode.hasKey("v") and jsonNode["v"].kind == JArray:
-    for trackNode in jsonNode["v"]:
-      var track: seq[Video] = @[]
-      if trackNode.kind == JArray:
-        for videoNode in trackNode:
-          track.add(parseVideo(videoNode, interner))
-      result.v.add(track)
-
-  # Parse audio tracks
-  result.a = @[]
-  if jsonNode.hasKey("a") and jsonNode["a"].kind == JArray:
-    for trackNode in jsonNode["a"]:
-      var track: seq[Audio] = @[]
-      if trackNode.kind == JArray:
-        for audioNode in trackNode:
-          track.add(parseAudio(audioNode, interner))
-      result.a.add(track)
 
 proc editMedia*(args: mainArgs) =
   var tb: AVRational

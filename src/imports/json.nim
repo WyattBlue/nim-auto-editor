@@ -1,0 +1,73 @@
+import std/json
+
+import ../log
+import ../timeline
+import ../ffmpeg
+
+proc parseVideo(node: JsonNode, interner: var StringInterner): Video =
+  result.src = interner.intern(node["src"].getStr())
+  result.start = node["start"].getInt()
+  result.dur = node["dur"].getInt()
+  result.offset = node["offset"].getInt()
+  result.speed = node["speed"].getFloat()
+  result.stream = node["stream"].getInt()
+
+
+proc parseAudio(node: JsonNode, interner: var StringInterner): Audio =
+  result.src = interner.intern(node["src"].getStr())
+  result.start = node["start"].getInt()
+  result.dur = node["dur"].getInt()
+  result.offset = node["offset"].getInt()
+  result.speed = node["speed"].getFloat()
+  result.stream = node["stream"].getInt()
+
+
+proc parseV3*(jsonStr: string, interner: var StringInterner): v3 =
+  let jsonNode = parseJson(jsonStr)
+
+  if not jsonNode.hasKey("version") or jsonNode["version"].getStr() != "3":
+    error("Unsupported version")
+
+  var tb: AVRational
+  try:
+    tb = jsonNode["timebase"].getStr()
+  except ValueError as e:
+    error(e.msg)
+
+  result.tb = jsonNode["timebase"].getStr()
+
+  if not jsonNode.hasKey("samplerate") or not jsonNode.hasKey("background"):
+    error("sr/bg bad structure")
+
+  result.sr = jsonNode["samplerate"].getInt()
+  result.background = jsonNode["background"].getStr()
+
+  if not jsonNode.hasKey("resolution") or jsonNode["resolution"].kind != JArray:
+    error("'resolution' has bad structure")
+
+  result.layout = jsonNode["layout"].getStr()
+
+  let resArray = jsonNode["resolution"]
+  if resArray.len >= 2:
+    result.res = (resArray[0].getInt(), resArray[1].getInt())
+  else:
+    result.res = (1920, 1080)
+
+  result.v = @[]
+  if jsonNode.hasKey("v") and jsonNode["v"].kind == JArray:
+    for trackNode in jsonNode["v"]:
+      var track: seq[Video] = @[]
+      if trackNode.kind == JArray:
+        for videoNode in trackNode:
+          track.add(parseVideo(videoNode, interner))
+      result.v.add(track)
+
+  # Parse audio tracks
+  result.a = @[]
+  if jsonNode.hasKey("a") and jsonNode["a"].kind == JArray:
+    for trackNode in jsonNode["a"]:
+      var track: seq[Audio] = @[]
+      if trackNode.kind == JArray:
+        for audioNode in trackNode:
+          track.add(parseAudio(audioNode, interner))
+      result.a.add(track)
