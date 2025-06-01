@@ -1,6 +1,5 @@
-import std/json
-import std/sequtils
 import std/sets
+import std/options
 from std/math import round
 
 import ffmpeg
@@ -8,11 +7,6 @@ import ffmpeg
 type v1* = object
   chunks*: seq[(int64, int64, float64)]
   source*: string
-
-func `%`*(obj: v1): JsonNode =
-  var jsonChunks = obj.chunks.mapIt(%[%it[0], %it[1], %it[2]])
-  return %* {"version": "1", "source": obj.source, "chunks": jsonChunks}
-
 
 type Clip* = object
   src*: ptr string
@@ -30,50 +24,7 @@ type v3* = object
   res*: (int64, int64)
   v*: seq[seq[Clip]]
   a*: seq[seq[Clip]]
-
-
-func `%`*(self: v3): JsonNode =
-  var videoTracks = newJArray()
-  for track in self.v:
-    var trackArray = newJArray()
-    for clip in track:
-      var clipObj = newJObject()
-      clipObj["name"] = %"video"
-      clipObj["src"] = %(if clip.src != nil: clip.src[] else: "")
-      clipObj["start"] = %clip.start
-      clipObj["dur"] = %clip.dur
-      clipObj["offset"] = %clip.offset
-      clipObj["speed"] = %clip.speed
-      clipObj["stream"] = %clip.stream
-      trackArray.add(clipObj)
-    videoTracks.add(trackArray)
-
-  var audioTracks = newJArray()
-  for track in self.a:
-    var trackArray = newJArray()
-    for clip in track:
-      var clipObj = newJObject()
-      clipObj["name"] = %"audio"
-      clipObj["src"] = %(if clip.src != nil: clip.src[] else: "")
-      clipObj["start"] = %clip.start
-      clipObj["dur"] = %clip.dur
-      clipObj["offset"] = %clip.offset
-      clipObj["speed"] = %clip.speed
-      clipObj["volume"] = %1
-      clipObj["stream"] = %clip.stream
-      trackArray.add(clipObj)
-    audioTracks.add(trackArray)
-
-  return %* {
-    "version": "3",
-    "timebase": $self.tb.num & "/" & $self.tb.den,
-    "background": self.background,
-    "resolution": [self.res[0], self.res[1]],
-    "samplerate": self.sr,
-    "layout": self.layout,
-    "v": videoTracks,
-    "a": audioTracks,
-  }
+  chunks*: Option[seq[(int64, int64, float64)]]
 
 
 func len*(self: v3): int64 =
@@ -118,5 +69,6 @@ func toNonLinear*(src: ptr string, chunks: seq[(int64, int64, float64)]): v3 =
       start += dur
       i += 1
 
-  return v3(v: @[vlayer], a: @[alayer])
+  return v3(v: @[vlayer], a: @[alayer], chunks: some(chunks),
+      background: "#000000")
 

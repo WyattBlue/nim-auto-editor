@@ -1,4 +1,3 @@
-import std/json
 import std/os
 import std/terminal
 
@@ -9,7 +8,7 @@ import av
 import media
 import ffmpeg
 import timeline
-import exports/fcp11
+import exports/[fcp11, json]
 import imports/json
 
 proc mediaLength*(container: InputContainer): float64 =
@@ -46,45 +45,33 @@ proc mediaLength*(container: InputContainer): float64 =
 
 
 proc editMedia*(args: mainArgs) =
-  var tb: AVRational
-  var tl: JsonNode
   var tlV3: v3
-  var src: MediaInfo
   var interner = newStringInterner()
   defer: interner.cleanup()
 
   if not stdin.isatty():
     let stdinContent = readAll(stdin)
     tlV3 = parseV3(stdinContent, interner)
-    tl = %tlV3
   else:
     let inputExt = splitFile(args.input).ext
-    var chunks: seq[(int64, int64, float64)]
 
     if inputExt == ".v3":
       tlV3 = parseV3(readFile(args.input), interner)
-      tb = tlV3.tb
-      tl = %tlV3
     else:
       var container = av.open(args.input)
-
-      tb = AVRational(num: 30, den: 1)
+      var tb = AVRational(num: 30, den: 1)
 
       # Get the timeline resolution from the first video stream.
-      src = initMediaInfo(container.formatContext, args.input)
+      let src = initMediaInfo(container.formatContext, args.input)
       let length = mediaLength(container)
       let tbLength = int64(round(tb.cdouble * length))
 
+      var chunks: seq[(int64, int64, float64)]
       if tbLength > 0:
         chunks.add((0'i64, tbLength, 1.0))
 
-    if args.`export` == "v1":
-      var tlObj = v1(chunks: chunks, source: args.input)
-      tl = %tlObj
-    elif tlV3.sr == 0:
       tlV3 = toNonLinear(addr args.input, chunks)
       tlV3.tb = tb
-      tlV3.background = "#000000"
       tlV3.res = src.get_res()
       tlV3.sr = 48000
       tlV3.layout = "stereo"
@@ -92,17 +79,9 @@ proc editMedia*(args: mainArgs) =
         tlV3.sr = src.a[0].sampleRate
         tlV3.layout = src.a[0].layout
 
-      tl = %tlV3
-
-  if tl == nil:
-    error("tl json object is nil")
-
   if args.`export` == "final-cut-pro":
     fcp11_write_xml("Auto-Editor Media Group", 11, args.output, false, tlV3)
   elif args.`export` == "v1" or args.`export` == "v3":
-    if args.output == "-":
-      echo pretty(tl)
-    else:
-      writeFile(args.output, pretty(tl))
+    export_json_tl(tlV3, args.`export`, args.input, args.output)
   else:
     error("Unknown export format")
