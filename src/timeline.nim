@@ -3,6 +3,7 @@ import std/options
 from std/math import round
 
 import ffmpeg
+import media
 
 type v1* = object
   chunks*: seq[(int64, int64, float64)]
@@ -45,7 +46,7 @@ func uniqueSources*(self: v3): HashSet[ptr string] =
     for audio in alayer:
       result.incl(audio.src)
 
-func toNonLinear*(src: ptr string, chunks: seq[(int64, int64, float64)]): v3 =
+func toNonLinear*(src: ptr string, tb: AvRational, info: MediaInfo, chunks: seq[(int64, int64, float64)]): v3 =
   var vlayer: seq[Clip] = @[]
   var alayer: seq[Clip] = @[]
   var i: int64 = 0
@@ -69,6 +70,12 @@ func toNonLinear*(src: ptr string, chunks: seq[(int64, int64, float64)]): v3 =
       start += dur
       i += 1
 
-  return v3(v: @[vlayer], a: @[alayer], chunks: some(chunks),
-      background: "#000000")
-
+  result = v3(v: @[vlayer], a: @[alayer], chunks: some(chunks))
+  result.background = "#000000"
+  result.tb = tb
+  result.res = info.get_res()
+  result.sr = 48000
+  result.layout = "stereo"
+  if info.a.len > 0:
+    result.sr = info.a[0].sampleRate
+    result.layout = info.a[0].layout

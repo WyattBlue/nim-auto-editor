@@ -1,5 +1,4 @@
 import std/json
-import std/os
 import std/options
 import std/sequtils
 
@@ -53,18 +52,22 @@ func `%`*(self: v3): JsonNode =
     "a": audioTracks,
   }
 
-proc exportJsonTl*(tlV3: v3, `export`: string, input: string, output: string) =
+proc exportJsonTl*(tlV3: v3, `export`: string, output: string) =
   var tlJson: JsonNode
 
   if `export` == "v1":
     if tlV3.chunks.isNone:
       error("No chunks available for export")
-    tlJson = %v1(chunks: tlV3.chunks.get, source: input.expandFilename)
+
+    var source: string = ""
+    if tlV3.v.len > 0 and tlV3.v[0].len > 0:
+      source = tlV3.v[0][0].src[]
+    elif tlV3.a.len > 0 and tlV3.a[0].len > 0:
+      source = tlV3.a[0][0].src[]
+
+    tlJson = %v1(chunks: tlV3.chunks.get, source: source)
   else:
     tlJson = %tlV3
-
-  if tlJson == nil:
-    error("tl json object is nil")
 
   if output == "-":
     echo pretty(tlJson)

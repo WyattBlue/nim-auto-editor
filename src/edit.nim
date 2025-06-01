@@ -51,13 +51,14 @@ proc editMedia*(args: mainArgs) =
 
   if not stdin.isatty():
     let stdinContent = readAll(stdin)
-    tlV3 = parseV3(stdinContent, interner)
+    tlV3 = readJson(stdinContent, interner)
   else:
     let inputExt = splitFile(args.input).ext
 
-    if inputExt == ".v3":
-      tlV3 = parseV3(readFile(args.input), interner)
+    if inputExt == ".v3" or inputExt == ".v1":
+      tlV3 = readJson(readFile(args.input), interner)
     else:
+      # Make `timeline` from media file
       var container = av.open(args.input)
       var tb = AVRational(num: 30, den: 1)
 
@@ -70,18 +71,11 @@ proc editMedia*(args: mainArgs) =
       if tbLength > 0:
         chunks.add((0'i64, tbLength, 1.0))
 
-      tlV3 = toNonLinear(addr args.input, chunks)
-      tlV3.tb = tb
-      tlV3.res = src.get_res()
-      tlV3.sr = 48000
-      tlV3.layout = "stereo"
-      if src.a.len > 0:
-        tlV3.sr = src.a[0].sampleRate
-        tlV3.layout = src.a[0].layout
+      tlV3 = toNonLinear(addr args.input, tb, src, chunks)
 
   if args.`export` == "final-cut-pro":
     fcp11_write_xml("Auto-Editor Media Group", 11, args.output, false, tlV3)
   elif args.`export` == "v1" or args.`export` == "v3":
-    export_json_tl(tlV3, args.`export`, args.input, args.output)
+    export_json_tl(tlV3, args.`export`, args.output)
   else:
     error("Unknown export format")

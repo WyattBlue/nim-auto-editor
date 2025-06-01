@@ -3,6 +3,7 @@ import std/json
 import ../log
 import ../timeline
 import ../ffmpeg
+import ../media
 
 proc parseClip(node: JsonNode, interner: var StringInterner): Clip =
   result.src = interner.intern(node["src"].getStr())
@@ -12,12 +13,7 @@ proc parseClip(node: JsonNode, interner: var StringInterner): Clip =
   result.speed = node["speed"].getFloat()
   result.stream = node["stream"].getInt()
 
-proc parseV3*(jsonStr: string, interner: var StringInterner): v3 =
-  let jsonNode = parseJson(jsonStr)
-
-  if not jsonNode.hasKey("version") or jsonNode["version"].getStr() != "3":
-    error("Unsupported version")
-
+proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 =
   var tb: AVRational
   try:
     tb = jsonNode["timebase"].getStr()
@@ -61,3 +57,32 @@ proc parseV3*(jsonStr: string, interner: var StringInterner): v3 =
         for audioNode in trackNode:
           track.add(parseClip(audioNode, interner))
       result.a.add(track)
+
+proc parseV1*(jsonNode: JsonNode, interner: var StringInterner): v3 =
+  var chunks: seq[(int64, int64, float64)] = @[]
+
+  let input = jsonNode["source"].getStr()
+  let ptrInput = intern(interner, input)
+
+  if jsonNode.hasKey("chunks") and jsonNode["chunks"].kind == JArray:
+    for chunkNode in jsonNode["chunks"]:
+      if chunkNode.kind == JArray and chunkNode.len >= 3:
+        let start = chunkNode[0].getInt().int64
+        let `end` = chunkNode[1].getInt().int64
+        let speed = chunkNode[2].getFloat().float64
+        chunks.add((start, `end`, speed))
+
+  let src = initMediaInfo(input)
+  var tb = AVRational(num: 30, den: 1)
+
+  result = toNonLinear(ptrInput, tb, src, chunks)
+
+proc readJson*(jsonStr: string, interner: var StringInterner): v3 =
+  let jsonNode = parseJson(jsonStr)
+
+  let version: string = jsonNode["version"].getStr("unknown")
+  if version == "3":
+    return parseV3(jsonNode, interner)
+  if version == "1":
+    return parseV1(jsonNode, interner)
+  error("Unsupported version")

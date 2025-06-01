@@ -1,9 +1,8 @@
-# 0.2.0
+# 0.2.1
 
 ## Major
 
 ## Features
- - Steps towards supporting the v3 timeline
- - Reduced binary size compared to the previous version
+ - Add ability to read "v1" files
 
 ## Fixes
