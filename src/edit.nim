@@ -8,7 +8,7 @@ import av
 import media
 import ffmpeg
 import timeline
-import exports/[fcp11, json]
+import exports/[fcp11, json, shotcut]
 import imports/json
 
 proc mediaLength*(container: InputContainer): float64 =
@@ -77,5 +77,7 @@ proc editMedia*(args: mainArgs) =
     fcp11_write_xml("Auto-Editor Media Group", 11, args.output, false, tlV3)
   elif args.`export` == "v1" or args.`export` == "v3":
     export_json_tl(tlV3, args.`export`, args.output)
+  elif args.`export` == "shotcut":
+    shotcut_write_mlt(args.output, tlV3)
   else:
     error("Unknown export format")

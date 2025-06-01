@@ -8,13 +8,13 @@ type
   AVColorPrimaries* = cint
   AVColorTransferCharacteristic* = cint
   AVColorSpace* = cint
-
   AVPixelFormat* = distinct cint
 
+
+type
   AVRational* {.importc, header: "<libavutil/rational.h>", bycopy.} = object
     num*: cint
     den*: cint
-
 
 proc av_mul_q*(b: AVRational, c: AVRational): AVRational {.importc,
     header: "<libavutil/rational.h>".}
@@ -31,7 +31,6 @@ proc av_parse_ratio*(q: ptr AVRational, str: cstring, max: cint,
 
 header: "<libavutil/parseutils.h>".}
 
-# Operator overloads
 proc `+`*(a, b: AVRational): AVRational =
   av_add_q(a, b)
 
@@ -43,6 +42,10 @@ proc `*`*(a, b: AVRational): AVRational =
 
 proc `/`*(a, b: AVRational): AVRational =
   av_div_q(a, b)
+
+proc `/`*(a: int64, b: AVRational): AVRational =
+  let aRational = AVRational(num: cint(a), den: 1)
+  av_div_q(aRational, b)
 
 converter toDouble*(r: AVRational): cdouble =
   av_q2d(r)
