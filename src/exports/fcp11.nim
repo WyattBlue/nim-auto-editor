@@ -124,7 +124,7 @@ proc fcp11_write_xml*(groupName: string, version: int, output: string,
     lib.add evt
     fcpxml.add lib
 
-    proc make_clip[T](`ref`: string, clip: T) =
+    proc make_clip(`ref`: string, clip: Clip) =
         let clip_properties = {
             "name": proj_name,
             "ref": `ref`,
@@ -158,25 +158,20 @@ proc fcp11_write_xml*(groupName: string, version: int, output: string,
 
             asset.add(timemap)
 
-
+    var clips: seq[Clip] = @[]
     if tl.v.len > 0 and tl.v[0].len > 0:
-        var all_refs: seq[string] = @["r2"]
-        if resolve:
-            for i in 1 ..< tl.a.len:
-                all_refs.add("r" & $((i + 1) * 2))
-
-        for my_ref in all_refs.reversed:
-            for clip in tl.v[0]:
-                make_clip(my_ref, clip)
+        clips = tl.v[0]
     elif tl.a.len > 0 and tl.a[0].len > 0:
-        var all_refs: seq[string] = @["r2"]
-        if resolve:
-            for i in 1 ..< tl.a.len:
-                all_refs.add("r" & $((i + 1) * 2))
+        clips = tl.a[0]
 
-        for my_ref in all_refs.reversed:
-            for clip in tl.a[0]:
-                make_clip(my_ref, clip)
+    var all_refs: seq[string] = @["r2"]
+    if resolve:
+        for i in 1 ..< tl.a.len:
+            all_refs.add("r" & $((i + 1) * 2))
+
+    for my_ref in all_refs.reversed:
+        for clip in clips:
+            make_clip(my_ref, clip)
 
     if output == "-":
         echo $fcpxml

@@ -4,23 +4,13 @@ import ../log
 import ../timeline
 import ../ffmpeg
 
-proc parseVideo(node: JsonNode, interner: var StringInterner): Video =
+proc parseClip(node: JsonNode, interner: var StringInterner): Clip =
   result.src = interner.intern(node["src"].getStr())
   result.start = node["start"].getInt()
   result.dur = node["dur"].getInt()
   result.offset = node["offset"].getInt()
   result.speed = node["speed"].getFloat()
   result.stream = node["stream"].getInt()
-
-
-proc parseAudio(node: JsonNode, interner: var StringInterner): Audio =
-  result.src = interner.intern(node["src"].getStr())
-  result.start = node["start"].getInt()
-  result.dur = node["dur"].getInt()
-  result.offset = node["offset"].getInt()
-  result.speed = node["speed"].getFloat()
-  result.stream = node["stream"].getInt()
-
 
 proc parseV3*(jsonStr: string, interner: var StringInterner): v3 =
   let jsonNode = parseJson(jsonStr)
@@ -56,18 +46,18 @@ proc parseV3*(jsonStr: string, interner: var StringInterner): v3 =
   result.v = @[]
   if jsonNode.hasKey("v") and jsonNode["v"].kind == JArray:
     for trackNode in jsonNode["v"]:
-      var track: seq[Video] = @[]
+      var track: seq[Clip] = @[]
       if trackNode.kind == JArray:
         for videoNode in trackNode:
-          track.add(parseVideo(videoNode, interner))
+          track.add(parseClip(videoNode, interner))
       result.v.add(track)
 
   # Parse audio tracks
   result.a = @[]
   if jsonNode.hasKey("a") and jsonNode["a"].kind == JArray:
     for trackNode in jsonNode["a"]:
-      var track: seq[Audio] = @[]
+      var track: seq[Clip] = @[]
       if trackNode.kind == JArray:
         for audioNode in trackNode:
-          track.add(parseAudio(audioNode, interner))
+          track.add(parseClip(audioNode, interner))
       result.a.add(track)

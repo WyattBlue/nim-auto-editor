@@ -14,46 +14,13 @@ func `%`*(obj: v1): JsonNode =
   return %* {"version": "1", "source": obj.source, "chunks": jsonChunks}
 
 
-type Video* = object
+type Clip* = object
   src*: ptr string
   start*: int64
   dur*: int64
   offset*: int64
   speed*: float64
   stream*: int64
-
-func `%`*(self: Video): JsonNode =
-  let srcStr = if self.src != nil: self.src[] else: ""
-  return %* {
-    "name": "video",
-    "src": srcStr,
-    "start": self.start,
-    "dur": self.dur,
-    "offset": self.offset,
-    "speed": self.speed,
-    "stream": self.stream,
-  }
-
-type Audio* = object
-  src*: ptr string
-  start*: int64
-  dur*: int64
-  offset*: int64
-  speed*: float64
-  stream*: int64
-
-func `%`*(self: Audio): JsonNode =
-  let srcStr = if self.src != nil: self.src[] else: ""
-  return %* {
-    "name": "audio",
-    "src": srcStr,
-    "start": self.start,
-    "dur": self.dur,
-    "offset": self.offset,
-    "speed": self.speed,
-    "volume": 1,
-    "stream": self.stream,
-  }
 
 type v3* = object
   tb*: AVRational
@@ -61,11 +28,42 @@ type v3* = object
   sr*: int64
   layout*: string
   res*: (int64, int64)
-  v*: seq[seq[Video]]
-  a*: seq[seq[Audio]]
+  v*: seq[seq[Clip]]
+  a*: seq[seq[Clip]]
 
 
 func `%`*(self: v3): JsonNode =
+  var videoTracks = newJArray()
+  for track in self.v:
+    var trackArray = newJArray()
+    for clip in track:
+      var clipObj = newJObject()
+      clipObj["name"] = %"video"
+      clipObj["src"] = %(if clip.src != nil: clip.src[] else: "")
+      clipObj["start"] = %clip.start
+      clipObj["dur"] = %clip.dur
+      clipObj["offset"] = %clip.offset
+      clipObj["speed"] = %clip.speed
+      clipObj["stream"] = %clip.stream
+      trackArray.add(clipObj)
+    videoTracks.add(trackArray)
+
+  var audioTracks = newJArray()
+  for track in self.a:
+    var trackArray = newJArray()
+    for clip in track:
+      var clipObj = newJObject()
+      clipObj["name"] = %"audio"
+      clipObj["src"] = %(if clip.src != nil: clip.src[] else: "")
+      clipObj["start"] = %clip.start
+      clipObj["dur"] = %clip.dur
+      clipObj["offset"] = %clip.offset
+      clipObj["speed"] = %clip.speed
+      clipObj["volume"] = %1
+      clipObj["stream"] = %clip.stream
+      trackArray.add(clipObj)
+    audioTracks.add(trackArray)
+
   return %* {
     "version": "3",
     "timebase": $self.tb.num & "/" & $self.tb.den,
@@ -73,8 +71,8 @@ func `%`*(self: v3): JsonNode =
     "resolution": [self.res[0], self.res[1]],
     "samplerate": self.sr,
     "layout": self.layout,
-    "v": self.v,
-    "a": self.a,
+    "v": videoTracks,
+    "a": audioTracks,
   }
 
 
@@ -97,8 +95,8 @@ func uniqueSources*(self: v3): HashSet[ptr string] =
       result.incl(audio.src)
 
 func toNonLinear*(src: ptr string, chunks: seq[(int64, int64, float64)]): v3 =
-  var vlayer: seq[Video] = @[]
-  var alayer: seq[Audio] = @[]
+  var vlayer: seq[Clip] = @[]
+  var alayer: seq[Clip] = @[]
   var i: int64 = 0
   var start: int64 = 0
   var dur: int64
@@ -113,9 +111,9 @@ func toNonLinear*(src: ptr string, chunks: seq[(int64, int64, float64)]): v3 =
       offset = int64(float64(chunk[0]) / chunk[2])
 
       if not (vlayer.len > 0 and vlayer[^1].start == start):
-        vlayer.add(Video(src: src, start: start, dur: dur, offset: offset,
+        vlayer.add(Clip(src: src, start: start, dur: dur, offset: offset,
             speed: chunk[2], stream: 0))
-        alayer.add(Audio(src: src, start: start, dur: dur, offset: offset,
+        alayer.add(Clip(src: src, start: start, dur: dur, offset: offset,
             speed: chunk[2], stream: 0))
       start += dur
       i += 1
