@@ -124,5 +124,5 @@ task windows, "Cross-compile to Windows (requires mingw-w64)":
 
 
 task grabWinBin, "Get the windows binary":
-  exec "curl -L -O https://github.com/WyattBlue/nim-auto-editor/releases/download/0.1.0/auto-editor.exe"
+  exec "curl -L -O https://github.com/WyattBlue/nim-auto-editor/releases/download/0.2.1/auto-editor.exe"
 
