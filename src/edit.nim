@@ -73,8 +73,11 @@ proc editMedia*(args: mainArgs) =
 
       tlV3 = toNonLinear(addr args.input, tb, src, chunks)
 
+  const tlName = "Auto-Editor Media Group"
   if args.`export` == "final-cut-pro":
-    fcp11_write_xml("Auto-Editor Media Group", 11, args.output, false, tlV3)
+    fcp11_write_xml(tlName, 11, args.output, false, tlV3)
+  elif args.`export` == "resolve":
+    fcp11_write_xml(tlName, 10, args.output, true, tlV3)
   elif args.`export` == "v1" or args.`export` == "v3":
     export_json_tl(tlV3, args.`export`, args.output)
   elif args.`export` == "shotcut":
