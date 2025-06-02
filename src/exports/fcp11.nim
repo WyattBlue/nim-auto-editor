@@ -18,13 +18,13 @@ https://developer.apple.com/documentation/professional_video_applications/fcpxml
 ]#
 
 
-func get_colorspace(src: MediaInfo): string =
+func getColorspace(mi: MediaInfo): string =
   # See: https://developer.apple.com/documentation/professional_video_applications/fcpxml_reference/asset#3686496
 
-  if src.v.len == 0:
+  if mi.v.len == 0:
     return "1-1-1 (Rec. 709)"
 
-  let s = src.v[0]
+  let s = mi.v[0]
   if s.pix_fmt == "rgb24":
     return "sRGB IEC61966-2.1"
   if s.color_space == 5: # "bt470bg"
@@ -40,10 +40,10 @@ func get_colorspace(src: MediaInfo): string =
   return "1-1-1 (Rec. 709)"
 
 
-func make_name(src: MediaInfo, tb: AVRational): string =
-  if src.get_res()[1] == 720 and tb == 30:
+func makeName(mi: MediaInfo, tb: AVRational): string =
+  if mi.get_res()[1] == 720 and tb == 30:
     return "FFVideoFormat720p30"
-  if src.get_res()[1] == 720 and tb == 25:
+  if mi.get_res()[1] == 720 and tb == 25:
     return "FFVideoFormat720p25"
   return "FFVideoFormatRateUndefined"
 
@@ -76,34 +76,33 @@ proc fcp11_write_xml*(groupName: string, version: string, output: string,
 
   var i = 0
   for ptrSrc in tl.uniqueSources:
-    let one_src = initMediaInfo(ptrSrc[])
+    let mi = initMediaInfo(ptrSrc[])
 
     if i == 0:
-      proj_name = splitFile(one_src.path).name
-      src_dur = int(one_src.duration * tl.tb)
+      proj_name = splitFile(mi.path).name
+      src_dur = int(mi.duration * tl.tb)
       if resolve:
         tl_dur = src_dur
 
     let id = "r" & $(i * 2 + 1)
     let width = $tl.res[0]
     let height = $tl.res[1]
-    resources.add(<>format(id = id, name = make_name(one_src, tl.tb),
+    resources.add(<>format(id = id, name = makeName(mi, tl.tb),
         frameDuration = fraction(1), width = width, height = height,
-        colorSpace = get_colorspace(one_src)))
+        colorSpace = getColorspace(mi)))
 
     let id2 = "r" & $(i * 2 + 2)
-    let hasVideo = (if one_src.v.len > 0: "1" else: "0")
-    let hasAudio = (if one_src.a.len > 0: "1" else: "0")
-    let audioChannels = (if one_src.a.len == 0: "2" else: $one_src.a[0].channels)
+    let hasVideo = (if mi.v.len > 0: "1" else: "0")
+    let hasAudio = (if mi.a.len > 0: "1" else: "0")
+    let audioChannels = (if mi.a.len == 0: "2" else: $mi.a[0].channels)
 
-    let r2 = <>asset(id = id2, name = splitFile(one_src.path).name,
+    let r2 = <>asset(id = id2, name = splitFile(mi.path).name,
         start = "0s", hasVideo = hasVideo, format = id,
         hasAudio = hasAudio, audioSources = "1",
         audioChannels = audioChannels, duration = fraction(tl_dur))
 
     let mediaRep = newElement("media-rep")
-    mediaRep.attrs = {"kind": "original-media",
-        "src": one_src.path.absolutePath().pathToUri()}.toXmlAttributes
+    mediaRep.attrs = {"kind": "original-media", "src": mi.path.absolutePath().pathToUri()}.toXmlAttributes
 
     r2.add mediaRep
     resources.add r2
