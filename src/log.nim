@@ -1,7 +1,6 @@
 import std/tables
 import std/terminal
-import std/strformat
-
+from std/math import gcd
 
 type mainArgs* = object
   input*: string
@@ -12,7 +11,7 @@ type mainArgs* = object
 
 
 proc error*(msg: string) =
-  stderr.styledWriteLine(fgRed, bgBlack, fmt"Error! {msg}", resetStyle)
+  stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)
   quit(1)
 
 
@@ -35,3 +34,9 @@ proc cleanup*(interner: var StringInterner) =
   for ptrStr in interner.strings.values:
     dealloc(ptrStr)
   interner.strings.clear()
+
+func aspectRatio*(width, height: int): tuple[w, h: int] =
+  if height == 0:
+    return (0, 0)
+  let c = gcd(width, height)
+  return (width div c, height div c)

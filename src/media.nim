@@ -61,12 +61,6 @@ proc hash*(mi: MediaInfo): Hash =
 proc `==`*(a, b: MediaInfo): bool =
   a.path == b.path
 
-func fracToHuman*(a: AVRational): string =
-  if a.den == 1:
-    return fmt"{a.num}"
-  else:
-    return fmt"{a.num}/{a.den}"
-
 proc round(x: AVRational, places: int): float64 =
   round(x.num.float64 / x.den.float64, places)
 

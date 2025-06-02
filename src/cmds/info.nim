@@ -15,21 +15,6 @@ proc genericTrack(lang: string, bitrate: int) =
     echo fmt"     - lang: {lang}"
 
 
-func aspectRatio(width, height: int): tuple[w, h: int] =
-  if height == 0:
-    return (0, 0)
-
-  func gcd(a, b: int): int =
-    var
-      x = a
-      y = b
-    while y != 0:
-      (x, y) = (y, x mod y)
-    return x
-
-  let c = gcd(width, height)
-  return (width div c, height div c)
-
 proc printYamlInfo(fileInfo: MediaInfo) =
   echo fileInfo.path, ":"
   echo fmt" - recommendedTimebase: {fileInfo.recommendedTimebase}"
@@ -90,7 +75,7 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
     let (ratioWidth, ratioHeight) = aspectRatio(v.width, v.height)
     varr.add( %* {
       "codec": v.codec,
-      "fps": v.avg_rate.fracToHuman,
+      "fps": $v.avg_rate,
       "resolution": [v.width, v.height],
       "aspect_ratio": [ratioWidth, ratioHeight],
       "pixel_aspect_ratio": v.sar,

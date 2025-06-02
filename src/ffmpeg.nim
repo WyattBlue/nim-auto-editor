@@ -39,6 +39,12 @@ proc `/`*(a: int64, b: AVRational): AVRational =
 proc `*`*(a: int64, b: AVRational): AVRational =
   AVRational(num: a.cint, den: 1) * b
 
+func `$`*(a: AVRational): string =
+  if a.den == 1:
+    return $a.num
+  else:
+    return $a.num & "/" & $a.den
+
 converter toDouble*(r: AVRational): cdouble =
   av_q2d(r)
 

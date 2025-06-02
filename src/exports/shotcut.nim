@@ -4,6 +4,7 @@ import std/strutils
 import std/math
 import ../timeline
 import ../ffmpeg
+import ../log
 from std/os import splitFile
 
 #[
@@ -15,10 +16,6 @@ https://mltframework.org/docs/mltxml/
 
 ]#
 
-
-proc aspect_ratio*(width, height: int): (int, int) =
-  let gcd_val = gcd(width, height)
-  result = (width div gcd_val, height div gcd_val)
 
 proc to_timecode(secs: float, fmt: string): string =
   var sign = ""
@@ -62,7 +59,7 @@ proc shotcut_write_mlt*(output: string, tl: v3) =
   }.toXmlAttributes()
 
   let (width, height) = tl.res
-  let (num, den) = aspect_ratio(width, height)
+  let (num, den) = aspectRatio(width, height)
   let tb = tl.tb
 
   let profile = newElement("profile")
