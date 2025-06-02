@@ -32,14 +32,15 @@ auto-editor example.mp4
 ### Subcommands
 - [x] info
 - [x] desc
-- [ ] subdump
+- [x] subdump
 - [ ] levels
 
 ### Exporting
 - [x] Final Cut Pro (.fcpxml)
 - [x] ShotCut (.mlt)
-- [ ] Premiere Pro (.xml)
-- [ ] DaVinci Resolve
+- [x] Premiere Pro (.xml)
+- [x] DaVinci Resolve
+- [ ] Media files
 
 ### Editing Methods
 - [x] "none"
