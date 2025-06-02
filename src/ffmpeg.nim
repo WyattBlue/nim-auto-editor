@@ -2,16 +2,6 @@
 {.passL: "-L./ffmpeg_build/lib -lavformat -lavcodec -lavutil -lswresample".}
 
 type
-  AVMediaType* = cint
-  AVCodecID* = cint
-  AVColorRange* = cint
-  AVColorPrimaries* = cint
-  AVColorTransferCharacteristic* = cint
-  AVColorSpace* = cint
-  AVPixelFormat* = distinct cint
-
-
-type
   AVRational* {.importc, header: "<libavutil/rational.h>", bycopy.} = object
     num*: cint
     den*: cint
@@ -72,8 +62,15 @@ converter toAVRational*(s: string): AVRational =
 
 
 type
-  AVDictionary* {.importc, header: "<libavutil/dict.h>".} = object
+  AVMediaType* = cint
+  AVCodecID* = cint
+  AVColorRange* = cint
+  AVColorPrimaries* = cint
+  AVColorTransferCharacteristic* = cint
+  AVColorSpace* = cint
+  AVPixelFormat* = distinct cint
 
+  AVDictionary* {.importc, header: "<libavutil/dict.h>".} = object
   AVDictionaryEntry* {.importc, header: "<libavutil/dict.h>".} = object
     key*: cstring
     value*: cstring
@@ -206,9 +203,24 @@ const
   AVMEDIA_TYPE_UNKNOWN* = AVMediaType(-1)
   AVMEDIA_TYPE_VIDEO* = AVMediaType(0)
   AVMEDIA_TYPE_AUDIO* = AVMediaType(1)
-  AVMEDIA_TYPE_SUBTITLE* = AVMediaType(2)
+  AVMEDIA_TYPE_DATA* = AVMediaType(2)
+  AVMEDIA_TYPE_SUBTITLE* = AVMediaType(3)
+  AVMEDIA_TYPE_ATTACHMENT* = AVMediaType(4)
   AV_TIME_BASE* = 1000000
   AV_NOPTS_VALUE* = -9223372036854775807'i64 - 1
+
+const
+  AV_LOG_QUIET* = -8      # Print no output
+  AV_LOG_PANIC* = 0       # Something went really wrong
+  AV_LOG_FATAL* = 8       # Something went wrong and recovery is not possible
+  AV_LOG_ERROR* = 16      # Something went wrong and cannot losslessly be recovered
+  AV_LOG_WARNING* = 24    # Something somehow does not look correct
+  AV_LOG_INFO* = 32       # Standard information
+  AV_LOG_VERBOSE* = 40    # Detailed information
+  AV_LOG_DEBUG* = 48      # Stuff which is only useful for libav* developers
+  AV_LOG_TRACE* = 56      # Extremely verbose debugging
+
+proc av_log_set_level*(level: cint) {.importc, header: "<libavutil/log.h>".}
 
 # Procedure declarations remain the same
 proc avformat_open_input*(ps: ptr ptr AVFormatContext, filename: cstring,
@@ -430,3 +442,37 @@ proc av_get_bytes_per_sample*(sample_fmt: AVSampleFormat): cint {.importc, cdecl
 proc av_samples_get_buffer_size*(linesize: ptr cint, nb_channels: cint,
     nb_samples: cint, sample_fmt: AVSampleFormat, align: cint): cint {.importc,
     header: "<libavutil/samplefmt.h>".}
+
+
+# Subtitles
+type
+  AVSubtitleType* {.importc: "enum AVSubtitleType", header: "<libavcodec/avcodec.h>".} = enum
+    SUBTITLE_NONE,
+    SUBTITLE_BITMAP,
+    SUBTITLE_TEXT,
+    SUBTITLE_ASS
+
+  AVSubtitleRect* {.importc, header: "<libavcodec/avcodec.h>".} = object
+    x*: cint
+    y*: cint
+    w*: cint
+    h*: cint
+    nb_colors*: cint
+    text*: cstring
+    ass*: cstring
+    flags*: cint
+    `type`*: AVSubtitleType
+
+  AVSubtitle* {.importc, header: "<libavcodec/avcodec.h>".} = object
+    format*: uint16
+    start_display_time*: uint32  # relative to packet pts, in ms
+    end_display_time*: uint32    # relative to packet pts, in ms
+    num_rects*: cuint
+    rects*: ptr UncheckedArray[ptr AVSubtitleRect]
+    pts*: int64
+
+proc avcodec_decode_subtitle2*(avctx: ptr AVCodecContext, sub: ptr AVSubtitle,
+    got_sub_ptr: ptr cint, avpkt: ptr AVPacket): cint {.importc,
+    header: "<libavcodec/avcodec.h>".}
+
+proc avsubtitle_free*(sub: ptr AVSubtitle) {.importc, header: "<libavcodec/avcodec.h>".}

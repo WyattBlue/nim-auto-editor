@@ -4,6 +4,7 @@ import std/[strformat, strutils]
 import std/parseopt
 
 import ../av
+import ../ffmpeg
 import ../media
 import ../log
 
@@ -129,6 +130,8 @@ proc main*(args: seq[string]) =
   if args.len < 1:
     echo "Retrieve information and properties about media files"
     quit(0)
+
+  av_log_set_level(AV_LOG_QUIET)
 
   var isJson = false
   var inputFiles: seq[string] = @[]

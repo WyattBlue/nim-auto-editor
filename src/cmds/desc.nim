@@ -6,6 +6,8 @@ proc main*(args: seq[string]) =
     echo "Display a media's description metadata"
     quit(0)
 
+  av_log_set_level(AV_LOG_QUIET)
+
   for inputFile in args:
     var container = av.open(inputFile)
     let formatContext = container.formatContext

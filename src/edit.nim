@@ -111,6 +111,8 @@ proc parseExportString*(exportStr: string): (string, string, string) =
 
 
 proc editMedia*(args: mainArgs) =
+  av_log_set_level(AV_LOG_QUIET)
+
   var tlV3: v3
   var interner = newStringInterner()
   defer: interner.cleanup()
