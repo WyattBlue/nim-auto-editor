@@ -46,9 +46,9 @@ func uniqueSources*(self: v3): HashSet[ptr string] =
     for audio in alayer:
       result.incl(audio.src)
 
-func toNonLinear*(src: ptr string, tb: AvRational, info: MediaInfo, chunks: seq[(int64, int64, float64)]): v3 =
-  var vlayer: seq[Clip] = @[]
-  var alayer: seq[Clip] = @[]
+func toNonLinear*(src: ptr string, tb: AvRational, mi: MediaInfo, chunks: seq[(
+    int64, int64, float64)]): v3 =
+  var clips: seq[Clip] = @[]
   var i: int64 = 0
   var start: int64 = 0
   var dur: int64
@@ -62,20 +62,37 @@ func toNonLinear*(src: ptr string, tb: AvRational, info: MediaInfo, chunks: seq[
 
       offset = int64(float64(chunk[0]) / chunk[2])
 
-      if not (vlayer.len > 0 and vlayer[^1].start == start):
-        vlayer.add(Clip(src: src, start: start, dur: dur, offset: offset,
-            speed: chunk[2], stream: 0))
-        alayer.add(Clip(src: src, start: start, dur: dur, offset: offset,
-            speed: chunk[2], stream: 0))
+      if not (clips.len > 0 and clips[^1].start == start):
+        clips.add(Clip(src: src, start: start, dur: dur, offset: offset,
+            speed: chunk[2]))
       start += dur
       i += 1
 
-  result = v3(v: @[vlayer], a: @[alayer], chunks: some(chunks))
+  var vspace: seq[seq[Clip]] = @[]
+  var aspace: seq[seq[Clip]] = @[]
+
+  if mi.v.len > 0:
+    var vlayer: seq[Clip] = @[]
+    for clip in clips:
+      var videoClip = clip
+      videoClip.stream = 0
+      vlayer.add(videoClip)
+    vspace.add(vlayer)
+
+  for i in 0 ..< mi.a.len:
+    var alayer: seq[Clip] = @[]
+    for clip in clips:
+      var audioClip = clip
+      audioClip.stream = i
+      alayer.add(audioClip)
+    aspace.add(alayer)
+
+  result = v3(v: vspace, a: aspace, chunks: some(chunks))
   result.background = "#000000"
   result.tb = tb
-  result.res = info.get_res()
+  result.res = mi.get_res()
   result.sr = 48000
   result.layout = "stereo"
-  if info.a.len > 0:
-    result.sr = info.a[0].sampleRate
-    result.layout = info.a[0].layout
+  if mi.a.len > 0:
+    result.sr = mi.a[0].sampleRate
+    result.layout = mi.a[0].layout
