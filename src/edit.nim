@@ -44,6 +44,72 @@ proc mediaLength*(container: InputContainer): float64 =
   error("No audio stream found")
 
 
+proc parseExportString*(exportStr: string): (string, string, string) =
+  var kind = exportStr
+  var name = "Auto-Editor Media Group"
+  var version = "11"
+
+  let colonPos = exportStr.find(':')
+  if colonPos == -1:
+    return (kind, name, version)
+
+  kind = exportStr[0..colonPos-1]
+  let paramsStr = exportStr[colonPos+1..^1]
+
+  var i = 0
+  while i < paramsStr.len:
+    while i < paramsStr.len and paramsStr[i] == ' ':
+      inc i
+
+    if i >= paramsStr.len:
+      break
+
+    var paramStart = i
+    while i < paramsStr.len and paramsStr[i] != '=':
+      inc i
+
+    if i >= paramsStr.len:
+      break
+
+    let paramName = paramsStr[paramStart..i-1]
+    inc i
+
+    var value = ""
+    if i < paramsStr.len and paramsStr[i] == '"':
+      inc i
+      while i < paramsStr.len:
+        if paramsStr[i] == '\\' and i + 1 < paramsStr.len:
+          # Handle escape sequences
+          inc i
+          case paramsStr[i]:
+            of '"': value.add('"')
+            of '\\': value.add('\\')
+            else:
+              value.add('\\')
+              value.add(paramsStr[i])
+        elif paramsStr[i] == '"':
+          inc i
+          break
+        else:
+          value.add(paramsStr[i])
+        inc i
+    else:
+      # Unquoted value (until comma or end)
+      while i < paramsStr.len and paramsStr[i] != ',':
+        value.add(paramsStr[i])
+        inc i
+
+    case paramName:
+      of "name": name = value
+      of "version": version = value
+
+    # Skip comma
+    if i < paramsStr.len and paramsStr[i] == ',':
+      inc i
+
+  return (kind, name, version)
+
+
 proc editMedia*(args: mainArgs) =
   var tlV3: v3
   var interner = newStringInterner()
@@ -73,19 +139,21 @@ proc editMedia*(args: mainArgs) =
 
       tlV3 = toNonLinear(addr args.input, tb, src, chunks)
 
-  const tlName = "Auto-Editor Media Group"
 
-  if args.`export` == "premiere":
+  let (exportKind, tlName, fcpVersion) = parseExportString(args.`export`)
+
+  case exportKind:
+  of "premiere":
     fcp7_write_xml(tlName, args.output, false, tlV3)
-  elif args.`export` == "resolve-fcp7":
+  of "resolve-fcp7":
     fcp7_write_xml(tlName, args.output, true, tlV3)
-  elif args.`export` == "final-cut-pro":
-    fcp11_write_xml(tlName, 11, args.output, false, tlV3)
-  elif args.`export` == "resolve":
-    fcp11_write_xml(tlName, 10, args.output, true, tlV3)
-  elif args.`export` == "v1" or args.`export` == "v3":
+  of "final-cut-pro":
+    fcp11_write_xml(tlName, fcpVersion, args.output, false, tlV3)
+  of "resolve":
+    fcp11_write_xml(tlName, fcpVersion, args.output, true, tlV3)
+  of "v1", "v3":
     export_json_tl(tlV3, args.`export`, args.output)
-  elif args.`export` == "shotcut":
+  of "shotcut":
     shotcut_write_mlt(args.output, tlV3)
   else:
     error("Unknown export format")

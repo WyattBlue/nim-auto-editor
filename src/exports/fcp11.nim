@@ -50,7 +50,7 @@ func make_name(src: MediaInfo, tb: AVRational): string =
 func pathToUri(a: string): string =
   return "file://" & a
 
-proc fcp11_write_xml*(groupName: string, version: int, output: string,
+proc fcp11_write_xml*(groupName: string, version: string, output: string,
     resolve: bool, tl: v3) =
   func fraction(val: int): string =
     if val == 0:
@@ -58,9 +58,9 @@ proc fcp11_write_xml*(groupName: string, version: int, output: string,
     return &"{val.cint * tl.tb.den}/{tl.tb.num}s"
 
   var verStr: string
-  if version == 11:
+  if version == "11":
     verStr = "1.11"
-  elif version == 10:
+  elif version == "10":
     verStr = "1.10"
   else:
     error(&"Unknown final cut pro version: {version}")

@@ -1,6 +1,7 @@
 import unittest
 
 import ../src/ffmpeg
+import ../src/edit
 
 test "maths":
   let a = AVRational(num: 3, den: 4)
@@ -21,3 +22,10 @@ test "strings":
   check(AVRational("-2/3") == AVRational(num: -2, den: 3))
   check(AVRational("6/8") == AVRational(num: 3, den: 4))
   check(AVRational("1.5") == AVRational(num: 3, den: 2))
+
+
+test "exports":
+  check(parseExportString("premiere:name=a,version=3") == ("premiere", "a", "3"))
+  check(parseExportString("premiere:name=a") == ("premiere", "a", "11"))
+  check(parseExportString("premiere:name=\"Hello \\\" World") == ("premiere", "Hello \" World", "11"))
+  check(parseExportString("premiere:name=\"Hello \\\\ World") == ("premiere", "Hello \\ World", "11"))
