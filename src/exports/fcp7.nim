@@ -45,8 +45,7 @@ proc elem(tag, text: string): XmlNode =
   return e
 
 proc param(id, name, value: string, min = "", max = ""): XmlNode =
-  let p = newElement("parameter")
-  p.attrs = {"authoringApp": "PremierePro"}.toXmlAttributes
+  let p = <>parameter(authoringApp = "PremierePro")
   p.add elem("parameterid", id)
   p.add elem("name", name)
   if min != "": p.add elem("valuemin", min)
@@ -244,8 +243,7 @@ proc fcp7_write_xml*(name: string, output: string, resolve: bool, tl: v3) =
 
   proc make_filedef(clipitem: XmlNode, mi: MediaInfo) =
     let pathurl = miToUrl[mi]
-    let filedef = newElement("file")
-    filedef.attrs = {"id": miToId[mi]}.toXmlAttributes
+    let filedef = <>file(id = miToId[mi])
     if pathurl notin fileDefs:
       media_def(filedef, pathurl, mi, tl, timebase, ntsc)
       fileDefs.incl(pathurl)
@@ -288,8 +286,7 @@ proc fcp7_write_xml*(name: string, output: string, resolve: bool, tl: v3) =
       let out_val = $(clip.offset + clip.dur)
 
       let this_clipid = &"clipitem-{j + 1}"
-      let clipitem = newElement("clipitem")
-      clipitem.attrs = {"id": this_clipid}.toXmlAttributes
+      let clipitem = <>clipitem(id = this_clipid)
       clipitem.add elem("name", clip.src[].splitFile.name)
       clipitem.add elem("enabled", "TRUE")
       clipitem.add elem("start", start_val)

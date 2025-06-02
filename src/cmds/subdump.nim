@@ -31,7 +31,8 @@ proc main*(args: seq[string]) =
         subStreams.add i
 
     for i, s in subStreams.pairs:
-      let codecName = $avcodec_get_name(formatContext.streams[s].codecpar.codec_id)
+      let codecName = $avcodec_get_name(formatContext.streams[
+          s].codecpar.codec_id)
       echo "file: " & inputFile & " (" & $i & ":" & codecName & ")"
 
       let subtitleStream = formatContext.streams[s]
@@ -56,7 +57,8 @@ proc main*(args: seq[string]) =
 
         if packet.stream_index == s.cint:
           var gotSubtitle: cint = 0
-          let ret = avcodec_decode_subtitle2(codecContext, addr subtitle, addr gotSubtitle, packet)
+          let ret = avcodec_decode_subtitle2(codecContext, addr subtitle,
+              addr gotSubtitle, packet)
 
           if ret >= 0 and gotSubtitle != 0:
             defer: avsubtitle_free(addr subtitle)

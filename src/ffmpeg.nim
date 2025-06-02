@@ -216,15 +216,15 @@ const
   AV_NOPTS_VALUE* = -9223372036854775807'i64 - 1
 
 const
-  AV_LOG_QUIET* = -8      # Print no output
-  AV_LOG_PANIC* = 0       # Something went really wrong
-  AV_LOG_FATAL* = 8       # Something went wrong and recovery is not possible
-  AV_LOG_ERROR* = 16      # Something went wrong and cannot losslessly be recovered
-  AV_LOG_WARNING* = 24    # Something somehow does not look correct
-  AV_LOG_INFO* = 32       # Standard information
-  AV_LOG_VERBOSE* = 40    # Detailed information
-  AV_LOG_DEBUG* = 48      # Stuff which is only useful for libav* developers
-  AV_LOG_TRACE* = 56      # Extremely verbose debugging
+  AV_LOG_QUIET* = -8   # Print no output
+  AV_LOG_PANIC* = 0    # Something went really wrong
+  AV_LOG_FATAL* = 8    # Something went wrong and recovery is not possible
+  AV_LOG_ERROR* = 16   # Something went wrong and cannot losslessly be recovered
+  AV_LOG_WARNING* = 24 # Something somehow does not look correct
+  AV_LOG_INFO* = 32    # Standard information
+  AV_LOG_VERBOSE* = 40 # Detailed information
+  AV_LOG_DEBUG* = 48   # Stuff which is only useful for libav* developers
+  AV_LOG_TRACE* = 56   # Extremely verbose debugging
 
 proc av_log_set_level*(level: cint) {.importc, header: "<libavutil/log.h>".}
 
@@ -452,7 +452,8 @@ proc av_samples_get_buffer_size*(linesize: ptr cint, nb_channels: cint,
 
 # Subtitles
 type
-  AVSubtitleType* {.importc: "enum AVSubtitleType", header: "<libavcodec/avcodec.h>".} = enum
+  AVSubtitleType* {.importc: "enum AVSubtitleType",
+      header: "<libavcodec/avcodec.h>".} = enum
     SUBTITLE_NONE,
     SUBTITLE_BITMAP,
     SUBTITLE_TEXT,
@@ -471,8 +472,8 @@ type
 
   AVSubtitle* {.importc, header: "<libavcodec/avcodec.h>".} = object
     format*: uint16
-    start_display_time*: uint32  # relative to packet pts, in ms
-    end_display_time*: uint32    # relative to packet pts, in ms
+    start_display_time*: uint32 # relative to packet pts, in ms
+    end_display_time*: uint32   # relative to packet pts, in ms
     num_rects*: cuint
     rects*: ptr UncheckedArray[ptr AVSubtitleRect]
     pts*: int64
@@ -481,4 +482,5 @@ proc avcodec_decode_subtitle2*(avctx: ptr AVCodecContext, sub: ptr AVSubtitle,
     got_sub_ptr: ptr cint, avpkt: ptr AVPacket): cint {.importc,
     header: "<libavcodec/avcodec.h>".}
 
-proc avsubtitle_free*(sub: ptr AVSubtitle) {.importc, header: "<libavcodec/avcodec.h>".}
+proc avsubtitle_free*(sub: ptr AVSubtitle) {.importc,
+    header: "<libavcodec/avcodec.h>".}
