@@ -1,5 +1,6 @@
 import ../ffmpeg
 import ../av
+import ../log
 
 
 proc main*(args: seq[string]) =
@@ -14,8 +15,12 @@ proc main*(args: seq[string]) =
     quit(1)
   defer: av_packet_free(addr packet)
 
+  var container: InputContainer
   for inputFile in args:
-    var container = av.open(inputFile)
+    try:
+      container = av.open(inputFile)
+    except IOError as e:
+      error(e.msg)
     defer: container.close()
     let formatContext = container.formatContext
 
