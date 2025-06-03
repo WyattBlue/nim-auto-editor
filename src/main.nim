@@ -45,6 +45,8 @@ judge making cuts.
         args.output = key
       of "export":
         args.`export` = key
+      of "progress":
+        args.progress = key
       expecting = ""
 
     of cmdLongOption:
@@ -52,10 +54,8 @@ judge making cuts.
         args.version = true
       elif key == "debug":
         args.debug = true
-      elif key == "export":
-        expecting = "export"
-      elif key == "output":
-        expecting = "output"
+      elif key in ["export", "output", "progress"]:
+        expecting = key
       else:
         error(fmt"Unknown option: {key}")
     of cmdShortOption:

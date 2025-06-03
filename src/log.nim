@@ -6,6 +6,7 @@ type mainArgs* = object
   input*: string
   version*: bool = false
   debug*: bool = false
+  progress*: string
   output*: string = "-"
   `export`*: string = "v3"
 
