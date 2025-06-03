@@ -9,7 +9,7 @@ import edit
 import log
 
 
-const version* = "0.2.1"
+const version* = "0.3.0"
 
 proc main() =
   if paramCount() < 1:

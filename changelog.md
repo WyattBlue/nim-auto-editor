@@ -3,6 +3,7 @@
 ## Major
 
 ## Features
- - Add `premiere` `resolve-fcp7` and `resolve` export formats
+ - Add `premiere` `shotcut` `resolve-fcp7` and `resolve` export formats
+ - Add export attributes
 
 ## Fixes
