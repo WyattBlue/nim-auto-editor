@@ -15,11 +15,26 @@ nimble makeffmpeg
 nimble make
 ```
 
+To install, just move the binary to a $PATH directory.
+
 ## Usage
 
-While most of the intesrting
+The `info`, `desc`, and `subdump` commands work as expected:
+
 ```
 auto-editor info example.mp4
+
+example.mp4:
+ - recommendedTimebase: 30/1
+ - video:
+   - track 0:
+     - codec: h264
+...
+```
+
+Converting one timeline format to another:
+```
+auto-editor input.fcpxml --export premiere -o out.xml
 ```
 
 Make a timeline, this part is under the most active development.
