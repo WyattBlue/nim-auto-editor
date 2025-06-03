@@ -41,8 +41,8 @@ let commonFlags = """
   --disable-xlib \
   --disable-filters \
   --disable-encoders \
-  --disable-muxers \
   --disable-encoder=avui,dca,mlp,opus,s302m,sonic,sonic_ls,truehd,vorbis \
+  --enable-encoder=pcm_s16le \
   --disable-decoder=sonic \
   --disable-autodetect
 """

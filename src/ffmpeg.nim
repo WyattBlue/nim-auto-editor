@@ -92,10 +92,20 @@ type
     mask*: uint64
     map*: array[64, uint8]
 
+  AVOutputFormat* {.importc, header: "<libavformat/avformat.h>".} = object
+    name*: cstring
+    long_name*: cstring
+    mime_type*: cstring
+    extensions*: cstring
+    audio_codec*: AVCodecID
+    video_codec*: AVCodecID
+    subtitle_codec*: AVCodecID
+    flags*: cint
+
   AVFormatContext* {.importc, header: "<libavformat/avformat.h>".} = object
     av_class*: pointer
     iformat*: pointer
-    oformat*: pointer
+    oformat*: ptr[AVOutputFormat]
     priv_data*: pointer
     pb*: pointer
     ctx_flags*: cint
@@ -484,3 +494,36 @@ proc avcodec_decode_subtitle2*(avctx: ptr AVCodecContext, sub: ptr AVSubtitle,
 
 proc avsubtitle_free*(sub: ptr AVSubtitle) {.importc,
     header: "<libavcodec/avcodec.h>".}
+
+
+proc avformat_alloc_output_context2*(ctx: ptr ptr AVFormatContext,
+    oformat: pointer, format_name: cstring, filename: cstring): cint {.importc,
+    header: "<libavformat/avformat.h>".}
+proc avformat_new_stream*(s: ptr AVFormatContext, c: pointer): ptr AVStream {.importc,
+    header: "<libavformat/avformat.h>".}
+proc avcodec_find_encoder*(id: AVCodecID): ptr AVCodec {.importc,
+    header: "<libavcodec/avcodec.h>".}
+proc avcodec_parameters_from_context*(par: ptr AVCodecParameters,
+    codec: ptr AVCodecContext): cint {.importc, header: "<libavcodec/avcodec.h>".}
+proc avio_open*(s: ptr pointer, filename: cstring, flags: cint): cint {.importc,
+    header: "<libavformat/avio.h>".}
+proc avio_closep*(s: ptr pointer): cint {.importc, header: "<libavformat/avio.h>".}
+proc avformat_write_header*(s: ptr AVFormatContext, options: pointer): cint {.importc,
+    header: "<libavformat/avformat.h>".}
+proc av_write_trailer*(s: ptr AVFormatContext): cint {.importc,
+    header: "<libavformat/avformat.h>".}
+proc avformat_free_context*(s: ptr AVFormatContext) {.importc,
+    header: "<libavformat/avformat.h>".}
+proc avcodec_send_frame*(avctx: ptr AVCodecContext, frame: ptr AVFrame): cint {.importc,
+    header: "<libavcodec/avcodec.h>".}
+proc avcodec_receive_packet*(avctx: ptr AVCodecContext, avpkt: ptr AVPacket): cint {.importc,
+    header: "<libavcodec/avcodec.h>".}
+proc av_interleaved_write_frame*(s: ptr AVFormatContext, pkt: ptr AVPacket): cint {.importc,
+    header: "<libavformat/avformat.h>".}
+proc av_packet_rescale_ts*(pkt: ptr AVPacket, tb_src: AVRational, tb_dst: AVRational) {.importc,
+    header: "<libavcodec/packet.h>".}
+
+const
+  AV_CODEC_ID_PCM_S16LE* = AVCodecID(65536)
+  AVFMT_NOFILE* = 0x0001
+  AVIO_FLAG_WRITE* = 2

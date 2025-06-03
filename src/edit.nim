@@ -152,6 +152,7 @@ proc editMedia*(args: mainArgs) =
   of "final-cut-pro":
     fcp11_write_xml(tlName, fcpVersion, args.output, false, tlV3)
   of "resolve":
+    tlV3.setStreamTo0(interner)
     fcp11_write_xml(tlName, fcpVersion, args.output, true, tlV3)
   of "v1", "v3":
     export_json_tl(tlV3, args.`export`, args.output)
