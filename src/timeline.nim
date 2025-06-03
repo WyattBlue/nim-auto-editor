@@ -7,7 +7,7 @@ from std/math import round
 import ffmpeg
 import media
 import log
-import make
+import wavutil
 
 type v1* = object
   chunks*: seq[(int64, int64, float64)]
