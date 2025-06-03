@@ -63,6 +63,8 @@ judge making cuts.
         args.version = true
       elif key == "o":
         expecting = "output"
+      elif key in ["d", "n"]:
+        discard
       else:
         error(fmt"Unknown option: {key}")
     of cmdEnd:
