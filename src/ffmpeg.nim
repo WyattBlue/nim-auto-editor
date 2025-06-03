@@ -176,6 +176,14 @@ type
     AV_SAMPLE_FMT_S32,
     AV_SAMPLE_FMT_FLT,
     AV_SAMPLE_FMT_DBL,
+    AV_SAMPLE_FMT_U8P,
+    AV_SAMPLE_FMT_S16P,
+    AV_SAMPLE_FMT_S32P,
+    AV_SAMPLE_FMT_FLTP,
+    AV_SAMPLE_FMT_DBLP
+
+  # SwrContext for audio resampling/conversion
+  SwrContext* {.importc, header: "<libswresample/swresample.h>".} = object
 
   AVCodecContext* {.importc, header: "<libavcodec/avcodec.h>".} = object
     av_class*: pointer
@@ -335,7 +343,8 @@ type
     crop_bottom*: csize_t
     crop_left*: csize_t
     crop_right*: csize_t
-    # private_ref*: ptr AVBufferRef
+    ch_layout*: AVChannelLayout
+    sample_rate*: cint
 
   AVPictureType* {.importc: "enum AVPictureType",
       header: "<libavutil/avutil.h>".} = enum
@@ -431,7 +440,6 @@ proc avcodec_close*(avctx: ptr AVCodecContext): cint {.importc,
 
 # Error
 proc AVERROR*(e: cint): cint {.inline.} = (-e)
-const EAGAIN* = 11
 const AVERROR_EOF* = AVERROR(0x10000051)
 
 # FIFO
@@ -459,6 +467,28 @@ proc av_samples_get_buffer_size*(linesize: ptr cint, nb_channels: cint,
     nb_samples: cint, sample_fmt: AVSampleFormat, align: cint): cint {.importc,
     header: "<libavutil/samplefmt.h>".}
 
+# Audio sample allocation and conversion utilities
+proc av_samples_alloc*(audio_data: ptr ptr uint8, linesize: ptr cint,
+    nb_channels: cint, nb_samples: cint, sample_fmt: AVSampleFormat,
+    align: cint): cint {.importc, header: "<libavutil/samplefmt.h>".}
+
+proc av_freep*(`ptr`: pointer) {.importc, header: "<libavutil/mem.h>".}
+
+# SwrContext functions for audio resampling/conversion
+proc swr_alloc*(): ptr SwrContext {.importc, header: "<libswresample/swresample.h>".}
+proc swr_init*(s: ptr SwrContext): cint {.importc, header: "<libswresample/swresample.h>".}
+proc swr_free*(s: ptr ptr SwrContext) {.importc, header: "<libswresample/swresample.h>".}
+proc swr_convert*(s: ptr SwrContext, output: ptr ptr uint8, out_count: cint,
+    input: ptr ptr uint8, in_count: cint): cint {.importc,
+    header: "<libswresample/swresample.h>".}
+
+# SwrContext option setting
+proc av_opt_set_int*(obj: pointer, name: cstring, val: int64, search_flags: cint): cint {.importc,
+    header: "<libavutil/opt.h>".}
+proc av_opt_set_sample_fmt*(obj: pointer, name: cstring, fmt: AVSampleFormat,
+    search_flags: cint): cint {.importc, header: "<libavutil/opt.h>".}
+proc av_opt_set_chlayout*(obj: pointer, name: cstring, layout: ptr AVChannelLayout,
+    search_flags: cint): cint {.importc, header: "<libavutil/opt.h>".}
 
 # Subtitles
 type
@@ -522,6 +552,10 @@ proc av_interleaved_write_frame*(s: ptr AVFormatContext, pkt: ptr AVPacket): cin
     header: "<libavformat/avformat.h>".}
 proc av_packet_rescale_ts*(pkt: ptr AVPacket, tb_src: AVRational, tb_dst: AVRational) {.importc,
     header: "<libavcodec/packet.h>".}
+
+
+proc swr_get_delay*(s: ptr SwrContext, base: int64): int64 {.importc, header: "<libswresample/swresample.h>".}
+
 
 const
   AV_CODEC_ID_PCM_S16LE* = AVCodecID(65536)
