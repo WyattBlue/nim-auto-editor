@@ -39,6 +39,9 @@ jobs:
             sudo apt-get install -y build-essential pkg-config nasm git
           elif [ "${{ matrix.os }}" = "macos-13" ]; then
             brew install nasm
+            export MACOSX_DEPLOYMENT_TARGET=13.0
+          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            export MACOSX_DEPLOYMENT_TARGET=14.0
           fi
       - name: Build FFmpeg
         run: nimble makeff
@@ -51,7 +54,7 @@ jobs:
         with:
           name: auto-editor-${{ matrix.os }}-${{ matrix.arch }}
           path: auto-editor
-  cross-compile:
+  windows:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
