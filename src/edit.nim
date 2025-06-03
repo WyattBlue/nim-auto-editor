@@ -123,7 +123,7 @@ proc editMedia*(args: mainArgs) =
   else:
     let inputExt = splitFile(args.input).ext
 
-    if inputExt == ".v3" or inputExt == ".v1":
+    if inputExt in [".v1", ".v3", ".json"]:
       tlV3 = readJson(readFile(args.input), interner)
     else:
       # Make `timeline` from media file
@@ -155,7 +155,7 @@ proc editMedia*(args: mainArgs) =
     tlV3.setStreamTo0(interner)
     fcp11_write_xml(tlName, fcpVersion, args.output, true, tlV3)
   of "v1", "v3":
-    export_json_tl(tlV3, args.`export`, args.output)
+    exportJsonTl(tlV3, exportKind, args.output)
   of "shotcut":
     shotcut_write_mlt(args.output, tlV3)
   else:
