@@ -56,6 +56,6 @@ proc main*(args: seq[string]) =
         process_audio_frame(frame)
 
   # Flush decoder
-  discard avcodec_send_packet(codecCtx, nil);
+  discard avcodec_send_packet(codecCtx, nil)
   while avcodec_receive_frame(codecCtx, frame) >= 0:
     process_audio_frame(frame)

@@ -30,7 +30,8 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
   let decoderCtx = initDecoder(inputStream.codecpar)
   defer: avcodec_free_context(addr decoderCtx)
 
-  ret = avformat_alloc_output_context2(addr outputCtx, nil, "wav", outputPath.cstring)
+  ret = avformat_alloc_output_context2(addr outputCtx, nil, "wav",
+      outputPath.cstring)
   if outputCtx == nil:
     error "Could not create output context"
 
@@ -46,7 +47,7 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
   encoderCtx.sample_rate = decoderCtx.sample_rate
   encoderCtx.ch_layout = decoderCtx.ch_layout
   encoderCtx.sample_fmt = AV_SAMPLE_FMT_S16
-  encoderCtx.bit_rate = 0  # PCM doesn't need bitrate
+  encoderCtx.bit_rate = 0 # PCM doesn't need bitrate
   encoderCtx.time_base = AVRational(num: 1, den: decoderCtx.sample_rate)
 
   if avcodec_open2(encoderCtx, encoder, nil) < 0:
@@ -88,7 +89,7 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
     error "Could not copy encoder parameters"
 
   outputStream.time_base = AVRational(num: 1, den: encoderCtx.sample_rate)
-  outputStream.codecpar.codec_tag = 0  # Let the muxer choose the appropriate tag
+  outputStream.codecpar.codec_tag = 0 # Let the muxer choose the appropriate tag
 
   # Open output file
   if (outputCtx.oformat.flags and AVFMT_NOFILE) == 0:
@@ -153,19 +154,16 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
 
         ret = av_frame_get_buffer(convertedFrame, 0)
         if ret < 0:
-          echo fmt"Error allocating converted frame buffer: {ret}"
-          av_frame_unref(frame)
-          continue
+          error fmt"Error allocating converted frame buffer: {ret}"
 
-        # Convert audio format
         let convertedSamples = swr_convert(swrCtx,
-                                          cast[ptr ptr uint8](addr convertedFrame.data[0]), maxDstNbSamples,
-                                          cast[ptr ptr uint8](addr frame.data[0]), frame.nb_samples)
+                                          cast[ptr ptr uint8](
+                                              addr convertedFrame.data[0]),
+                                              maxDstNbSamples,
+                                          cast[ptr ptr uint8](addr frame.data[
+                                              0]), frame.nb_samples)
         if convertedSamples < 0:
-          echo "Error converting audio samples"
-          av_frame_unref(convertedFrame)
-          av_frame_unref(frame)
-          continue
+          error "Error converting audio samples"
 
         if convertedSamples > 0:
           convertedFrame.nb_samples = convertedSamples
@@ -176,10 +174,7 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
           # Encode converted frame
           ret = avcodec_send_frame(encoderCtx, convertedFrame)
           if ret < 0 and ret != AVERROR_EAGAIN:
-            echo fmt"Error sending frame to encoder: {ret}"
-            av_frame_unref(convertedFrame)
-            av_frame_unref(frame)
-            continue
+            error fmt"Error sending frame to encoder: {ret}"
 
           while true:
             var outPacket = av_packet_alloc()
@@ -193,8 +188,9 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
               break
 
             outPacket.stream_index = outputStream.index
-            outPacket.duration = convertedSamples  # Set packet duration
-            av_packet_rescale_ts(outPacket, encoderCtx.time_base, outputStream.time_base)
+            outPacket.duration = convertedSamples # Set packet duration
+            av_packet_rescale_ts(outPacket, encoderCtx.time_base,
+                outputStream.time_base)
 
             ret = av_interleaved_write_frame(outputCtx, outPacket)
             av_packet_free(addr outPacket)
@@ -236,8 +232,11 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
         continue
 
       let convertedSamples = swr_convert(swrCtx,
-                                        cast[ptr ptr uint8](addr convertedFrame.data[0]), maxDstNbSamples,
-                                        cast[ptr ptr uint8](addr frame.data[0]), frame.nb_samples)
+                                        cast[ptr ptr uint8](
+                                            addr convertedFrame.data[0]),
+                                            maxDstNbSamples,
+                                        cast[ptr ptr uint8](addr frame.data[0]),
+                                            frame.nb_samples)
       if convertedSamples <= 0:
         av_frame_unref(convertedFrame)
         av_frame_unref(frame)
@@ -264,7 +263,8 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
           break
 
         outPacket.stream_index = outputStream.index
-        av_packet_rescale_ts(outPacket, encoderCtx.time_base, outputStream.time_base)
+        av_packet_rescale_ts(outPacket, encoderCtx.time_base,
+            outputStream.time_base)
 
         discard av_interleaved_write_frame(outputCtx, outPacket)
         av_packet_free(addr outPacket)
@@ -293,7 +293,9 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
       break
 
     let convertedSamples = swr_convert(swrCtx,
-                                      cast[ptr ptr uint8](addr convertedFrame.data[0]), maxDstNbSamples,
+                                      cast[ptr ptr uint8](
+                                          addr convertedFrame.data[0]),
+                                          maxDstNbSamples,
                                       nil, 0)
     if convertedSamples <= 0:
       av_frame_unref(convertedFrame)
@@ -319,7 +321,8 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
         break
 
       outPacket.stream_index = outputStream.index
-      av_packet_rescale_ts(outPacket, encoderCtx.time_base, outputStream.time_base)
+      av_packet_rescale_ts(outPacket, encoderCtx.time_base,
+          outputStream.time_base)
 
       discard av_interleaved_write_frame(outputCtx, outPacket)
       av_packet_free(addr outPacket)
@@ -340,7 +343,8 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
         break
 
       outPacket.stream_index = outputStream.index
-      av_packet_rescale_ts(outPacket, encoderCtx.time_base, outputStream.time_base)
+      av_packet_rescale_ts(outPacket, encoderCtx.time_base,
+          outputStream.time_base)
 
       discard av_interleaved_write_frame(outputCtx, outPacket)
       av_packet_free(addr outPacket)

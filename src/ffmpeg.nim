@@ -306,18 +306,15 @@ type
     width*, height*: cint
     nb_samples*: cint
     format*: cint
-    key_frame*: cint
     pict_type*: AVPictureType
     sample_aspect_ratio*: AVRational
     pts*: int64
     pkt_dts*: int64
     time_base*: AVRational
-    coded_picture_number*: cint
-    display_picture_number*: cint
     quality*: cint
     opaque*: pointer
     repeat_pict*: cint
-    reordered_opaque*: int64
+    sample_rate*: cint
     # buf*: array[8, ptr AVBufferRef]
     # extended_buf*: ptr ptr AVBufferRef
     nb_extended_buf*: cint
@@ -329,17 +326,13 @@ type
     color_trc*: AVColorTransferCharacteristic
     colorspace*: AVColorSpace
     best_effort_timestamp*: int64
-    pkt_pos*: int64
-    pkt_duration*: int64
     metadata*: ptr AVDictionary
     decode_error_flags*: cint
-    pkt_size*: cint
     crop_top*: csize_t
     crop_bottom*: csize_t
     crop_left*: csize_t
     crop_right*: csize_t
     ch_layout*: AVChannelLayout
-    sample_rate*: cint
 
   AVPictureType* {.importc: "enum AVPictureType",
       header: "<libavutil/avutil.h>".} = enum
@@ -471,20 +464,24 @@ proc av_samples_alloc*(audio_data: ptr ptr uint8, linesize: ptr cint,
 proc av_freep*(`ptr`: pointer) {.importc, header: "<libavutil/mem.h>".}
 
 # SwrContext functions for audio resampling/conversion
-proc swr_alloc*(): ptr SwrContext {.importc, header: "<libswresample/swresample.h>".}
-proc swr_init*(s: ptr SwrContext): cint {.importc, header: "<libswresample/swresample.h>".}
-proc swr_free*(s: ptr ptr SwrContext) {.importc, header: "<libswresample/swresample.h>".}
+proc swr_alloc*(): ptr SwrContext {.importc,
+    header: "<libswresample/swresample.h>".}
+proc swr_init*(s: ptr SwrContext): cint {.importc,
+    header: "<libswresample/swresample.h>".}
+proc swr_free*(s: ptr ptr SwrContext) {.importc,
+    header: "<libswresample/swresample.h>".}
 proc swr_convert*(s: ptr SwrContext, output: ptr ptr uint8, out_count: cint,
     input: ptr ptr uint8, in_count: cint): cint {.importc,
     header: "<libswresample/swresample.h>".}
 
 # SwrContext option setting
-proc av_opt_set_int*(obj: pointer, name: cstring, val: int64, search_flags: cint): cint {.importc,
-    header: "<libavutil/opt.h>".}
+proc av_opt_set_int*(obj: pointer, name: cstring, val: int64,
+    search_flags: cint): cint {.importc, header: "<libavutil/opt.h>".}
 proc av_opt_set_sample_fmt*(obj: pointer, name: cstring, fmt: AVSampleFormat,
     search_flags: cint): cint {.importc, header: "<libavutil/opt.h>".}
-proc av_opt_set_chlayout*(obj: pointer, name: cstring, layout: ptr AVChannelLayout,
-    search_flags: cint): cint {.importc, header: "<libavutil/opt.h>".}
+proc av_opt_set_chlayout*(obj: pointer, name: cstring,
+    layout: ptr AVChannelLayout, search_flags: cint): cint {.importc,
+        header: "<libavutil/opt.h>".}
 
 # Subtitles
 type
@@ -522,7 +519,8 @@ proc avsubtitle_free*(sub: ptr AVSubtitle) {.importc,
     header: "<libavcodec/avcodec.h>".}
 
 
-proc av_get_sample_fmt_name*(sample_fmt: cint): cstring {.importc, header: "<libavutil/samplefmt.h>".}
+proc av_get_sample_fmt_name*(sample_fmt: cint): cstring {.importc,
+    header: "<libavutil/samplefmt.h>".}
 
 proc prettyAudioFrame*(frame: ptr AVFrame): string =
   proc getAudioFormatName(format: cint): string =
@@ -532,38 +530,42 @@ proc prettyAudioFrame*(frame: ptr AVFrame): string =
     else:
       "Unknown(" & $format & ")"
 
-  return "<AVFrame format=" & getAudioFormatName(frame.format) & " samples=" & $frame.nb_samples & ">"
+  return "<AVFrame format=" & getAudioFormatName(frame.format) & " samples=" &
+      $frame.nb_samples & ">"
 
 
 proc avformat_alloc_output_context2*(ctx: ptr ptr AVFormatContext,
     oformat: pointer, format_name: cstring, filename: cstring): cint {.importc,
     header: "<libavformat/avformat.h>".}
-proc avformat_new_stream*(s: ptr AVFormatContext, c: pointer): ptr AVStream {.importc,
-    header: "<libavformat/avformat.h>".}
+proc avformat_new_stream*(s: ptr AVFormatContext,
+    c: pointer): ptr AVStream {.importc, header: "<libavformat/avformat.h>".}
 proc avcodec_find_encoder*(id: AVCodecID): ptr AVCodec {.importc,
     header: "<libavcodec/avcodec.h>".}
 proc avcodec_parameters_from_context*(par: ptr AVCodecParameters,
-    codec: ptr AVCodecContext): cint {.importc, header: "<libavcodec/avcodec.h>".}
+    codec: ptr AVCodecContext): cint {.importc,
+        header: "<libavcodec/avcodec.h>".}
 proc avio_open*(s: ptr pointer, filename: cstring, flags: cint): cint {.importc,
     header: "<libavformat/avio.h>".}
-proc avio_closep*(s: ptr pointer): cint {.importc, header: "<libavformat/avio.h>".}
-proc avformat_write_header*(s: ptr AVFormatContext, options: pointer): cint {.importc,
-    header: "<libavformat/avformat.h>".}
+proc avio_closep*(s: ptr pointer): cint {.importc,
+    header: "<libavformat/avio.h>".}
+proc avformat_write_header*(s: ptr AVFormatContext,
+    options: pointer): cint {.importc, header: "<libavformat/avformat.h>".}
 proc av_write_trailer*(s: ptr AVFormatContext): cint {.importc,
     header: "<libavformat/avformat.h>".}
 proc avformat_free_context*(s: ptr AVFormatContext) {.importc,
     header: "<libavformat/avformat.h>".}
-proc avcodec_send_frame*(avctx: ptr AVCodecContext, frame: ptr AVFrame): cint {.importc,
-    header: "<libavcodec/avcodec.h>".}
-proc avcodec_receive_packet*(avctx: ptr AVCodecContext, avpkt: ptr AVPacket): cint {.importc,
-    header: "<libavcodec/avcodec.h>".}
-proc av_interleaved_write_frame*(s: ptr AVFormatContext, pkt: ptr AVPacket): cint {.importc,
-    header: "<libavformat/avformat.h>".}
-proc av_packet_rescale_ts*(pkt: ptr AVPacket, tb_src: AVRational, tb_dst: AVRational) {.importc,
-    header: "<libavcodec/packet.h>".}
+proc avcodec_send_frame*(avctx: ptr AVCodecContext,
+    frame: ptr AVFrame): cint {.importc, header: "<libavcodec/avcodec.h>".}
+proc avcodec_receive_packet*(avctx: ptr AVCodecContext,
+    avpkt: ptr AVPacket): cint {.importc, header: "<libavcodec/avcodec.h>".}
+proc av_interleaved_write_frame*(s: ptr AVFormatContext,
+    pkt: ptr AVPacket): cint {.importc, header: "<libavformat/avformat.h>".}
+proc av_packet_rescale_ts*(pkt: ptr AVPacket, tb_src: AVRational,
+    tb_dst: AVRational) {.importc, header: "<libavcodec/packet.h>".}
 
 
-proc swr_get_delay*(s: ptr SwrContext, base: int64): int64 {.importc, header: "<libswresample/swresample.h>".}
+proc swr_get_delay*(s: ptr SwrContext, base: int64): int64 {.importc,
+    header: "<libswresample/swresample.h>".}
 
 
 const
