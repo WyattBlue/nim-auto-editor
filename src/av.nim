@@ -1,29 +1,26 @@
 import ffmpeg
+import log
+
+proc initDecoder*(codecpar: ptr AVCodecParameters): ptr AVCodecContext =
+  let codec: ptr AVCodec = avcodec_find_decoder(codecpar.codec_id)
+  if codec == nil:
+    error "Decoder not found"
+
+  result = avcodec_alloc_context3(codec)
+  if result == nil:
+    error "Could not allocate decoder ctx"
+
+  discard avcodec_parameters_to_context(result, codecpar)
+  if avcodec_open2(result, codec, nil) < 0:
+    error "Could not open codec"
 
 type
-  Stream* = ref object
-    index*: int
-    myPtr*: ptr AVStream
-    codecContext*: ptr AVCodecContext
-    timeBase*: AVRational
-    codecType: AVMediaType
-
   InputContainer* = ref object
     formatContext*: ptr AVFormatContext
-    video*: seq[Stream]
-    audio*: seq[Stream]
-    subtitle*: seq[Stream]
-    streams*: seq[Stream]
-
-proc newStream(streamPtr: ptr AVStream): Stream =
-  result = Stream(
-    index: streamPtr.index,
-    myPtr: streamPtr,
-    codecContext: avcodec_alloc_context3(nil),
-    timeBase: streamPtr.time_base,
-    codecType: streamPtr.codecpar.codec_type,
-  )
-  discard avcodec_parameters_to_context(result.codecContext, streamPtr.codecpar)
+    video*: seq[ptr AVStream]
+    audio*: seq[ptr AVStream]
+    subtitle*: seq[ptr AVStream]
+    streams*: seq[ptr AVStream]
 
 proc open*(filename: string): InputContainer =
   result = InputContainer()
@@ -37,9 +34,9 @@ proc open*(filename: string): InputContainer =
     raise newException(IOError, "Could not find stream information")
 
   for i in 0 ..< result.formatContext.nb_streams.int:
-    let stream = newStream(result.formatContext.streams[i])
+    let stream: ptr AVStream = result.formatContext.streams[i]
     result.streams.add(stream)
-    case stream.codecType
+    case stream.codecpar.codecType
     of AVMEDIA_TYPE_VIDEO:
       result.video.add(stream)
     of AVMEDIA_TYPE_AUDIO:
@@ -58,14 +55,8 @@ func bitRate*(container: InputContainer): int64 =
   return container.formatContext.bit_rate
 
 proc close*(container: InputContainer) =
-  for stream in container.streams:
-    avcodec_free_context(addr stream.codecContext)
   avformat_close_input(addr container.formatContext)
 
-
-func avgRate*(stream: Stream): AVRational =
-  return stream.myPtr.avg_frame_rate
-
-func codecName*(stream: Stream): string =
-  $avcodec_get_name(stream.codecContext.codec_id)
+func avgRate*(stream: ptr AVStream): AVRational =
+  return stream.avg_frame_rate
 

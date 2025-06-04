@@ -317,9 +317,6 @@ type
     quality*: cint
     opaque*: pointer
     repeat_pict*: cint
-    interlaced_frame*: cint
-    top_field_first*: cint
-    palette_has_changed*: cint
     reordered_opaque*: int64
     # buf*: array[8, ptr AVBufferRef]
     # extended_buf*: ptr ptr AVBufferRef

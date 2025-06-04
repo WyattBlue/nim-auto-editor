@@ -24,21 +24,11 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
   if container.audio.len == 0:
     error "No audio streams"
 
-  let inputStream: ptr AVStream = container.audio[0].myPtr
+  let inputStream: ptr AVStream = container.audio[0]
   let audioStreamIdx = inputStream.index
 
-  let decoder = avcodec_find_decoder(inputStream.codecpar.codec_id)
-  if decoder == nil:
-    error "Could not find decoder"
-
-  var decoderCtx = avcodec_alloc_context3(decoder)
-  if decoderCtx == nil:
-    error "Could not allocate decoder context"
+  let decoderCtx = initDecoder(inputStream.codecpar)
   defer: avcodec_free_context(addr decoderCtx)
-
-  discard avcodec_parameters_to_context(decoderCtx, inputStream.codecpar)
-  if avcodec_open2(decoderCtx, decoder, nil) < 0:
-    error "Could not open decoder"
 
   ret = avformat_alloc_output_context2(addr outputCtx, nil, "wav", outputPath.cstring)
   if outputCtx == nil:

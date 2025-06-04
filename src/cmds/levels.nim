@@ -14,7 +14,11 @@ proc main*(args: seq[string]) =
 
   let inputFile = args[0]
 
-  var container = av.open(inputFile)
+  var container: InputContainer
+  try:
+    container = av.open(inputFile)
+  except IOError as e:
+    error e.msg
   defer: container.close()
 
   let formatCtx = container.formatContext
@@ -22,20 +26,11 @@ proc main*(args: seq[string]) =
   if container.audio.len == 0:
     error "No audio stream"
 
-  let audioStream: ptr AVStream = container.audio[0].myPtr
+  let audioStream: ptr AVStream = container.audio[0]
   let audioIndex: cint = audioStream.index
 
-  let codec: ptr AVCodec = avcodec_find_decoder(audioStream.codecpar.codec_id)
-  if codec == nil:
-    error "Decoder not found"
-
-  let codecCtx = avcodec_alloc_context3(codec);
-  if codecCtx == nil:
-    error "Could not allocate decoder ctx"
-
-  discard avcodec_parameters_to_context(codecCtx, audioStream.codecpar)
-  if avcodec_open2(codecCtx, codec, nil) < 0:
-    error "Could not open codec\n"
+  let codecCtx = initDecoder(audioStream.codecpar)
+  defer: avcodec_free_context(addr codecCtx)
 
   var packet = av_packet_alloc()
   var frame = av_frame_alloc()
