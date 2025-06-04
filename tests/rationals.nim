@@ -2,6 +2,7 @@ import unittest
 
 import ../src/ffmpeg
 import ../src/edit
+import ../src/wavutil
 
 test "maths":
   let a = AVRational(num: 3, den: 4)
@@ -29,3 +30,7 @@ test "exports":
   check(parseExportString("premiere:name=a") == ("premiere", "a", "11"))
   check(parseExportString("premiere:name=\"Hello \\\" World") == ("premiere", "Hello \" World", "11"))
   check(parseExportString("premiere:name=\"Hello \\\\ World") == ("premiere", "Hello \\ World", "11"))
+
+
+# test "wav":
+#   toS16Wav("example.mp4", "out.wav", 0)

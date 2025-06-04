@@ -4,7 +4,7 @@ import std/posix_utils
 import std/strformat
 import std/terminal
 
-import cmds/[desc, info, subdump]
+import cmds/[desc, info, levels, subdump]
 import edit
 import log
 
@@ -27,6 +27,9 @@ judge making cuts.
     quit(0)
   elif paramStr(1) == "desc":
     desc.main(commandLineParams()[1..^1])
+    quit(0)
+  elif paramStr(1) == "levels":
+    levels.main(commandLineParams()[1..^1])
     quit(0)
   elif paramStr(1) == "subdump":
     subdump.main(commandLineParams()[1..^1])

@@ -297,6 +297,7 @@ type
     opaque_ref*: pointer   # reference to opaque
     time_base*: AVRational # time base of the packet
 
+  # https://ffmpeg.org/doxygen/7.0/structAVFrame.html
   AVFrame* {.importc: "AVFrame", header: "<libavutil/frame.h>",
       bycopy.} = object
     data*: array[8, ptr uint8]
@@ -330,15 +331,12 @@ type
     color_primaries*: AVColorPrimaries
     color_trc*: AVColorTransferCharacteristic
     colorspace*: AVColorSpace
-    # chroma_location*: AVChromaLocation
     best_effort_timestamp*: int64
     pkt_pos*: int64
     pkt_duration*: int64
     metadata*: ptr AVDictionary
     decode_error_flags*: cint
     pkt_size*: cint
-    # hw_frames_ctx*: ptr AVBufferRef
-    # opaque_ref*: ptr AVBufferRef
     crop_top*: csize_t
     crop_bottom*: csize_t
     crop_left*: csize_t
@@ -441,6 +439,7 @@ proc avcodec_close*(avctx: ptr AVCodecContext): cint {.importc,
 # Error
 proc AVERROR*(e: cint): cint {.inline.} = (-e)
 const AVERROR_EOF* = AVERROR(0x10000051)
+const AVERROR_EAGAIN* = -35
 
 # FIFO
 type
@@ -524,6 +523,19 @@ proc avcodec_decode_subtitle2*(avctx: ptr AVCodecContext, sub: ptr AVSubtitle,
 
 proc avsubtitle_free*(sub: ptr AVSubtitle) {.importc,
     header: "<libavcodec/avcodec.h>".}
+
+
+proc av_get_sample_fmt_name*(sample_fmt: cint): cstring {.importc, header: "<libavutil/samplefmt.h>".}
+
+proc prettyAudioFrame*(frame: ptr AVFrame): string =
+  proc getAudioFormatName(format: cint): string =
+    let name = av_get_sample_fmt_name(format)
+    if name != nil:
+      $name
+    else:
+      "Unknown(" & $format & ")"
+
+  return "<AVFrame format=" & getAudioFormatName(frame.format) & " samples=" & $frame.nb_samples & ">"
 
 
 proc avformat_alloc_output_context2*(ctx: ptr ptr AVFormatContext,

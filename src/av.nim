@@ -1,5 +1,4 @@
 import ffmpeg
-import std/sequtils
 
 type
   Stream* = ref object
@@ -50,21 +49,23 @@ proc open*(filename: string): InputContainer =
     else:
       discard
 
-proc codecName*(stream: Stream): string =
-  $avcodec_get_name(stream.codecContext.codec_id)
-
 func duration*(container: InputContainer): float64 =
   if container.formatContext.duration != AV_NOPTS_VALUE:
     return float64(container.formatContext.duration) / AV_TIME_BASE
   return 0.0
 
-func avgRate*(stream: Stream): AVRational =
-  return stream.myPtr.avg_frame_rate
-
 func bitRate*(container: InputContainer): int64 =
   return container.formatContext.bit_rate
 
 proc close*(container: InputContainer) =
-  for stream in concat(container.video, container.audio, container.subtitle):
+  for stream in container.streams:
     avcodec_free_context(addr stream.codecContext)
   avformat_close_input(addr container.formatContext)
+
+
+func avgRate*(stream: Stream): AVRational =
+  return stream.myPtr.avg_frame_rate
+
+func codecName*(stream: Stream): string =
+  $avcodec_get_name(stream.codecContext.codec_id)
+
