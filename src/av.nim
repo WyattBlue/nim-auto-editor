@@ -4,6 +4,7 @@ import std/sequtils
 type
   Stream* = ref object
     index*: int
+    myPtr*: ptr AVStream
     codecContext*: ptr AVCodecContext
     timeBase*: AVRational
     codecType: AVMediaType
@@ -18,6 +19,7 @@ type
 proc newStream(streamPtr: ptr AVStream): Stream =
   result = Stream(
     index: streamPtr.index,
+    myPtr: streamPtr,
     codecContext: avcodec_alloc_context3(nil),
     timeBase: streamPtr.time_base,
     codecType: streamPtr.codecpar.codec_type,
@@ -51,18 +53,18 @@ proc open*(filename: string): InputContainer =
 proc codecName*(stream: Stream): string =
   $avcodec_get_name(stream.codecContext.codec_id)
 
-proc duration*(container: InputContainer): float64 =
+func duration*(container: InputContainer): float64 =
   if container.formatContext.duration != AV_NOPTS_VALUE:
     return float64(container.formatContext.duration) / AV_TIME_BASE
   return 0.0
 
-proc bitRate*(container: InputContainer): int64 =
+func avgRate*(stream: Stream): AVRational =
+  return stream.myPtr.avg_frame_rate
+
+func bitRate*(container: InputContainer): int64 =
   return container.formatContext.bit_rate
 
 proc close*(container: InputContainer) =
   for stream in concat(container.video, container.audio, container.subtitle):
     avcodec_free_context(addr stream.codecContext)
   avformat_close_input(addr container.formatContext)
-
-export InputContainer, Stream
-

@@ -129,6 +129,8 @@ proc editMedia*(args: mainArgs) =
       # Make `timeline` from media file
       var container = av.open(args.input)
       var tb = AVRational(num: 30, den: 1)
+      if container.video.len > 0:
+        tb = makeSaneTimebase(container.video[0].avgRate)
 
       # Get the timeline resolution from the first video stream.
       let src = initMediaInfo(container.formatContext, args.input)

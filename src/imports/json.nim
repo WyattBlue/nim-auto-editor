@@ -67,15 +67,17 @@ proc parseV1*(jsonNode: JsonNode, interner: var StringInterner): v3 =
   if jsonNode.hasKey("chunks") and jsonNode["chunks"].kind == JArray:
     for chunkNode in jsonNode["chunks"]:
       if chunkNode.kind == JArray and chunkNode.len >= 3:
-        let start = chunkNode[0].getInt().int64
-        let `end` = chunkNode[1].getInt().int64
-        let speed = chunkNode[2].getFloat().float64
+        let start: int64 = chunkNode[0].getInt()
+        let `end`: int64 = chunkNode[1].getInt()
+        let speed = chunkNode[2].getFloat()
         chunks.add((start, `end`, speed))
 
-  let src = initMediaInfo(input)
+  let mi = initMediaInfo(input)
   var tb = AVRational(num: 30, den: 1)
+  if mi.v.len > 0:
+    tb = makeSaneTimebase(mi.v[0].avgRate)
 
-  result = toNonLinear(ptrInput, tb, src, chunks)
+  result = toNonLinear(ptrInput, tb, mi, chunks)
 
 proc readJson*(jsonStr: string, interner: var StringInterner): v3 =
   let jsonNode = parseJson(jsonStr)

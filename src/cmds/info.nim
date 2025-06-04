@@ -5,6 +5,7 @@ import std/parseopt
 
 import ../av
 import ../ffmpeg
+import ../timeline
 import ../media
 import ../log
 
@@ -17,7 +18,11 @@ proc genericTrack(lang: string, bitrate: int) =
 
 proc printYamlInfo(fileInfo: MediaInfo) =
   echo fileInfo.path, ":"
-  echo fmt" - recommendedTimebase: {fileInfo.recommendedTimebase}"
+
+  var tb = AVRational(30)
+  if fileInfo.v.len > 0:
+    tb = makeSaneTimebase(fileInfo.v[0].avg_rate)
+  echo fmt" - recommendedTimebase: {tb.num}/{tb.den}"
 
   if fileInfo.v.len > 0:
     echo fmt" - video:"
@@ -71,6 +76,10 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
     aarr: seq[JsonNode] = @[]
     sarr: seq[JsonNode] = @[]
 
+  var tb = AVRational(30)
+  if fileInfo.v.len > 0:
+    tb = makeSaneTimebase(fileInfo.v[0].avg_rate)
+
   for v in fileInfo.v:
     let (ratioWidth, ratioHeight) = aspectRatio(v.width, v.height)
     varr.add( %* {
@@ -100,7 +109,7 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
 
   result = %* {
     "type": "media",
-    "recommendedTimebase": fileInfo.recommendedTimebase,
+    "recommendedTimebase": tb,
     "video": varr,
     "audio": aarr,
     "subtitle": sarr,

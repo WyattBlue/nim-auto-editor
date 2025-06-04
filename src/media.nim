@@ -1,5 +1,4 @@
 import std/strformat
-import std/math
 import std/hashes
 
 import av
@@ -60,26 +59,6 @@ proc hash*(mi: MediaInfo): Hash =
 
 proc `==`*(a, b: MediaInfo): bool =
   a.path == b.path
-
-proc round(x: AVRational, places: int): float64 =
-  round(x.num.float64 / x.den.float64, places)
-
-proc make_sane_timebase(fps: AVRational): string =
-  let tb = round(fps, 2)
-
-  let ntsc_60 = AVRational(num: 60000, den: 1001)
-  let ntsc = AVRational(num: 30000, den: 1001)
-  let film_ntsc = AVRational(num: 24000, den: 1001)
-
-  if tb == round(ntsc_60, 2):
-    return $ntsc_60.num & "/" & $ntsc_60.den
-  if tb == round(ntsc, 2):
-    return $ntsc.num & "/" & $ntsc.den
-  if tb == round(film_ntsc, 2):
-    return $film_ntsc.num & "/" & $film_ntsc.den
-
-  return $fps.num & "/" & $fps.den
-
 
 func get_res*(self: MediaInfo): (int64, int64) =
   if self.v.len > 0:
@@ -162,11 +141,6 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext,
       ))
 
     avcodec_free_context(addr codecContext)
-
-  if result.v.len == 0:
-    result.recommendedTimebase = "30/1"
-  else:
-    result.recommendedTimebase = make_sane_timebase(result.v[0].avg_rate)
 
 
 proc initMediaInfo*(path: string): MediaInfo =

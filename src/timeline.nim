@@ -102,9 +102,23 @@ func toNonLinear*(src: ptr string, tb: AvRational, mi: MediaInfo, chunks: seq[(
     result.layout = mi.a[0].layout
 
 
-proc stem(path: string): string =
+func stem(path: string): string =
   splitFile(path).name
 
+func makeSaneTimebase*(tb: AVRational): AVRational =
+  let tbFloat = round(tb.float64, 2)
+
+  let ntsc60 = AVRational(num: 60000, den: 1001)
+  let ntsc = AVRational(num: 30000, den: 1001)
+  let filmNtsc = AVRational(num: 24000, den: 1001)
+
+  if tbFloat == round(ntsc60.float64, 2):
+    return ntsc60
+  if tbFloat == round(ntsc.float64, 2):
+    return ntsc
+  if tbFloat == round(filmNtsc.float64, 2):
+    return filmNtsc
+  return tb
 
 proc setStreamTo0*(tl: var v3, interner: var StringInterner) =
   var dirExists = false
