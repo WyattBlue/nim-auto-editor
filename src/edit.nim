@@ -117,6 +117,10 @@ proc editMedia*(args: mainArgs) =
   var interner = newStringInterner()
   defer: interner.cleanup()
 
+  if args.progress == "machine" and args.`output` != "-":
+    stdout.write("Starting\n")
+    stdout.flushFile()
+
   if not stdin.isatty():
     let stdinContent = readAll(stdin)
     tlV3 = readJson(stdinContent, interner)
