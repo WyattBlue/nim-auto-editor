@@ -3,7 +3,7 @@ import std/terminal
 from std/math import gcd
 
 type mainArgs* = object
-  input*: string
+  input*: string = ""
   version*: bool = false
   debug*: bool = false
   progress*: string
