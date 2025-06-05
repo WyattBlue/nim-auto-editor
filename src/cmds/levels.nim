@@ -11,6 +11,7 @@ type
   AudioIterator* = ref object
     fifo: ptr AVAudioFifo
     swrCtx: ptr SwrContext
+    outputFrame: ptr AVFrame
     exactSize: float64
     accumulatedError: float64
     sampleRate: int
@@ -43,6 +44,11 @@ proc newAudioIterator*(sampleRate: int, channelLayout: AVChannelLayout, timeBase
   if result.fifo == nil:
     error "Could not allocate audio FIFO"
 
+  # Allocate output frame once
+  result.outputFrame = av_frame_alloc()
+  if result.outputFrame == nil:
+    error "Could not allocate output frame"
+
 proc cleanup*(iter: AudioIterator) =
   if iter.fifo != nil:
     av_audio_fifo_free(iter.fifo)
@@ -50,6 +56,9 @@ proc cleanup*(iter: AudioIterator) =
   if iter.swrCtx != nil:
     swr_free(addr iter.swrCtx)
     iter.swrCtx = nil
+  if iter.outputFrame != nil:
+    av_frame_free(addr iter.outputFrame)
+    iter.outputFrame = nil
 
 proc initResampler*(iter: AudioIterator, inputFormat: AVSampleFormat, inputLayout: AVChannelLayout) =
   if iter.isInitialized:
@@ -88,11 +97,11 @@ proc writeFrame*(iter: AudioIterator, frame: ptr AVFrame) =
 
   iter.totalFramesProcessed += 1
 
-  # Allocate output frame for resampling
-  let outputFrame = av_frame_alloc()
-  if outputFrame == nil:
-    error "Could not allocate output frame"
-  defer: av_frame_free(addr outputFrame)
+  # Reuse the existing output frame
+  let outputFrame = iter.outputFrame
+
+  # Reset frame properties for reuse
+  av_frame_unref(outputFrame)
 
   # Set output frame properties
   outputFrame.format = iter.targetFormat.cint
@@ -100,7 +109,7 @@ proc writeFrame*(iter: AudioIterator, frame: ptr AVFrame) =
   outputFrame.sample_rate = iter.sampleRate.cint
   outputFrame.nb_samples = frame.nb_samples
 
-  # Allocate buffer for output frame
+  # Allocate buffer for output frame (this will reuse or reallocate as needed)
   if av_frame_get_buffer(outputFrame, 0) < 0:
     error "Could not allocate output frame buffer"
 
@@ -139,7 +148,8 @@ proc readChunk*(iter: AudioIterator): float32 =
                            currentSize.cint, iter.targetFormat, 0)
   if ret < 0:
     error "Could not allocate sample buffer"
-  defer: av_freep(addr buffer)
+  defer:
+    av_freep(addr buffer)
 
   # Read from FIFO
   let samplesRead = av_audio_fifo_read(iter.fifo, cast[pointer](addr buffer), currentSize.cint)
