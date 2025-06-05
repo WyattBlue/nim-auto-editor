@@ -109,7 +109,7 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
 
   result = %* {
     "type": "media",
-    "recommendedTimebase": tb,
+    "recommendedTimebase": $tb.num & "/" & $tb.den,
     "video": varr,
     "audio": aarr,
     "subtitle": sarr,
