@@ -1,9 +1,12 @@
-# 0.3.0
+# 0.4.0
 
 ## Major
 
 ## Features
- - Add `premiere` `shotcut` `resolve-fcp7` and `resolve` export formats
- - Add export attributes
+ - Add levels subcommand
 
 ## Fixes
+ - Know about the `--progress` option
+ - Treat `.json` as a valid format
+ - info: fix recommendedTimebase shape
+ - Ignore stdin when input file is available

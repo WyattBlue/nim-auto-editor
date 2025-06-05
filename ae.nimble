@@ -1,5 +1,5 @@
 # Package
-version = "0.3.0"
+version = "0.4.0"
 author = "WyattBlue"
 description = "Auto-Editor: Efficient media analysis and rendering"
 license = "Unlicense"
@@ -121,8 +121,4 @@ task windows, "Cross-compile to Windows (requires mingw-w64)":
     
     # Strip the Windows binary
     exec "x86_64-w64-mingw32-strip -s auto-editor.exe"
-
-
-task grabWinBin, "Get the windows binary":
-  exec "curl -L -O https://github.com/WyattBlue/nim-auto-editor/releases/download/0.3.0/auto-editor.exe"
 
