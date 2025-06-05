@@ -1,7 +1,10 @@
+import std/math
+import std/parseopt
+import std/strformat
+
 import ../av
 import ../ffmpeg
 import ../log
-import math
 
 type
   AudioIterator* = ref object
@@ -40,7 +43,6 @@ proc newAudioIterator*(sampleRate: int, channelLayout: AVChannelLayout, timeBase
     error "Could not allocate audio FIFO"
 
 proc cleanup*(iter: AudioIterator) =
-  # echo "Cleanup: processed ", iter.totalFramesProcessed, " frames, wrote ", iter.totalSamplesWritten, " samples"
   if iter.fifo != nil:
     av_audio_fifo_free(iter.fifo)
     iter.fifo = nil
@@ -158,8 +160,7 @@ proc readChunk*(iter: AudioIterator): float32 =
 # Global iterator instance
 var globalAudioIterator: AudioIterator = nil
 
-proc process_audio_frame(frame: ptr AVFrame) =
-  let chunkDuration: float64 = 0.03333333333333333  # 30 Hz = 1/30 second chunks
+proc process_audio_frame(chunkDuration: float64, frame: ptr AVFrame) =
   if globalAudioIterator == nil:
     globalAudioIterator = newAudioIterator(frame.sample_rate, frame.ch_layout, chunkDuration)
 
@@ -173,18 +174,57 @@ proc process_audio_frame(frame: ptr AVFrame) =
     chunksProcessed += 1
     echo loudness
 
+
+type levelArgs* = object
+  input*: string
+  timebase*: string = "30/1"
+  edit*: string # no-op for now
+
 proc main*(args: seq[string]) =
   if args.len < 1:
     echo "Display loudness over time"
     quit(0)
 
-  # Set up cleanup
+  var args = levelArgs()
+  var expecting: string = ""
+
+  for kind, key, val in getopt():
+    case kind
+    of cmdArgument:
+      case expecting
+      of "":
+        args.input = key
+      of "timebase":
+        args.timebase = key
+      of "edit":
+        args.edit = key
+      expecting = ""
+
+    of cmdLongOption:
+      if key in ["edit", "timebase"]:
+        expecting = key
+      else:
+        error(fmt"Unknown option: {key}")
+    of cmdShortOption:
+      if key == "t":
+        discard
+      elif key == "b":
+        expecting = "timebase"
+      else:
+        error(fmt"Unknown option: {key}")
+    of cmdEnd:
+      discard
+
+  if expecting != "":
+    error(fmt"--{expecting} needs argument.")
+
   defer:
     if globalAudioIterator != nil:
       globalAudioIterator.cleanup()
 
   av_log_set_level(AV_LOG_QUIET)
-  let inputFile = args[0]
+  let inputFile = args.input
+  let chunkDuration: float64 = av_inv_q(AVRational(args.timebase))
 
   var container: InputContainer
   try:
@@ -229,22 +269,17 @@ proc main*(args: seq[string]) =
         elif ret < 0:
           error "Error receiving frame from decoder"
 
-        process_audio_frame(frame)
+        process_audio_frame(chunkDuration, frame)
 
   # Flush decoder
   discard avcodec_send_packet(codecCtx, nil)
   while avcodec_receive_frame(codecCtx, frame) >= 0:
-    process_audio_frame(frame)
+    process_audio_frame(chunkDuration, frame)
 
-  # Process any remaining chunks in the FIFO
   if globalAudioIterator != nil:
-    var finalChunks = 0
     while globalAudioIterator.hasChunk():
       let loudness = globalAudioIterator.readChunk()
-      finalChunks += 1
-      echo "Final loudness ", finalChunks, ": ", loudness
+      echo "Final loudness ", loudness
       error "Final"
 
   echo ""
-    # let remainingSamples = av_audio_fifo_size(globalAudioIterator.fifo)
-    # echo "Remaining samples in FIFO: ", remainingSamples
