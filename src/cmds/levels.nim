@@ -7,6 +7,10 @@ import ../av
 import ../ffmpeg
 import ../log
 
+# Enable project wide, see: https://simonbyrne.github.io/notes/fastmath/
+{.passC: "-ffast-math".}
+
+
 type
   AudioIterator* = ref object
     fifo: ptr AVAudioFifo
@@ -152,22 +156,30 @@ proc readChunk*(iter: AudioIterator): float32 =
     av_freep(addr buffer)
 
   # Read from FIFO
-  let samplesRead = av_audio_fifo_read(iter.fifo, cast[pointer](addr buffer), currentSize.cint)
-  if samplesRead != currentSize:
-    echo "Warning: requested ", currentSize, " samples, got ", samplesRead
-
-  # Calculate maximum absolute value
   let samples = cast[ptr UncheckedArray[float32]](buffer)
+  let samplesRead = av_audio_fifo_read(iter.fifo, cast[pointer](addr buffer), currentSize.cint)
   let totalSamples = samplesRead * iter.channelCount
+
+  # Process 4 floats at once using SIMD-like operations
+  let simdWidth = 4
+  let simdSamples = totalSamples and not (simdWidth - 1)  # Round down to multiple of 4
+
   var maxAbs: float32 = 0.0
 
-  for i in 0 ..< totalSamples:
-    let absVal = abs(samples[i])
-    if absVal > maxAbs:
-      maxAbs = absVal
+  # SIMD-style loop (unrolled)
+  for i in countup(0, simdSamples - 1, simdWidth):
+    let v0 = abs(samples[i])
+    let v1 = abs(samples[i + 1])
+    let v2 = abs(samples[i + 2])
+    let v3 = abs(samples[i + 3])
+
+    maxAbs = max(maxAbs, max(max(v0, v1), max(v2, v3)))
+
+  # Handle remaining samples
+  for i in simdSamples ..< totalSamples:
+    maxAbs = max(maxAbs, abs(samples[i]))
 
   return maxAbs
-
 
 iterator loudness*(processor: var AudioProcessor): float32 =
   var packet = av_packet_alloc()
