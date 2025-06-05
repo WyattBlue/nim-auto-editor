@@ -1,6 +1,7 @@
 import std/math
 import std/parseopt
 import std/strformat
+import std/strutils
 
 import ../av
 import ../ffmpeg
@@ -178,7 +179,72 @@ proc process_audio_frame(chunkDuration: float64, frame: ptr AVFrame) =
 type levelArgs* = object
   input*: string
   timebase*: string = "30/1"
-  edit*: string # no-op for now
+  edit*: string = "audio"
+
+
+# TODO: Make a generic version
+proc parseEditString*(exportStr: string): (string, string) =
+  var kind = exportStr
+  var stream = "0"
+
+  let colonPos = exportStr.find(':')
+  if colonPos == -1:
+    return (kind, stream)
+
+  kind = exportStr[0..colonPos-1]
+  let paramsStr = exportStr[colonPos+1..^1]
+
+  var i = 0
+  while i < paramsStr.len:
+    while i < paramsStr.len and paramsStr[i] == ' ':
+      inc i
+
+    if i >= paramsStr.len:
+      break
+
+    var paramStart = i
+    while i < paramsStr.len and paramsStr[i] != '=':
+      inc i
+
+    if i >= paramsStr.len:
+      break
+
+    let paramName = paramsStr[paramStart..i-1]
+    inc i
+
+    var value = ""
+    if i < paramsStr.len and paramsStr[i] == '"':
+      inc i
+      while i < paramsStr.len:
+        if paramsStr[i] == '\\' and i + 1 < paramsStr.len:
+          # Handle escape sequences
+          inc i
+          case paramsStr[i]:
+            of '"': value.add('"')
+            of '\\': value.add('\\')
+            else:
+              value.add('\\')
+              value.add(paramsStr[i])
+        elif paramsStr[i] == '"':
+          inc i
+          break
+        else:
+          value.add(paramsStr[i])
+        inc i
+    else:
+      # Unquoted value (until comma or end)
+      while i < paramsStr.len and paramsStr[i] != ',':
+        value.add(paramsStr[i])
+        inc i
+
+    case paramName:
+      of "stream": stream = value
+
+    # Skip comma
+    if i < paramsStr.len and paramsStr[i] == ',':
+      inc i
+
+  return (kind, stream)
 
 proc main*(args: seq[string]) =
   if args.len < 1:
@@ -225,6 +291,10 @@ proc main*(args: seq[string]) =
   av_log_set_level(AV_LOG_QUIET)
   let inputFile = args.input
   let chunkDuration: float64 = av_inv_q(AVRational(args.timebase))
+  let (editMethod, streamStr) = parseEditString(args.edit)
+  if editMethod != "audio":
+    error fmt"Unknown editing method: {editMethod}"
+  let userStream = parseInt(streamStr)
 
   var container: InputContainer
   try:
@@ -233,13 +303,15 @@ proc main*(args: seq[string]) =
     error e.msg
   defer: container.close()
 
-  echo "\n@start"
-
   let formatCtx = container.formatContext
   if container.audio.len == 0:
     error "No audio stream"
+  if userStream < 0:
+    error "Stream must be positive"
+  if container.audio.len <= userStream:
+    error fmt"Audio stream out of range: {userStream}"
 
-  let audioStream: ptr AVStream = container.audio[0]
+  let audioStream: ptr AVStream = container.audio[userStream]
   let audioIndex: cint = audioStream.index
   let codecCtx = initDecoder(audioStream.codecpar)
   defer: avcodec_free_context(addr codecCtx)
@@ -252,6 +324,8 @@ proc main*(args: seq[string]) =
   defer:
     av_packet_free(addr packet)
     av_frame_free(addr frame)
+
+  echo "\n@start"
 
   var ret: cint
   while av_read_frame(formatCtx, packet) >= 0:
