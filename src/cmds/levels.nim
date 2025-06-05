@@ -20,6 +20,13 @@ type
     totalFramesProcessed: int
     totalSamplesWritten: int
 
+  AudioProcessor* = object
+    formatCtx: ptr AVFormatContext
+    `iterator`: AudioIterator
+    codecCtx: ptr AVCodecContext
+    audioIndex: cint
+    chunkDuration: float64
+
 proc newAudioIterator*(sampleRate: int, channelLayout: AVChannelLayout, timeBase: float64): AudioIterator =
   result = AudioIterator()
   result.sampleRate = sampleRate
@@ -30,13 +37,6 @@ proc newAudioIterator*(sampleRate: int, channelLayout: AVChannelLayout, timeBase
   result.isInitialized = false
   result.totalFramesProcessed = 0
   result.totalSamplesWritten = 0
-
-  # echo "AudioIterator initialized:"
-  # echo "  Sample rate: ", sampleRate
-  # echo "  Channels: ", channelLayout.nb_channels
-  # echo "  Time base: ", timeBase
-  # echo "  Exact chunk size: ", result.exactSize, " samples"
-  # echo "  Chunk duration: ", result.exactSize / float64(sampleRate), " seconds"
 
   # Initialize audio FIFO
   result.fifo = av_audio_fifo_alloc(result.targetFormat, result.channelCount, 1024)
@@ -158,29 +158,57 @@ proc readChunk*(iter: AudioIterator): float32 =
 
   return maxAbs
 
-# Global iterator instance
-var globalAudioIterator: AudioIterator = nil
 
-proc process_audio_frame(chunkDuration: float64, frame: ptr AVFrame) =
-  if globalAudioIterator == nil:
-    globalAudioIterator = newAudioIterator(frame.sample_rate, frame.ch_layout, chunkDuration)
+iterator loudness*(processor: var AudioProcessor): float32 =
+  var packet = av_packet_alloc()
+  var frame = av_frame_alloc()
+  if packet == nil or frame == nil:
+    error "Could not allocate packet/frame"
 
-  # Write frame to iterator
-  globalAudioIterator.writeFrame(frame)
+  defer:
+    av_packet_free(addr packet)
+    av_frame_free(addr frame)
+    if processor.`iterator` != nil:
+      processor.`iterator`.cleanup()
+    avcodec_free_context(addr processor.codecCtx)
 
-  # Process any available chunks
-  var chunksProcessed = 0
-  while globalAudioIterator.hasChunk():
-    let loudness = globalAudioIterator.readChunk()
-    chunksProcessed += 1
-    echo loudness
+  var ret: cint
+  while av_read_frame(processor.formatCtx, packet) >= 0:
+    defer: av_packet_unref(packet)
+
+    if packet.stream_index == processor.audioIndex:
+      ret = avcodec_send_packet(processor.codecCtx, packet)
+      if ret < 0:
+        error "sending packet to decoder"
+
+      while ret >= 0:
+        ret = avcodec_receive_frame(processor.codecCtx, frame)
+        if ret == AVERROR_EAGAIN or ret == AVERROR_EOF:
+          break
+        elif ret < 0:
+          error "Error receiving frame from decoder"
+
+        if processor.`iterator` == nil:
+          processor.`iterator` = newAudioIterator(frame.sample_rate, frame.ch_layout, processor.chunkDuration)
+
+        processor.`iterator`.writeFrame(frame)
+
+        while processor.`iterator`.hasChunk():
+          yield processor.`iterator`.readChunk()
+
+  # Flush decoder
+  discard avcodec_send_packet(processor.codecCtx, nil)
+  while avcodec_receive_frame(processor.codecCtx, frame) >= 0:
+    if processor.`iterator` != nil:
+      processor.`iterator`.writeFrame(frame)
+      while processor.`iterator`.hasChunk():
+        yield processor.`iterator`.readChunk()
 
 
 type levelArgs* = object
   input*: string
   timebase*: string = "30/1"
   edit*: string = "audio"
-
 
 # TODO: Make a generic version
 proc parseEditString*(exportStr: string): (string, string) =
@@ -284,10 +312,6 @@ proc main*(args: seq[string]) =
   if expecting != "":
     error(fmt"--{expecting} needs argument.")
 
-  defer:
-    if globalAudioIterator != nil:
-      globalAudioIterator.cleanup()
-
   av_log_set_level(AV_LOG_QUIET)
   let inputFile = args.input
   let chunkDuration: float64 = av_inv_q(AVRational(args.timebase))
@@ -303,7 +327,6 @@ proc main*(args: seq[string]) =
     error e.msg
   defer: container.close()
 
-  let formatCtx = container.formatContext
   if container.audio.len == 0:
     error "No audio stream"
   if userStream < 0:
@@ -313,47 +336,17 @@ proc main*(args: seq[string]) =
 
   let audioStream: ptr AVStream = container.audio[userStream]
   let audioIndex: cint = audioStream.index
-  let codecCtx = initDecoder(audioStream.codecpar)
-  defer: avcodec_free_context(addr codecCtx)
 
-  var packet = av_packet_alloc()
-  var frame = av_frame_alloc()
-  if packet == nil or frame == nil:
-    error "Could not allocate packet/frame"
-
-  defer:
-    av_packet_free(addr packet)
-    av_frame_free(addr frame)
+  var processor = AudioProcessor(
+    formatCtx: container.formatContext,
+    codecCtx: initDecoder(audioStream.codecpar),
+    audioIndex: audioIndex,
+    chunkDuration: chunkDuration
+  )
 
   echo "\n@start"
 
-  var ret: cint
-  while av_read_frame(formatCtx, packet) >= 0:
-    defer: av_packet_unref(packet)
-
-    if packet.stream_index == audioIndex:
-      ret = avcodec_send_packet(codecCtx, packet)
-      if ret < 0:
-        error "sending packet to decoder"
-
-      while ret >= 0:
-        ret = avcodec_receive_frame(codecCtx, frame)
-        if ret == AVERROR_EAGAIN or ret == AVERROR_EOF:
-          break
-        elif ret < 0:
-          error "Error receiving frame from decoder"
-
-        process_audio_frame(chunkDuration, frame)
-
-  # Flush decoder
-  discard avcodec_send_packet(codecCtx, nil)
-  while avcodec_receive_frame(codecCtx, frame) >= 0:
-    process_audio_frame(chunkDuration, frame)
-
-  if globalAudioIterator != nil:
-    while globalAudioIterator.hasChunk():
-      let loudness = globalAudioIterator.readChunk()
-      echo "Final loudness ", loudness
-      error "Final"
+  for loudnessValue in processor.loudness():
+    echo loudnessValue
 
   echo ""
