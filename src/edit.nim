@@ -10,6 +10,7 @@ import ffmpeg
 import timeline
 import exports/[fcp7, fcp11, json, shotcut]
 import imports/json
+import analyze
 
 proc mediaLength*(container: InputContainer): float64 =
   # Get the mediaLength in seconds.
@@ -110,6 +111,36 @@ proc parseExportString*(exportStr: string): (string, string, string) =
   return (kind, name, version)
 
 
+func chunkify(arr: seq[bool]): seq[(int64, int64, float64)] =
+  var start: int64 = 0
+  var j: int64 = 1
+  var arr_len: int64 = arr.len
+  while j < arr_len:
+    if arr[j] != arr[j - 1]:
+      let speed = (if arr[j-1] == true: 1.0 else: 99999.0)
+      result.add (start, j, speed)
+      start = j
+    inc j
+  result.add (start, arr_len, (if arr[j] == true: 1.0 else: 99999.0))
+
+proc audioLevels(container: InputContainer, tb: AVRational): seq[bool] =
+  if container.audio.len == 0:
+    error "No audio stream"
+
+  let userStream = 0
+  let audioStream: ptr AVStream = container.audio[userStream]
+  let audioIndex: cint = audioStream.index
+
+  let threshold = 0.04
+  var processor = AudioProcessor(
+    formatCtx: container.formatContext,
+    codecCtx: initDecoder(audioStream.codecpar),
+    audioIndex: audioIndex,
+    chunkDuration: av_inv_q(tb),
+  )
+  for loudnessValue in processor.loudness():
+    result.add (loudnessValue > threshold)
+
 proc editMedia*(args: mainArgs) =
   av_log_set_level(AV_LOG_QUIET)
 
@@ -136,14 +167,17 @@ proc editMedia*(args: mainArgs) =
       if container.video.len > 0:
         tb = makeSaneTimebase(container.video[0].avgRate)
 
-      # Get the timeline resolution from the first video stream.
+      var chunks: seq[(int64, int64, float64)] = @[]
       let src = initMediaInfo(container.formatContext, args.input)
-      let length = mediaLength(container)
-      let tbLength = int64(round(tb.cdouble * length))
 
-      var chunks: seq[(int64, int64, float64)]
-      if tbLength > 0:
-        chunks.add((0'i64, tbLength, 1.0))
+      if args.edit == "audio":
+        chunks = chunkify(audioLevels(container, tb))
+      else:
+        let length = mediaLength(container)
+        let tbLength = int64(round(tb.cdouble * length))
+
+        if tbLength > 0:
+          chunks.add((0'i64, tbLength, 1.0))
 
       tlV3 = toNonLinear(addr args.input, tb, src, chunks)
 

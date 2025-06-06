@@ -8,7 +8,7 @@ import log
 {.passL: "-flto".}
 
 type
-  AudioIterator* = ref object
+  AudioIterator = ref object
     fifo: ptr AVAudioFifo
     swrCtx: ptr SwrContext
     outputFrame: ptr AVFrame
@@ -31,7 +31,7 @@ type
     audioIndex*: cint
     chunkDuration*: float64
 
-proc newAudioIterator*(sampleRate: cint, channelLayout: AVChannelLayout, chunkDuration: float64): AudioIterator =
+proc newAudioIterator(sampleRate: cint, channelLayout: AVChannelLayout, chunkDuration: float64): AudioIterator =
   result = AudioIterator()
   result.sampleRate = sampleRate
   result.channelCount = channelLayout.nb_channels
@@ -60,7 +60,7 @@ proc newAudioIterator*(sampleRate: cint, channelLayout: AVChannelLayout, chunkDu
   if ret < 0:
     error "Could not allocate read buffer"
 
-proc cleanup*(iter: AudioIterator) =
+proc cleanup(iter: AudioIterator) =
   if iter.fifo != nil:
     av_audio_fifo_free(iter.fifo)
     iter.fifo = nil
@@ -74,7 +74,7 @@ proc cleanup*(iter: AudioIterator) =
     av_freep(addr iter.readBuffer)
     iter.readBuffer = nil
 
-proc initResampler*(iter: AudioIterator, inputFormat: AVSampleFormat, inputLayout: AVChannelLayout) =
+proc initResampler(iter: AudioIterator, inputFormat: AVSampleFormat, inputLayout: AVChannelLayout) =
   if iter.isInitialized:
     return
 
@@ -111,7 +111,7 @@ proc initResampler*(iter: AudioIterator, inputFormat: AVSampleFormat, inputLayou
 
   iter.isInitialized = true
 
-proc writeFrame*(iter: AudioIterator, frame: ptr AVFrame) =
+proc writeFrame(iter: AudioIterator, frame: ptr AVFrame) =
   # Initialize resampler on first frame
   if not iter.isInitialized:
     iter.initResampler(AVSampleFormat(frame.format), frame.ch_layout)

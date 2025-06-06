@@ -9,6 +9,7 @@ type mainArgs* = object
   progress*: string
   output*: string = "-"
   `export`*: string = "v3"
+  edit*: string = "audio"
 
 
 proc error*(msg: string) =

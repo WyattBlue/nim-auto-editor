@@ -48,6 +48,8 @@ judge making cuts.
         args.output = key
       of "export":
         args.`export` = key
+      of "edit":
+        args.edit = key
       of "progress":
         args.progress = key
       expecting = ""
@@ -57,7 +59,7 @@ judge making cuts.
         args.version = true
       elif key == "debug":
         args.debug = true
-      elif key in ["export", "output", "progress"]:
+      elif key in ["edit", "export", "output", "progress"]:
         expecting = key
       else:
         error(fmt"Unknown option: {key}")
