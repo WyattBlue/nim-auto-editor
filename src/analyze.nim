@@ -5,7 +5,7 @@ import log
 
 # Enable project wide, see: https://simonbyrne.github.io/notes/fastmath/
 {.passC: "-ffast-math".}
-
+{.passL: "-flto".}
 
 type
   AudioIterator* = ref object
@@ -75,7 +75,6 @@ proc cleanup*(iter: AudioIterator) =
     iter.readBuffer = nil
 
 proc initResampler*(iter: AudioIterator, inputFormat: AVSampleFormat, inputLayout: AVChannelLayout) =
-  echo "initResampler"
   if iter.isInitialized:
     return
 
