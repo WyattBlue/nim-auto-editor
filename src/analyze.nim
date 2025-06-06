@@ -21,6 +21,8 @@ type
     needsResampling: bool
     totalFramesProcessed: int
     totalSamplesWritten: int
+    readBuffer: ptr uint8
+    maxBufferSize: int
 
   AudioProcessor* = object
     formatCtx*: ptr AVFormatContext
@@ -51,6 +53,13 @@ proc newAudioIterator*(sampleRate: cint, channelLayout: AVChannelLayout, chunkDu
   if result.outputFrame == nil:
     error "Could not allocate output frame"
 
+  # Pre-allocate buffer for reading chunks
+  result.maxBufferSize = int(result.exactSize)
+  let ret = av_samples_alloc(addr result.readBuffer, nil, result.channelCount.cint,
+                           result.maxBufferSize.cint, result.targetFormat, 0)
+  if ret < 0:
+    error "Could not allocate read buffer"
+
 proc cleanup*(iter: AudioIterator) =
   if iter.fifo != nil:
     av_audio_fifo_free(iter.fifo)
@@ -61,8 +70,12 @@ proc cleanup*(iter: AudioIterator) =
   if iter.outputFrame != nil:
     av_frame_free(addr iter.outputFrame)
     iter.outputFrame = nil
+  if iter.readBuffer != nil:
+    av_freep(addr iter.readBuffer)
+    iter.readBuffer = nil
 
 proc initResampler*(iter: AudioIterator, inputFormat: AVSampleFormat, inputLayout: AVChannelLayout) =
+  echo "initResampler"
   if iter.isInitialized:
     return
 
@@ -161,17 +174,9 @@ proc readChunk(iter: AudioIterator): float32 =
   let currentSize = round(sizeWithError).int
   iter.accumulatedError = sizeWithError - float64(currentSize)
 
-  var buffer: ptr uint8
-  let ret = av_samples_alloc(addr buffer, nil, iter.channelCount.cint,
-                           currentSize.cint, iter.targetFormat, 0)
-  if ret < 0:
-    error "Could not allocate sample buffer"
-  defer:
-    av_freep(addr buffer)
-
-  # Read from FIFO
-  let samples = cast[ptr UncheckedArray[float32]](buffer)
-  let samplesRead = av_audio_fifo_read(iter.fifo, cast[pointer](addr buffer), currentSize.cint)
+  # Use pre-allocated buffer - no allocation needed!
+  let samples = cast[ptr UncheckedArray[float32]](iter.readBuffer)
+  let samplesRead = av_audio_fifo_read(iter.fifo, cast[pointer](addr iter.readBuffer), currentSize.cint)
   let totalSamples = samplesRead * iter.channelCount
 
   # Process 4 floats at once using SIMD-like operations
