@@ -1,4 +1,5 @@
 import std/math
+import std/strformat
 
 import ffmpeg
 import log
@@ -226,7 +227,7 @@ iterator loudness*(processor: var AudioProcessor): float32 =
         if ret == AVERROR_EAGAIN or ret == AVERROR_EOF:
           break
         elif ret < 0:
-          error "Error receiving frame from decoder"
+          error fmt"Error receiving frame from decoder: {ret}"
 
         if processor.`iterator` == nil:
           processor.`iterator` = newAudioIterator(frame.sample_rate, frame.ch_layout, processor.chunkDuration)
