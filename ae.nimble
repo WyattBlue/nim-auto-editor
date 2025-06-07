@@ -12,6 +12,9 @@ requires "nim >= 2.2.2"
 # Tasks
 import os
 
+task test, "Test the project":
+  exec "nim c -r tests/rationals"
+
 task build, "Build the project in debug mode":
   exec "nim c -d:debug --out:auto-editor src/main.nim"
 

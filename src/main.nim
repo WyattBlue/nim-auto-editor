@@ -2,6 +2,7 @@ import std/os
 import std/parseopt
 import std/posix_utils
 import std/strformat
+import std/strutils
 import std/terminal
 
 import cmds/[desc, info, levels, subdump]
@@ -9,7 +10,16 @@ import edit
 import log
 
 
-const version* = "0.4.0"
+const version* = "0.5.0-pre"
+
+
+proc parseMargin(val: string): (string, string) =
+  var vals = val.strip().split(",")
+  if vals.len == 1:
+    vals.add vals[0]
+  if vals.len != 2:
+    error "--margin has too many arguments."
+  return (vals[0], vals[1])
 
 proc main() =
   if paramCount() < 1:
@@ -44,14 +54,16 @@ judge making cuts.
       case expecting
       of "":
         args.input = key
-      of "output":
-        args.output = key
-      of "export":
-        args.`export` = key
       of "edit":
         args.edit = key
+      of "export":
+        args.`export` = key
+      of "output":
+        args.output = key
       of "progress":
         args.progress = key
+      of "margin":
+        args.margin = parseMargin(key)
       expecting = ""
 
     of cmdLongOption:
@@ -59,7 +71,7 @@ judge making cuts.
         args.version = true
       elif key == "debug":
         args.debug = true
-      elif key in ["edit", "export", "output", "progress"]:
+      elif key in ["edit", "export", "output", "progress", "margin"]:
         expecting = key
       else:
         error(fmt"Unknown option: {key}")

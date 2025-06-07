@@ -10,6 +10,7 @@ type mainArgs* = object
   output*: string = "-"
   `export`*: string = "v3"
   edit*: string = "audio"
+  margin*: (string, string) = ("0.2s", "0.2s")
 
 
 proc error*(msg: string) =

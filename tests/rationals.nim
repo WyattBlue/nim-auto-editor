@@ -1,8 +1,11 @@
 import unittest
+import std/os
+import std/tempfiles
 
 import ../src/ffmpeg
 import ../src/edit
 import ../src/wavutil
+import ../src/cmds/info
 
 test "maths":
   let a = AVRational(num: 3, den: 4)
@@ -31,6 +34,29 @@ test "exports":
   check(parseExportString("premiere:name=\"Hello \\\" World") == ("premiere", "Hello \" World", "11"))
   check(parseExportString("premiere:name=\"Hello \\\\ World") == ("premiere", "Hello \\ World", "11"))
 
+test "info":
+  main(@["example.mp4"])
 
-# test "wav":
-#   toS16Wav("example.mp4", "out.wav", 0)
+test "margin":
+  var levels: seq[bool]
+  levels = @[false, false, true, false, false]
+  mutMargin(levels, 0, 1)
+  check(levels == @[false, false, true, true, false])
+
+  levels = @[false, false, true, false, false]
+  mutMargin(levels, 1, 0)
+  check(levels == @[false, true, true, false, false])
+
+  levels = @[false, false, true, false, false]
+  mutMargin(levels, 1, 1)
+  check(levels == @[false, true, true, true, false])
+
+  levels = @[false, false, true, false, false]
+  mutMargin(levels, 2, 2)
+  check(levels == @[true, true, true, true, true])
+
+test "wav":
+  let tempDir = createTempDir("tmp", "")
+  let outWav = tempDir / "out.wav"
+  toS16Wav("example.mp4", outWav, 0)
+  removeDir(tempDir)

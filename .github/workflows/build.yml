@@ -48,7 +48,7 @@ jobs:
       - name: Compile
         run: nimble make
       - name: Test
-        run: ./auto-editor info example.mp4
+        run: nimble test
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
