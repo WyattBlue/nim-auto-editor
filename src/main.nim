@@ -1,5 +1,4 @@
 import std/os
-import std/parseopt
 import std/posix_utils
 import std/strformat
 import std/strutils
@@ -48,9 +47,22 @@ judge making cuts.
   var args = mainArgs()
   var expecting: string = ""
 
-  for kind, key, val in getopt():
-    case kind
-    of cmdArgument:
+  for key in commandLineParams():
+    case key:
+    of "-V", "--version":
+      args.version = true
+    of "--debug":
+      args.debug = true
+    of "-dn", "-sn":
+      discard
+    of "-o":
+      expecting = "output"
+    of "--edit", "--export", "--output", "--progress", "--margin":
+      expecting = key[2..^1]
+    else:
+      if key.startsWith("--"):
+        error(fmt"Unknown option: {key}")
+
       case expecting
       of "":
         args.input = key
@@ -65,27 +77,6 @@ judge making cuts.
       of "margin":
         args.margin = parseMargin(key)
       expecting = ""
-
-    of cmdLongOption:
-      if key == "version":
-        args.version = true
-      elif key == "debug":
-        args.debug = true
-      elif key in ["edit", "export", "output", "progress", "margin"]:
-        expecting = key
-      else:
-        error(fmt"Unknown option: {key}")
-    of cmdShortOption:
-      if key == "V":
-        args.version = true
-      elif key == "o":
-        expecting = "output"
-      elif key in ["d", "n"]:
-        discard
-      else:
-        error(fmt"Unknown option: {key}")
-    of cmdEnd:
-      discard
 
   if expecting != "":
     error(fmt"--{expecting} needs argument.")
