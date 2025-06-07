@@ -1,6 +1,8 @@
 {.passC: "-I./ffmpeg_build/include".}
 {.passL: "-L./ffmpeg_build/lib -lavformat -lavcodec -lavutil -lswresample".}
 
+import std/posix
+
 type
   AVRational* {.importc, header: "<libavutil/rational.h>", bycopy.} = object
     num*: cint
@@ -430,7 +432,7 @@ proc avcodec_close*(avctx: ptr AVCodecContext): cint {.importc,
 # Error
 proc AVERROR*(e: cint): cint {.inline.} = (-e)
 const AVERROR_EOF* = AVERROR(0x10000051)
-const AVERROR_EAGAIN* = -35
+let AVERROR_EAGAIN* = AVERROR(EAGAIN)
 
 # FIFO
 type

@@ -224,7 +224,7 @@ iterator loudness*(processor: var AudioProcessor): float32 =
 
       while ret >= 0:
         ret = avcodec_receive_frame(processor.codecCtx, frame)
-        if ret == AVERROR_EAGAIN or ret == AVERROR_EOF or ret == -11:
+        if ret == AVERROR_EAGAIN or ret == AVERROR_EOF:
           break
         elif ret < 0:
           error fmt"Error receiving frame from decoder: {ret}"
