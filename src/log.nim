@@ -2,11 +2,15 @@ import std/tables
 import std/terminal
 from std/math import gcd
 
+
+type BarType* = enum
+  modern, classic, ascii, machine, none
+
 type mainArgs* = object
   input*: string = ""
   version*: bool = false
   debug*: bool = false
-  progress*: string
+  progress*: BarType = modern
   output*: string = "-"
   `export`*: string = "v3"
   edit*: string = "audio"

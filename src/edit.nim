@@ -2,6 +2,7 @@ import std/os
 import std/terminal
 import std/strutils
 import std/strformat
+import std/sequtils
 
 from std/math import round, trunc
 
@@ -13,6 +14,7 @@ import timeline
 import exports/[fcp7, fcp11, json, shotcut]
 import imports/json
 import analyze
+import util/bar
 
 proc mediaLength*(container: InputContainer): float64 =
   # Get the mediaLength in seconds.
@@ -188,23 +190,6 @@ proc mutMargin*(arr: var seq[bool], startM: int, endM: int) =
       for k in max(i + endM, 0) ..< i:
         arr[k] = false
 
-proc audioLevels(container: InputContainer, tb: AVRational): seq[bool] =
-  if container.audio.len == 0:
-    error "No audio stream"
-
-  let userStream = 0
-  let audioStream: ptr AVStream = container.audio[userStream]
-  let audioIndex: cint = audioStream.index
-
-  let threshold = 0.04
-  var processor = AudioProcessor(
-    formatCtx: container.formatContext,
-    codecCtx: initDecoder(audioStream.codecpar),
-    audioIndex: audioIndex,
-    chunkDuration: av_inv_q(tb),
-  )
-  for loudnessValue in processor.loudness():
-    result.add (loudnessValue > threshold)
 
 proc editMedia*(args: mainArgs) =
   av_log_set_level(AV_LOG_QUIET)
@@ -213,7 +198,7 @@ proc editMedia*(args: mainArgs) =
   var interner = newStringInterner()
   defer: interner.cleanup()
 
-  if args.progress == "machine" and args.output != "-":
+  if args.progress == BarType.machine and args.output != "-":
     stdout.write("Starting\n")
     stdout.flushFile()
 
@@ -238,11 +223,17 @@ proc editMedia*(args: mainArgs) =
       let src = initMediaInfo(container.formatContext, args.input)
 
       if args.edit == "audio":
-        var levels = audioLevels(container, tb)
+        let threshold = 0.04
+
+        let bar = initBar(args.progress)
+        let levels = audio(bar, tb, container, 0) # TODO: Don't hardcode
+        var hasLoud = newSeq[bool](levels.len)
+        hasLoud = levels.mapIt(it > threshold)
+
         let startMargin = parseTime(args.margin[0], tb.float64)
         let endMargin = parseTime(args.margin[1], tb.float64)
-        mutMargin(levels, startMargin, endMargin)
-        chunks = chunkify(levels)
+        mutMargin(hasLoud, startMargin, endMargin)
+        chunks = chunkify(hasLoud)
       else:
         let length = mediaLength(container)
         let tbLength = int64(round(tb.cdouble * length))

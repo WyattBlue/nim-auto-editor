@@ -2,7 +2,9 @@ import std/math
 import std/strformat
 
 import ffmpeg
+import av
 import log
+import util/bar
 
 # Enable project wide, see: https://simonbyrne.github.io/notes/fastmath/
 {.passC: "-ffast-math".}
@@ -244,3 +246,32 @@ iterator loudness*(processor: var AudioProcessor): float32 =
       processor.`iterator`.writeFrame(frame)
       while processor.`iterator`.hasChunk():
         yield processor.`iterator`.readChunk()
+
+
+proc audio*(bar: Bar, tb: AVRational, container: InputContainer, stream: int64): seq[float32] =
+  if stream >= container.audio.len:
+    error fmt"audio: audio stream '{stream}' does not exist."
+
+  let audioStream: ptr AVStream = container.audio[stream]
+
+  var processor = AudioProcessor(
+    formatCtx: container.formatContext,
+    codecCtx: initDecoder(audioStream.codecpar),
+    audioIndex: audioStream.index,
+    chunkDuration: av_inv_q(tb),
+  )
+
+  var inaccurateDur: float = 1024.0
+  if audioStream.duration != AV_NOPTS_VALUE and audioStream.time_base != AV_NOPTS_VALUE:
+    inaccurateDur = float(audioStream.duration) * float(audioStream.time_base * tb)
+  elif container.duration != 0.0:
+    inaccurateDur = container.duration / float(tb)
+
+  bar.start(inaccurateDur, "Analyzing audio volume")
+  var i: float = 0
+  for value in processor.loudness():
+    result.add value
+    bar.tick(i)
+    i += 1
+
+  bar.`end`()

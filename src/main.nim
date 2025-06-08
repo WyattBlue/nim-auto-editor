@@ -73,7 +73,10 @@ judge making cuts.
       of "output":
         args.output = key
       of "progress":
-        args.progress = key
+        try:
+          args.progress = parseEnum[BarType](key)
+        except ValueError:
+          error &"{key} is not a choice for --progress\nchoices are:\n  modern, classic, ascii, machine, none"
       of "margin":
         args.margin = parseMargin(key)
       expecting = ""
