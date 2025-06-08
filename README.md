@@ -48,17 +48,21 @@ auto-editor example.mp4
 - [x] info
 - [x] desc
 - [x] subdump
-- [ ] levels
+- [x] levels
+- [ ] cache
 
 ### Exporting
 - [x] Final Cut Pro (.fcpxml)
 - [x] ShotCut (.mlt)
 - [x] Premiere Pro (.xml)
 - [x] DaVinci Resolve
-- [ ] Media files
+- [ ] Media file
+- [ ] Clip sequence
 
-### Editing Methods
+### Editing Procedures
 - [x] "none"
-- [ ] audio
+- [x] audio
 - [ ] motion
 - [ ] subtitle
+- [ ] or
+- [ ] and
