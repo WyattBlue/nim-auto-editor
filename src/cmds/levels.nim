@@ -12,13 +12,14 @@ type levelArgs* = object
   edit*: string = "audio"
 
 # TODO: Make a generic version
-proc parseEditString*(exportStr: string): (string, string) =
+proc parseEditString*(exportStr: string): (string, string, string) =
   var kind = exportStr
   var stream = "0"
+  var threshold = ""
 
   let colonPos = exportStr.find(':')
   if colonPos == -1:
-    return (kind, stream)
+    return (kind, stream, threshold)
 
   kind = exportStr[0..colonPos-1]
   let paramsStr = exportStr[colonPos+1..^1]
@@ -68,12 +69,13 @@ proc parseEditString*(exportStr: string): (string, string) =
 
     case paramName:
       of "stream": stream = value
+      of "threshold": threshold = value
 
     # Skip comma
     if i < paramsStr.len and paramsStr[i] == ',':
       inc i
 
-  return (kind, stream)
+  return (kind, stream, threshold)
 
 proc main*(args: seq[string]) =
   if args.len < 1:
@@ -116,7 +118,7 @@ proc main*(args: seq[string]) =
   av_log_set_level(AV_LOG_QUIET)
   let inputFile = args.input
   let chunkDuration: float64 = av_inv_q(AVRational(args.timebase))
-  let (editMethod, streamStr) = parseEditString(args.edit)
+  let (editMethod, streamStr, _) = parseEditString(args.edit)
   if editMethod != "audio":
     error fmt"Unknown editing method: {editMethod}"
   let userStream = parseInt(streamStr)

@@ -15,6 +15,7 @@ import exports/[fcp7, fcp11, json, shotcut]
 import imports/json
 import analyze
 import util/bar
+import cmds/levels
 
 proc mediaLength*(container: InputContainer): float64 =
   # Get the mediaLength in seconds.
@@ -221,24 +222,35 @@ proc editMedia*(args: mainArgs) =
       var chunks: seq[(int64, int64, float64)] = @[]
       let src = initMediaInfo(container.formatContext, args.input)
 
-      if args.edit == "audio":
-        let threshold = 0.04
+      let (editMethod, strStream, strThres) = parseEditString(args.edit)
+
+      if editMethod == "audio":
+        var threshold = 0.04
+        var stream: int32
+        try:
+          stream = parseInt(strStream).int32
+          if strThres != "":
+            threshold = parseFloat(strThres)
+        except ValueError as e:
+          error e.msg
 
         let bar = initBar(args.progress)
-        let levels = audio(bar, tb, container, 0) # TODO: Don't hardcode
+        let levels = audio(bar, tb, container, stream)
         var hasLoud = newSeq[bool](levels.len)
-        hasLoud = levels.mapIt(it > threshold)
+        hasLoud = levels.mapIt(it >= threshold)
 
         let startMargin = parseTime(args.margin[0], tb.float64)
         let endMargin = parseTime(args.margin[1], tb.float64)
         mutMargin(hasLoud, startMargin, endMargin)
         chunks = chunkify(hasLoud)
-      else:
+      elif editMethod == "none":
         let length = mediaLength(container)
         let tbLength = int64(round(tb.cdouble * length))
 
         if tbLength > 0:
           chunks.add((0'i64, tbLength, 1.0))
+      else:
+        error "Unknown edit method"
 
       tlV3 = toNonLinear(addr args.input, tb, src, chunks)
 

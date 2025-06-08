@@ -248,8 +248,8 @@ iterator loudness*(processor: var AudioProcessor): float32 =
         yield processor.`iterator`.readChunk()
 
 
-proc audio*(bar: Bar, tb: AVRational, container: InputContainer, stream: int64): seq[float32] =
-  if stream >= container.audio.len:
+proc audio*(bar: Bar, tb: AVRational, container: InputContainer, stream: int32): seq[float32] =
+  if stream < 0 or stream >= container.audio.len:
     error fmt"audio: audio stream '{stream}' does not exist."
 
   let audioStream: ptr AVStream = container.audio[stream]
