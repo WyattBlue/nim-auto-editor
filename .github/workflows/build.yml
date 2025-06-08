@@ -11,6 +11,8 @@ on:
   pull_request:
     branches:
       - master
+permissions:
+  contents: write
 jobs:
   main:
     runs-on: ${{ matrix.os }}
@@ -19,10 +21,13 @@ jobs:
         include:
           - os: ubuntu-latest
             arch: x86_64
+            binary_name: auto-editor-linux-x86_64
           - os: macos-13
             arch: x86_64
+            binary_name: auto-editor-macos-x86_64
           - os: macos-latest
             arch: arm64
+            binary_name: auto-editor-macos-arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,11 +54,23 @@ jobs:
         run: nimble make
       - name: Test
         run: nimble test
-      - name: Upload
+      - name: Rename binary
+        run: |
+          mv auto-editor ${{ matrix.binary_name }}
+      - name: Upload to Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ matrix.binary_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload Artifact (for non-release builds)
+        if: github.event_name != 'release'
         uses: actions/upload-artifact@v4
         with:
           name: auto-editor-${{ matrix.os }}-${{ matrix.arch }}
-          path: auto-editor
+          path: ${{ matrix.binary_name }}
+
   windows:
     runs-on: ubuntu-latest
     steps:
@@ -74,8 +91,19 @@ jobs:
         run: nimble makeffwin
       - name: Compile
         run: nimble windows
-      - name: Upload
+      - name: Rename binary
+        run: |
+          mv auto-editor.exe auto-editor-windows-amd64.exe
+      - name: Upload to Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: auto-editor-windows-amd64.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload Artifact (for non-release builds)
+        if: github.event_name != 'release'
         uses: actions/upload-artifact@v4
         with:
           name: auto-editor-win-amd64
-          path: auto-editor.exe
+          path: auto-editor-windows-amd64.exe
