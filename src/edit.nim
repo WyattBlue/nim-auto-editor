@@ -199,8 +199,7 @@ proc editMedia*(args: mainArgs) =
   defer: interner.cleanup()
 
   if args.progress == BarType.machine and args.output != "-":
-    stdout.write("Starting\n")
-    stdout.flushFile()
+    conwrite("Starting")
 
   if args.input == "" and not stdin.isatty():
     let stdinContent = readAll(stdin)

@@ -1,5 +1,6 @@
 import std/tables
 import std/terminal
+import std/strutils
 from std/math import gcd
 
 
@@ -10,14 +11,21 @@ type mainArgs* = object
   input*: string = ""
   version*: bool = false
   debug*: bool = false
+  quiet*: bool = false
   progress*: BarType = modern
   output*: string = "-"
   `export`*: string = "v3"
   edit*: string = "audio"
   margin*: (string, string) = ("0.2s", "0.2s")
 
+proc conwrite*(msg: string) =
+  let columns = terminalWidth()
+  let buffer: string = " ".repeat(columns - msg.len - 3)
+  stdout.write("  " & msg & buffer & "\r")
+  stdout.flushFile()
 
 proc error*(msg: string) =
+  conwrite("")
   stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)
   quit(1)
 

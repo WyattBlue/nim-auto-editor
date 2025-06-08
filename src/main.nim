@@ -11,6 +11,10 @@ import log
 
 const version* = "0.5.0-pre"
 
+proc ctrlc() {.noconv.} =
+  error "Keyboard Interrupt"
+
+setControlCHook(ctrlc)
 
 proc parseMargin(val: string): (string, string) =
   var vals = val.strip().split(",")
@@ -51,12 +55,18 @@ judge making cuts.
     case key:
     of "-V", "--version":
       args.version = true
+    of "-q", "--quiet":
+      args.quiet = true
     of "--debug":
       args.debug = true
     of "-dn", "-sn":
       discard
+    of "-ex":
+      expecting = "export"
     of "-o":
       expecting = "output"
+    of "-m":
+      expecting = "margin"
     of "--edit", "--export", "--output", "--progress", "--margin":
       expecting = key[2..^1]
     else:
