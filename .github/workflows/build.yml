@@ -64,12 +64,6 @@ jobs:
           files: ${{ matrix.binary_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload Artifact (for non-release builds)
-        if: github.event_name != 'release'
-        uses: actions/upload-artifact@v4
-        with:
-          name: auto-editor-${{ matrix.os }}-${{ matrix.arch }}
-          path: ${{ matrix.binary_name }}
 
   windows:
     runs-on: ubuntu-latest
@@ -101,9 +95,3 @@ jobs:
           files: auto-editor-windows-amd64.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Upload Artifact (for non-release builds)
-        if: github.event_name != 'release'
-        uses: actions/upload-artifact@v4
-        with:
-          name: auto-editor-win-amd64
-          path: auto-editor-windows-amd64.exe

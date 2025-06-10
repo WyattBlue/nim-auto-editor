@@ -1,6 +1,6 @@
 import std/os
 import std/terminal
-import std/[strutils, strformat]
+import std/strformat
 
 import ../about
 
