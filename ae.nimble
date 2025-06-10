@@ -42,7 +42,8 @@ let commonFlags = """
   --disable-indevs \
   --disable-outdevs \
   --disable-xlib \
-  --enable-pixelutils \
+  --disable-filters \
+  --enable-filter=scale,format,gblur \
   --disable-encoders \
   --disable-encoder=avui,dca,mlp,opus,s302m,sonic,sonic_ls,truehd,vorbis \
   --enable-encoder=pcm_s16le \
