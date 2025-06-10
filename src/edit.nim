@@ -224,7 +224,7 @@ proc editMedia*(args: mainArgs) =
 
       let (editMethod, strStream, strThres) = parseEditString(args.edit)
 
-      if editMethod == "audio":
+      if editMethod in ["audio", "motion"]:
         var threshold = 0.04
         var stream: int32
         try:
@@ -235,7 +235,13 @@ proc editMedia*(args: mainArgs) =
           error e.msg
 
         let bar = initBar(args.progress)
-        let levels = audio(bar, container, args.input, tb, stream)
+
+        let levels = (if editMethod == "audio":
+          audio(bar, container, args.input, tb, stream)
+          else:
+          motion(bar, container, args.input, tb, stream)
+        )
+
         var hasLoud = newSeq[bool](levels.len)
         hasLoud = levels.mapIt(it >= threshold)
 

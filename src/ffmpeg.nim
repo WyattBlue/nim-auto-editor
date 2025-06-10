@@ -1,5 +1,5 @@
 {.passC: "-I./ffmpeg_build/include".}
-{.passL: "-L./ffmpeg_build/lib -lavformat -lavcodec -lavutil -lswresample".}
+{.passL: "-L./ffmpeg_build/lib -lavformat -lavcodec -lavutil -lswresample -lavfilter -lswscale".}
 
 import std/posix
 
@@ -537,6 +537,10 @@ proc prettyAudioFrame*(frame: ptr AVFrame): string =
   return "<AVFrame format=" & getAudioFormatName(frame.format) & " samples=" &
       $frame.nb_samples & ">"
 
+const
+  AV_CODEC_ID_PCM_S16LE* = AVCodecID(65536)
+  AVFMT_NOFILE* = 0x0001
+  AVIO_FLAG_WRITE* = 2
 
 proc avformat_alloc_output_context2*(ctx: ptr ptr AVFormatContext,
     oformat: pointer, format_name: cstring, filename: cstring): cint {.importc,
@@ -572,7 +576,98 @@ proc swr_get_delay*(s: ptr SwrContext, base: int64): int64 {.importc,
     header: "<libswresample/swresample.h>".}
 
 
+# Filters
+type
+  AVFilterGraph* {.importc, header: "<libavfilter/avfilter.h>".} = object
+    filters*: ptr UncheckedArray[ptr AVFilterContext]
+    nb_filters*: cuint
+    scale_sws_opts*: cstring
+    thread_type*: cint
+    nb_threads*: cint
+
+  AVFilterContext* {.importc, header: "<libavfilter/avfilter.h>".} = object
+    av_class*: pointer
+    filter*: ptr AVFilter
+    name*: cstring
+    input_pads*: pointer
+    inputs*: ptr UncheckedArray[ptr AVFilterLink]
+    nb_inputs*: cuint
+    output_pads*: pointer
+    outputs*: ptr UncheckedArray[ptr AVFilterLink]
+    nb_outputs*: cuint
+    priv*: pointer
+    graph*: ptr AVFilterGraph
+
+  AVFilter* {.importc, header: "<libavfilter/avfilter.h>".} = object
+    name*: cstring
+    description*: cstring
+    inputs*: pointer
+    outputs*: pointer
+    priv_class*: pointer
+    flags*: cint
+
+  AVFilterLink* {.importc, header: "<libavfilter/avfilter.h>".} = object
+    src*: ptr AVFilterContext
+    srcpad*: pointer
+    dst*: ptr AVFilterContext
+    dstpad*: pointer
+    `type`*: AVMediaType
+    w*: cint
+    h*: cint
+    sample_aspect_ratio*: AVRational
+    channel_layout*: uint64
+    sample_rate*: cint
+    format*: cint
+    time_base*: AVRational
+    ch_layout*: AVChannelLayout
+
+  AVFilterInOut* {.importc, header: "<libavfilter/avfilter.h>".} = object
+    name*: cstring
+    filter_ctx*: ptr AVFilterContext
+    pad_idx*: cint
+    next*: ptr AVFilterInOut
+
+# Constants
 const
-  AV_CODEC_ID_PCM_S16LE* = AVCodecID(65536)
-  AVFMT_NOFILE* = 0x0001
-  AVIO_FLAG_WRITE* = 2
+  AV_BUFFERSRC_FLAG_NO_CHECK_FORMAT* = 1
+  AV_BUFFERSRC_FLAG_PUSH* = 4
+  AV_BUFFERSRC_FLAG_KEEP_REF* = 8
+
+# Filter graph management
+proc avfilter_graph_alloc*(): ptr AVFilterGraph {.importc,
+    header: "<libavfilter/avfilter.h>".}
+proc avfilter_graph_free*(graph: ptr ptr AVFilterGraph) {.importc,
+    header: "<libavfilter/avfilter.h>".}
+proc avfilter_graph_create_filter*(filt_ctx: ptr ptr AVFilterContext,
+    filt: ptr AVFilter, name: cstring, args: cstring, opaque: pointer,
+    graph_ctx: ptr AVFilterGraph): cint {.importc,
+    header: "<libavfilter/avfilter.h>".}
+proc avfilter_graph_parse_ptr*(graph: ptr AVFilterGraph, filters: cstring,
+    inputs: ptr ptr AVFilterInOut, outputs: ptr ptr AVFilterInOut,
+    log_ctx: pointer): cint {.importc, header: "<libavfilter/avfilter.h>".}
+proc avfilter_graph_config*(graphctx: ptr AVFilterGraph,
+    log_ctx: pointer): cint {.importc, header: "<libavfilter/avfilter.h>".}
+
+# Filter lookup
+proc avfilter_get_by_name*(name: cstring): ptr AVFilter {.importc,
+    header: "<libavfilter/avfilter.h>".}
+
+# Filter input/output management
+proc avfilter_inout_alloc*(): ptr AVFilterInOut {.importc,
+    header: "<libavfilter/avfilter.h>".}
+proc avfilter_inout_free*(inout: ptr ptr AVFilterInOut) {.importc,
+    header: "<libavfilter/avfilter.h>".}
+
+# Buffer source/sink operations
+proc av_buffersrc_add_frame_flags*(ctx: ptr AVFilterContext, frame: ptr AVFrame,
+    flags: cint): cint {.importc, header: "<libavfilter/buffersrc.h>".}
+proc av_buffersrc_add_frame*(ctx: ptr AVFilterContext,
+    frame: ptr AVFrame): cint {.importc, header: "<libavfilter/buffersrc.h>".}
+proc av_buffersink_get_frame*(ctx: ptr AVFilterContext,
+    frame: ptr AVFrame): cint {.importc, header: "<libavfilter/buffersink.h>".}
+proc av_buffersink_get_frame_flags*(ctx: ptr AVFilterContext,
+    frame: ptr AVFrame, flags: cint): cint {.importc,
+    header: "<libavfilter/buffersink.h>".}
+
+# String utilities for filters
+proc av_strdup*(s: cstring): cstring {.importc, header: "<libavutil/mem.h>".}

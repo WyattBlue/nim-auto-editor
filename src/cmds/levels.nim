@@ -10,8 +10,8 @@ import ../cache
 # TODO: Make a generic version
 proc parseEditString*(exportStr: string): (string, string, string) =
   var kind = exportStr
-  var stream = "0"
   var threshold = ""
+  var stream = "0"
 
   let colonPos = exportStr.find(':')
   if colonPos == -1:
@@ -118,9 +118,12 @@ proc main*(strArgs: seq[string]) =
   let tb = AVRational(args.timebase)
   let chunkDuration: float64 = av_inv_q(tb)
   let (editMethod, streamStr, _) = parseEditString(args.edit)
-  if editMethod != "audio":
+  if editMethod notin ["audio", "motion"]:
     error fmt"Unknown editing method: {editMethod}"
   let userStream: int32 = parseInt(streamStr).int32
+
+  if userStream < 0:
+    error "Stream must be positive"
 
   echo "\n@start"
 
@@ -133,35 +136,56 @@ proc main*(strArgs: seq[string]) =
       return
 
   var container: InputContainer
+  var data: seq[float32] = @[]
+
   try:
     container = av.open(inputFile)
   except IOError as e:
     error e.msg
   defer: container.close()
 
-  if container.audio.len == 0:
-    error "No audio stream"
-  if userStream < 0:
-    error "Stream must be positive"
-  if container.audio.len <= userStream:
-    error fmt"Audio stream out of range: {userStream}"
+  if editMethod == "audio":
+    if container.audio.len == 0:
+      error "No audio stream"
+    if container.audio.len <= userStream:
+      error fmt"Audio stream out of range: {userStream}"
 
-  let audioStream: ptr AVStream = container.audio[userStream]
-  let audioIndex: cint = audioStream.index
+    let audioStream: ptr AVStream = container.audio[userStream]
+    let audioIndex: cint = audioStream.index
 
-  var processor = AudioProcessor(
-    formatCtx: container.formatContext,
-    codecCtx: initDecoder(audioStream.codecpar),
-    audioIndex: audioIndex,
-    chunkDuration: chunkDuration
-  )
+    var processor = AudioProcessor(
+      formatCtx: container.formatContext,
+      codecCtx: initDecoder(audioStream.codecpar),
+      audioIndex: audioIndex,
+      chunkDuration: chunkDuration
+    )
 
-  var data: seq[float32] = @[]
-  for loudnessValue in processor.loudness():
-    data.add loudnessValue
-    echo loudnessValue
+    for loudnessValue in processor.loudness():
+      echo loudnessValue
+      data.add loudnessValue
+    echo ""
 
-  echo ""
+  elif editMethod == "motion":
+    if container.video.len == 0:
+      error "No audio stream"
+    if container.video.len <= userStream:
+      error fmt"Video stream out of range: {userStream}"
+
+    let videoStream: ptr AVStream = container.video[userStream]
+    let videoIndex = videoStream.index
+    var processor = VideoProcessor(
+      formatCtx: container.formatContext,
+      codecCtx: initDecoder(videoStream.codecpar),
+      videoIndex: videoIndex,
+      width: 400,
+      blur: 9,
+      tb: tb,
+    )
+
+    for value in processor.motionness():
+      echo value
+      data.add value
+    echo ""
 
   if not args.noCache:
     writeCache(data, inputFile, tb, editMethod, userStream)
