@@ -51,7 +51,8 @@ proc initBar*(barType: BarType): Bar =
   when defined(macosx):
     if barType in {modern, classic, ascii}:
       try:
-        let dateFormat = getStdoutBytes(@["defaults", "read", "com.apple.menuextra.clock", "Show24Hour"])
+        let dateFormat = getStdoutBytes(@["defaults", "read",
+            "com.apple.menuextra.clock", "Show24Hour"])
         ampm = dateFormat == "0\n"
       except OSError:
         discard
@@ -138,7 +139,8 @@ proc start*(bar: Bar, total: float, title: string) =
     elif c == 'm':
       inEscape = false
 
-  bar.stack.add((title: title, lenTitle: lenTitle, total: total, begin: epochTime()))
+  bar.stack.add((title: title, lenTitle: lenTitle, total: total,
+      begin: epochTime()))
 
   try:
     bar.tick(0)

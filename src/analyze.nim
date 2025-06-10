@@ -36,11 +36,12 @@ type
     audioIndex*: cint
     chunkDuration*: float64
 
-proc newAudioIterator(sampleRate: cint, channelLayout: AVChannelLayout, chunkDuration: float64): AudioIterator =
+proc newAudioIterator(sampleRate: cint, channelLayout: AVChannelLayout,
+    chunkDuration: float64): AudioIterator =
   result = AudioIterator()
   result.sampleRate = sampleRate
   result.channelCount = channelLayout.nb_channels
-  result.targetFormat = AV_SAMPLE_FMT_FLT  # 32-bit float, interleaved
+  result.targetFormat = AV_SAMPLE_FMT_FLT # 32-bit float, interleaved
   result.exactSize = chunkDuration * float64(sampleRate)
   result.accumulatedError = 0.0
   result.isInitialized = false
@@ -79,7 +80,8 @@ proc cleanup(iter: AudioIterator) =
     av_freep(addr iter.readBuffer)
     iter.readBuffer = nil
 
-proc initResampler(iter: AudioIterator, inputFormat: AVSampleFormat, inputLayout: AVChannelLayout) =
+proc initResampler(iter: AudioIterator, inputFormat: AVSampleFormat,
+    inputLayout: AVChannelLayout) =
   if iter.isInitialized:
     return
 
@@ -103,7 +105,7 @@ proc initResampler(iter: AudioIterator, inputFormat: AVSampleFormat, inputLayout
     error "Could not set input sample format"
 
   # Set output parameters (target format)
-  var outputLayout = inputLayout  # Keep same layout
+  var outputLayout = inputLayout # Keep same layout
   if av_opt_set_chlayout(iter.swrCtx, "out_chlayout", unsafeAddr outputLayout, 0) < 0:
     error "Could not set output channel layout"
   if av_opt_set_int(iter.swrCtx, "out_sample_rate", iter.sampleRate, 0) < 0:
@@ -126,7 +128,8 @@ proc writeFrame(iter: AudioIterator, frame: ptr AVFrame) =
   # Passthrough for compatible formats
   if not iter.needsResampling:
     # Write frame directly to FIFO without conversion
-    let ret = av_audio_fifo_write(iter.fifo, cast[pointer](addr frame.data[0]), frame.nb_samples)
+    let ret = av_audio_fifo_write(iter.fifo, cast[pointer](addr frame.data[0]),
+        frame.nb_samples)
     if ret < frame.nb_samples:
       error "Could not write data to FIFO"
     iter.totalSamplesWritten += frame.nb_samples
@@ -150,7 +153,8 @@ proc writeFrame(iter: AudioIterator, frame: ptr AVFrame) =
 
   # Convert the audio
   let convertedSamples = swr_convert(iter.swrCtx,
-                                   cast[ptr ptr uint8](addr outputFrame.data[0]),
+                                   cast[ptr ptr uint8](addr outputFrame.data[
+                                       0]),
                                    frame.nb_samples,
                                    cast[ptr ptr uint8](addr frame.data[0]),
                                    frame.nb_samples)
@@ -161,7 +165,8 @@ proc writeFrame(iter: AudioIterator, frame: ptr AVFrame) =
   outputFrame.nb_samples = convertedSamples
 
   # Write converted frame to FIFO
-  let ret = av_audio_fifo_write(iter.fifo, cast[pointer](addr outputFrame.data[0]), convertedSamples)
+  let ret = av_audio_fifo_write(iter.fifo, cast[pointer](addr outputFrame.data[
+      0]), convertedSamples)
   if ret < convertedSamples:
     error "Could not write data to FIFO"
 
@@ -180,12 +185,13 @@ proc readChunk(iter: AudioIterator): float32 =
 
   # Use pre-allocated buffer - no allocation needed!
   let samples = cast[ptr UncheckedArray[float32]](iter.readBuffer)
-  let samplesRead = av_audio_fifo_read(iter.fifo, cast[pointer](addr iter.readBuffer), currentSize.cint)
+  let samplesRead = av_audio_fifo_read(iter.fifo, cast[pointer](
+      addr iter.readBuffer), currentSize.cint)
   let totalSamples = samplesRead * iter.channelCount
 
   # Process 4 floats at once using SIMD-like operations
   let simdWidth = 4
-  let simdSamples = totalSamples and not (simdWidth - 1)  # Round down to multiple of 4
+  let simdSamples = totalSamples and not (simdWidth - 1) # Round down to multiple of 4
 
   var maxAbs: float32 = 0.0
 
@@ -234,7 +240,8 @@ iterator loudness*(processor: var AudioProcessor): float32 =
           error fmt"Error receiving frame from decoder: {ret}"
 
         if processor.`iterator` == nil:
-          processor.`iterator` = newAudioIterator(frame.sample_rate, frame.ch_layout, processor.chunkDuration)
+          processor.`iterator` = newAudioIterator(frame.sample_rate,
+              frame.ch_layout, processor.chunkDuration)
 
         processor.`iterator`.writeFrame(frame)
 
@@ -250,7 +257,8 @@ iterator loudness*(processor: var AudioProcessor): float32 =
         yield processor.`iterator`.readChunk()
 
 
-proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational, stream: int32): seq[float32] =
+proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
+    stream: int32): seq[float32] =
   let cacheData = readCache(path, tb, "audio", stream)
   if cacheData.isSome:
     return cacheData.get()

@@ -49,7 +49,7 @@ auto-editor example.mp4
 - [x] desc
 - [x] subdump
 - [x] levels
-- [ ] cache
+- [x] cache
 
 ### Exporting
 - [x] Final Cut Pro (.fcpxml)

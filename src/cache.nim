@@ -7,7 +7,8 @@ import ffmpeg
 import log
 import about
 
-proc procTag(path: string, tb: AVRational, kind: string, stream: int32): string =
+proc procTag(path: string, tb: AVRational, kind: string,
+    stream: int32): string =
   let modTime = getLastModificationTime(path).toUnix().int
   let (_, name, ext) = splitFile(path)
   let key = fmt"{name}{ext}:{modTime:x}:{tb}:{stream}"
@@ -33,7 +34,8 @@ proc loadFloats(filename: string): seq[float32] =
     result[i] = fs.readFloat32()
 
 
-proc readCache*(path: string, tb: AVRational, kind: string, stream: int32): Option[seq[float32]] =
+proc readCache*(path: string, tb: AVRational, kind: string,
+    stream: int32): Option[seq[float32]] =
   let temp: string = getTempDir()
   let cacheFile = temp / &"ae-{version}" / &"{procTag(path, tb, kind, stream)}.bin"
   try:
@@ -43,7 +45,8 @@ proc readCache*(path: string, tb: AVRational, kind: string, stream: int32): Opti
 
 type CacheEntry = tuple[path: string, mtime: Time]
 
-proc writeCache*(data: seq[float32], path: string, tb: AVRational, kind: string, stream: int32) =
+proc writeCache*(data: seq[float32], path: string, tb: AVRational, kind: string,
+    stream: int32) =
   let workdir = getTempDir() / fmt"ae-{version}"
   try:
     createDir(workdir)

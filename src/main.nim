@@ -4,7 +4,7 @@ import std/strformat
 import std/strutils
 import std/terminal
 
-import cmds/[desc, info, levels, subdump]
+import cmds/[info, desc, cache, levels, subdump]
 import edit
 import log
 import about
@@ -39,6 +39,9 @@ judge making cuts.
     quit(0)
   elif paramStr(1) == "desc":
     desc.main(commandLineParams()[1..^1])
+    quit(0)
+  elif paramStr(1) == "cache":
+    cache.main(commandLineParams()[1..^1])
     quit(0)
   elif paramStr(1) == "levels":
     levels.main(commandLineParams()[1..^1])
