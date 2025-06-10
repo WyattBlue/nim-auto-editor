@@ -316,7 +316,6 @@ iterator motionness*(processor: var VideoProcessor): float32 =
     if processor.codecCtx != nil:
       avcodec_free_context(addr processor.codecCtx)
 
-  # Calculate original video properties from codec context
   let originalWidth = processor.codecCtx.width
   let originalHeight = processor.codecCtx.height
   let pixelFormat = processor.codecCtx.pix_fmt
@@ -324,6 +323,7 @@ iterator motionness*(processor: var VideoProcessor): float32 =
   # Use the target timebase (processor.tb) as the stream timebase for the filter
   # This is more reliable than codecCtx.time_base which might be 0/1
   let timeBase = processor.tb
+  let floatTb = float64(timeBase)
 
   # Get pixel format name for buffer args
   let pixFmtName = av_get_pix_fmt_name(pixelFormat)
@@ -388,11 +388,12 @@ iterator motionness*(processor: var VideoProcessor): float32 =
   avfilter_inout_free(addr inputs)
   avfilter_inout_free(addr outputs)
 
-  var prevFrame: seq[uint8] = @[]
-  var currentFrame: seq[uint8] = @[]
   var totalPixels: int = 0
   var frameIndex: int = 0
   var prevIndex: int = -1
+
+  var prevFrame: seq[uint8] = @[]
+  var currentFrame: seq[uint8] = @[]
 
   # Main decoding loop
   while av_read_frame(processor.formatCtx, packet) >= 0:
@@ -415,12 +416,10 @@ iterator motionness*(processor: var VideoProcessor): float32 =
 
         # Calculate frame index based on timebase
         # Convert frame PTS to the target timebase and get the frame index
-        let frameTime = float64(frame.pts) * av_q2d(timeBase)
-        frameIndex = int(round(frameTime / av_q2d(processor.tb)))
+        let frameTime = float64(frame.pts) * floatTb
+        frameIndex = int(round(frameTime / floatTb))
 
-        # Filter the frame (scale, grayscale, blur)
-        ret = av_buffersrc_add_frame_flags(bufferSrc, frame, AV_BUFFERSRC_FLAG_KEEP_REF)
-        if ret < 0:
+        if av_buffersrc_add_frame_flags(bufferSrc, frame, AV_BUFFERSRC_FLAG_KEEP_REF) < 0:
           error "Error adding frame to filter"
 
         ret = av_buffersink_get_frame(bufferSink, filteredFrame)
@@ -437,12 +436,11 @@ iterator motionness*(processor: var VideoProcessor): float32 =
         copyMem(addr currentFrame[0], filteredFrame.data[0], dataSize)
 
         var motionValue: float32 = 0.0
-
         if prevFrame.len > 0:
           # Calculate motion by comparing with previous frame
-          var diffCount: int = 0
+          var diffCount: int32 = 0
           for i in 0 ..< totalPixels:
-            if abs(int16(prevFrame[i]) - int16(currentFrame[i])) > 0:
+            if prevFrame[i] != currentFrame[i]:
               inc diffCount
 
           motionValue = float32(diffCount) / float32(totalPixels)
@@ -480,7 +478,7 @@ iterator motionness*(processor: var VideoProcessor): float32 =
         if prevFrame.len > 0:
           var diffCount: int = 0
           for i in 0 ..< totalPixels:
-            if abs(int16(prevFrame[i]) - int16(currentFrame[i])) > 0:
+            if prevFrame[i] != currentFrame[i]:
               inc diffCount
           motionValue = float32(diffCount) / float32(totalPixels)
 
