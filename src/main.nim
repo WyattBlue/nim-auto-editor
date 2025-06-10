@@ -7,9 +7,8 @@ import std/terminal
 import cmds/[desc, info, levels, subdump]
 import edit
 import log
+import about
 
-
-const version* = "0.5.0-pre"
 
 proc ctrlc() {.noconv.} =
   error "Keyboard Interrupt"

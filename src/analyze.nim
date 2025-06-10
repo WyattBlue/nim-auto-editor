@@ -1,10 +1,12 @@
 import std/math
 import std/strformat
+import std/options
 
 import ffmpeg
 import av
 import log
 import util/bar
+import cache
 
 # Enable project wide, see: https://simonbyrne.github.io/notes/fastmath/
 {.passC: "-ffast-math".}
@@ -248,7 +250,11 @@ iterator loudness*(processor: var AudioProcessor): float32 =
         yield processor.`iterator`.readChunk()
 
 
-proc audio*(bar: Bar, tb: AVRational, container: InputContainer, stream: int32): seq[float32] =
+proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational, stream: int32): seq[float32] =
+  let cacheData = readCache(path, tb, "audio", stream)
+  if cacheData.isSome:
+    return cacheData.get()
+
   if stream < 0 or stream >= container.audio.len:
     error fmt"audio: audio stream '{stream}' does not exist."
 
@@ -275,3 +281,5 @@ proc audio*(bar: Bar, tb: AVRational, container: InputContainer, stream: int32):
     i += 1
 
   bar.`end`()
+
+  writeCache(result, path, tb, "audio", stream)

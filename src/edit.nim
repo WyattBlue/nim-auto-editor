@@ -116,10 +116,10 @@ proc parseExportString*(exportStr: string): (string, string, string) =
   return (kind, name, version)
 
 
-func chunkify(arr: seq[bool]): seq[(int64, int64, float64)] =
+proc chunkify(arr: seq[bool]): seq[(int64, int64, float64)] =
+  var arr_len: int64 = arr.len
   var start: int64 = 0
   var j: int64 = 1
-  var arr_len: int64 = arr.len
   while j < arr_len:
     if arr[j] != arr[j - 1]:
       let speed = (if arr[j-1] == true: 1.0 else: 99999.0)
@@ -235,7 +235,7 @@ proc editMedia*(args: mainArgs) =
           error e.msg
 
         let bar = initBar(args.progress)
-        let levels = audio(bar, tb, container, stream)
+        let levels = audio(bar, container, args.input, tb, stream)
         var hasLoud = newSeq[bool](levels.len)
         hasLoud = levels.mapIt(it >= threshold)
 

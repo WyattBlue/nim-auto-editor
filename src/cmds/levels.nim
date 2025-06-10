@@ -1,15 +1,11 @@
-import std/parseopt
+import std/options
 import std/[strformat, strutils]
 
 import ../av
 import ../ffmpeg
 import ../analyze
 import ../log
-
-type levelArgs* = object
-  input*: string
-  timebase*: string = "30/1"
-  edit*: string = "audio"
+import ../cache
 
 # TODO: Make a generic version
 proc parseEditString*(exportStr: string): (string, string, string) =
@@ -77,51 +73,64 @@ proc parseEditString*(exportStr: string): (string, string, string) =
 
   return (kind, stream, threshold)
 
-proc main*(args: seq[string]) =
-  if args.len < 1:
+type levelArgs* = object
+  timebase*: string = "30/1"
+  edit*: string = "audio"
+  noCache*: bool = false
+
+proc main*(strArgs: seq[string]) =
+  if strArgs.len < 1:
     echo "Display loudness over time"
     quit(0)
 
   var args = levelArgs()
   var expecting: string = ""
+  var inputFile: string = ""
 
-  for kind, key, val in getopt():
-    case kind
-    of cmdArgument:
+  for key in strArgs:
+    case key
+    of "--no-cache":
+      args.noCache = true
+    of "-tb":
+      expecting = "timebase"
+    of "--timebase", "--edit":
+      expecting = key[2..^1]
+    else:
+      if key.startsWith("--"):
+        error(fmt"Unknown option: {key}")
+
       case expecting
       of "":
-        args.input = key
+        inputFile = key
       of "timebase":
         args.timebase = key
       of "edit":
         args.edit = key
       expecting = ""
 
-    of cmdLongOption:
-      if key in ["edit", "timebase"]:
-        expecting = key
-      else:
-        error(fmt"Unknown option: {key}")
-    of cmdShortOption:
-      if key == "t":
-        discard
-      elif key == "b":
-        expecting = "timebase"
-      else:
-        error(fmt"Unknown option: {key}")
-    of cmdEnd:
-      discard
-
   if expecting != "":
     error(fmt"--{expecting} needs argument.")
 
+  if inputFile == "":
+    error("Expecting an input file.")
+
   av_log_set_level(AV_LOG_QUIET)
-  let inputFile = args.input
-  let chunkDuration: float64 = av_inv_q(AVRational(args.timebase))
+  let tb = AVRational(args.timebase)
+  let chunkDuration: float64 = av_inv_q(tb)
   let (editMethod, streamStr, _) = parseEditString(args.edit)
   if editMethod != "audio":
     error fmt"Unknown editing method: {editMethod}"
-  let userStream = parseInt(streamStr)
+  let userStream: int32 = parseInt(streamStr).int32
+
+  echo "\n@start"
+
+  if not args.noCache:
+    let cacheData = readCache(inputFile, tb, editMethod, userStream)
+    if cacheData.isSome:
+      for loudnessValue in cacheData.get():
+        echo loudnessValue
+      echo ""
+      return
 
   var container: InputContainer
   try:
@@ -147,9 +156,12 @@ proc main*(args: seq[string]) =
     chunkDuration: chunkDuration
   )
 
-  echo "\n@start"
-
+  var data: seq[float32] = @[]
   for loudnessValue in processor.loudness():
+    data.add loudnessValue
     echo loudnessValue
 
   echo ""
+
+  if not args.noCache:
+    writeCache(data, inputFile, tb, editMethod, userStream)
