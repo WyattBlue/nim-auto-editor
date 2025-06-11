@@ -3,7 +3,7 @@ import std/[strformat, strutils]
 
 import ../av
 import ../ffmpeg
-import ../analyze
+import ../analyze/[audio, motion]
 import ../log
 import ../cache
 

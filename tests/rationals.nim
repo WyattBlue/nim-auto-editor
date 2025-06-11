@@ -6,7 +6,6 @@ import ../src/ffmpeg
 import ../src/edit
 import ../src/wavutil
 import ../src/cmds/info
-import ../src/analyze
 
 test "maths":
   let a = AVRational(num: 3, den: 4)

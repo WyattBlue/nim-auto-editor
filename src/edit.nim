@@ -1,21 +1,20 @@
 import std/os
 import std/terminal
-import std/strutils
-import std/strformat
+import std/[strutils, strformat]
 import std/sequtils
-
 from std/math import round, trunc
 
-import log
 import av
+import log
 import media
 import ffmpeg
 import timeline
-import exports/[fcp7, fcp11, json, shotcut]
-import imports/json
-import analyze
 import util/bar
 import cmds/levels
+import analyze/[audio, motion]
+
+import imports/json
+import exports/[fcp7, fcp11, json, shotcut]
 
 proc mediaLength*(container: InputContainer): float64 =
   # Get the mediaLength in seconds.
