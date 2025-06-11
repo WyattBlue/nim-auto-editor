@@ -259,7 +259,7 @@ iterator loudness*(processor: var AudioProcessor): float32 =
 
 proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
     stream: int32): seq[float32] =
-  let cacheData = readCache(path, tb, "audio", stream)
+  let cacheData = readCache(path, tb, "audio", $stream)
   if cacheData.isSome:
     return cacheData.get()
 
@@ -290,4 +290,4 @@ proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
 
   bar.`end`()
 
-  writeCache(result, path, tb, "audio", stream)
+  writeCache(result, path, tb, "audio", $stream)

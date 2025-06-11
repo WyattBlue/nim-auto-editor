@@ -8,14 +8,17 @@ import ../log
 import ../cache
 
 # TODO: Make a generic version
-proc parseEditString*(exportStr: string): (string, string, string) =
-  var kind = exportStr
-  var threshold = ""
-  var stream = "0"
+proc parseEditString*(exportStr: string): (string, float32, int32, int32, int32) =
+  var
+    kind = exportStr
+    threshold: float32 = 0.04
+    stream: int32 = 0
+    width: int32 = 400
+    blur: int32 = 9
 
   let colonPos = exportStr.find(':')
   if colonPos == -1:
-    return (kind, stream, threshold)
+    return (kind, threshold, stream, width, blur)
 
   kind = exportStr[0..colonPos-1]
   let paramsStr = exportStr[colonPos+1..^1]
@@ -64,14 +67,17 @@ proc parseEditString*(exportStr: string): (string, string, string) =
         inc i
 
     case paramName:
-      of "stream": stream = value
-      of "threshold": threshold = value
+      of "stream": stream = parseInt(value).int32
+      of "threshold": threshold = parseFloat(value).float32
+      of "width": width = parseInt(value).int32
+      of "blur": blur = parseInt(value).int32
+      else: error &"Unknown paramter: {paramName}"
 
     # Skip comma
     if i < paramsStr.len and paramsStr[i] == ',':
       inc i
 
-  return (kind, stream, threshold)
+  return (kind, threshold, stream, width, blur)
 
 type levelArgs* = object
   timebase*: string = "30/1"
@@ -117,10 +123,11 @@ proc main*(strArgs: seq[string]) =
   av_log_set_level(AV_LOG_QUIET)
   let tb = AVRational(args.timebase)
   let chunkDuration: float64 = av_inv_q(tb)
-  let (editMethod, streamStr, _) = parseEditString(args.edit)
+  let (editMethod, _, userStream, width, blur) = parseEditString(args.edit)
   if editMethod notin ["audio", "motion"]:
     error fmt"Unknown editing method: {editMethod}"
-  let userStream: int32 = parseInt(streamStr).int32
+
+  let cacheArgs = (if editMethod == "audio": $userStream else: &"{userStream},{width},{blur}")
 
   if userStream < 0:
     error "Stream must be positive"
@@ -128,7 +135,7 @@ proc main*(strArgs: seq[string]) =
   echo "\n@start"
 
   if not args.noCache:
-    let cacheData = readCache(inputFile, tb, editMethod, userStream)
+    let cacheData = readCache(inputFile, tb, editMethod, cacheArgs)
     if cacheData.isSome:
       for loudnessValue in cacheData.get():
         echo loudnessValue
@@ -151,12 +158,10 @@ proc main*(strArgs: seq[string]) =
       error fmt"Audio stream out of range: {userStream}"
 
     let audioStream: ptr AVStream = container.audio[userStream]
-    let audioIndex: cint = audioStream.index
-
     var processor = AudioProcessor(
       formatCtx: container.formatContext,
       codecCtx: initDecoder(audioStream.codecpar),
-      audioIndex: audioIndex,
+      audioIndex: audioStream.index,
       chunkDuration: chunkDuration
     )
 
@@ -172,13 +177,12 @@ proc main*(strArgs: seq[string]) =
       error fmt"Video stream out of range: {userStream}"
 
     let videoStream: ptr AVStream = container.video[userStream]
-    let videoIndex = videoStream.index
     var processor = VideoProcessor(
       formatCtx: container.formatContext,
       codecCtx: initDecoder(videoStream.codecpar),
-      videoIndex: videoIndex,
-      width: 400,
-      blur: 9,
+      videoIndex: videoStream.index,
+      width: width,
+      blur: blur,
       tb: tb,
     )
 
@@ -188,4 +192,4 @@ proc main*(strArgs: seq[string]) =
     echo ""
 
   if not args.noCache:
-    writeCache(data, inputFile, tb, editMethod, userStream)
+    writeCache(data, inputFile, tb, editMethod, cacheArgs)

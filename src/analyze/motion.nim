@@ -13,8 +13,8 @@ type
     formatCtx*: ptr AVFormatContext
     codecCtx*: ptr AVCodecContext
     videoIndex*: cint
-    width*: cint
-    blur*: cint
+    width*: int32
+    blur*: int32
     tb*: AVRational
 
 iterator motionness*(processor: var VideoProcessor): float32 =
@@ -205,8 +205,9 @@ iterator motionness*(processor: var VideoProcessor): float32 =
         av_frame_unref(filteredFrame)
 
 proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
-    stream: int32): seq[float32] =
-  let cacheData = readCache(path, tb, "motion", stream)
+    stream: int32, width: int32, blur: int32): seq[float32] =
+  let cacheArgs = &"{stream},{width},{blur}"
+  let cacheData = readCache(path, tb, "motion", cacheArgs)
   if cacheData.isSome:
     return cacheData.get()
 
@@ -219,8 +220,8 @@ proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
     formatCtx: container.formatContext,
     codecCtx: initDecoder(videoStream.codecpar),
     videoIndex: videoStream.index,
-    width: 400,
-    blur: 9,
+    width: width,
+    blur: blur,
     tb: tb,
   )
 
@@ -239,4 +240,4 @@ proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
 
   bar.`end`()
 
-  writeCache(result, path, tb, "motion", stream)
+  writeCache(result, path, tb, "motion", cacheArgs)

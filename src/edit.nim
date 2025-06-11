@@ -107,6 +107,7 @@ proc parseExportString*(exportStr: string): (string, string, string) =
     case paramName:
       of "name": name = value
       of "version": version = value
+      else: error &"Unknown paramter: {paramName}"
 
     # Skip comma
     if i < paramsStr.len and paramsStr[i] == ',':
@@ -221,26 +222,15 @@ proc editMedia*(args: mainArgs) =
       var chunks: seq[(int64, int64, float64)] = @[]
       let src = initMediaInfo(container.formatContext, args.input)
 
-      let (editMethod, strStream, strThres) = parseEditString(args.edit)
+      let (editMethod, threshold, stream, width, blur) = parseEditString(args.edit)
 
       if editMethod in ["audio", "motion"]:
-        var threshold = 0.04
-        var stream: int32
-        try:
-          stream = parseInt(strStream).int32
-          if strThres != "":
-            threshold = parseFloat(strThres)
-        except ValueError as e:
-          error e.msg
-
         let bar = initBar(args.progress)
-
         let levels = (if editMethod == "audio":
           audio(bar, container, args.input, tb, stream)
           else:
-          motion(bar, container, args.input, tb, stream)
+          motion(bar, container, args.input, tb, stream, width, blur)
         )
-
         var hasLoud = newSeq[bool](levels.len)
         hasLoud = levels.mapIt(it >= threshold)
 

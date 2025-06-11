@@ -7,11 +7,10 @@ import ffmpeg
 import log
 import about
 
-proc procTag(path: string, tb: AVRational, kind: string,
-    stream: int32): string =
+proc procTag(path: string, tb: AVRational, kind, args: string): string =
   let modTime = getLastModificationTime(path).toUnix().int
   let (_, name, ext) = splitFile(path)
-  let key = fmt"{name}{ext}:{modTime:x}:{tb}:{stream}"
+  let key = fmt"{name}{ext}:{modTime:x}:{tb}:{args}"
   return ($secureHash(key))[0..<16].toLowerAscii() & kind
 
 proc saveFloats(filename: string, data: seq[float32]) =
@@ -34,10 +33,9 @@ proc loadFloats(filename: string): seq[float32] =
     result[i] = fs.readFloat32()
 
 
-proc readCache*(path: string, tb: AVRational, kind: string,
-    stream: int32): Option[seq[float32]] =
+proc readCache*(path: string, tb: AVRational, kind, args: string): Option[seq[float32]] =
   let temp: string = getTempDir()
-  let cacheFile = temp / &"ae-{version}" / &"{procTag(path, tb, kind, stream)}.bin"
+  let cacheFile = temp / &"ae-{version}" / &"{procTag(path, tb, kind, args)}.bin"
   try:
     return some(loadFloats(cacheFile))
   except Exception:
@@ -45,15 +43,14 @@ proc readCache*(path: string, tb: AVRational, kind: string,
 
 type CacheEntry = tuple[path: string, mtime: Time]
 
-proc writeCache*(data: seq[float32], path: string, tb: AVRational, kind: string,
-    stream: int32) =
+proc writeCache*(data: seq[float32], path: string, tb: AVRational, kind, args: string) =
   let workdir = getTempDir() / fmt"ae-{version}"
   try:
     createDir(workdir)
   except OSError:
     discard
 
-  let cacheTag = procTag(path, tb, kind, stream)
+  let cacheTag = procTag(path, tb, kind, args)
   let cacheFile = workdir / fmt"{cacheTag}.bin"
 
   try:
