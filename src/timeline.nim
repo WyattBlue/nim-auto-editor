@@ -19,7 +19,7 @@ type Clip* = object
   dur*: int64
   offset*: int64
   speed*: float64
-  stream*: int64
+  stream*: int32
 
 type v3* = object
   tb*: AVRational
@@ -87,7 +87,7 @@ func toNonLinear*(src: ptr string, tb: AvRational, mi: MediaInfo, chunks: seq[(
     var alayer: seq[Clip] = @[]
     for clip in clips:
       var audioClip = clip
-      audioClip.stream = i
+      audioClip.stream = i.int32
       alayer.add(audioClip)
     aspace.add(alayer)
 

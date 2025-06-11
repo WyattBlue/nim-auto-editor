@@ -11,7 +11,7 @@ proc parseClip(node: JsonNode, interner: var StringInterner): Clip =
   result.dur = node["dur"].getInt()
   result.offset = node["offset"].getInt()
   result.speed = node["speed"].getFloat()
-  result.stream = node["stream"].getInt()
+  result.stream = node["stream"].getInt().int32
 
 proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 =
   var tb: AVRational
