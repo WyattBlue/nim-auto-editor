@@ -282,6 +282,10 @@ proc av_dict_get*(m: ptr AVDictionary, key: cstring,
     prev: ptr AVDictionaryEntry, flags: cint): ptr AVDictionaryEntry {.importc,
     header: "<libavutil/dict.h>".}
 
+proc av_dict_set*(pm: ptr ptr AVDictionary, key: cstring, value: cstring,
+                  flags: cint): cint {.importc, header: "<libavutil/dict.h>".}
+proc av_dict_free*(m: ptr ptr AVDictionary) {.importc, header: "<libavutil/dict.h>".}
+
 proc av_channel_layout_describe*(ch_layout: ptr AVChannelLayout, buf: cstring,
     buf_size: csize_t): cint {.importc, header: "<libavutil/channel_layout.h>".}
 
