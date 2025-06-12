@@ -10,6 +10,9 @@ proc initDecoder*(codecpar: ptr AVCodecParameters): ptr AVCodecContext =
   if result == nil:
     error "Could not allocate decoder ctx"
 
+  result.thread_count = 0 # Auto-detect CPU cores
+  result.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
+
   discard avcodec_parameters_to_context(result, codecpar)
   if avcodec_open2(result, codec, nil) < 0:
     error "Could not open codec"
