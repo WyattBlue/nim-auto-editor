@@ -1,7 +1,7 @@
 import std/tables
 import std/terminal
-import std/strutils
-from std/math import gcd
+import std/[strutils, strformat]
+import std/math
 
 
 type BarType* = enum
@@ -12,6 +12,7 @@ type mainArgs* = object
   version*: bool = false
   debug*: bool = false
   quiet*: bool = false
+  preview*: bool = false
   progress*: BarType = modern
   output*: string = "-"
   `export`*: string = "v3"
@@ -24,7 +25,7 @@ proc conwrite*(msg: string) =
   stdout.write("  " & msg & buffer & "\r")
   stdout.flushFile()
 
-proc error*(msg: string) =
+proc error*(msg: string) {.noreturn.} =
   conwrite("")
   stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)
   quit(1)
@@ -55,3 +56,36 @@ func aspectRatio*(width, height: int): tuple[w, h: int] =
     return (0, 0)
   let c = gcd(width, height)
   return (width div c, height div c)
+
+type Code* = enum
+  webvtt, srt, mov_text, standard, ass, rass
+
+func toTimecode*(secs: float, fmt: Code): string =
+  var sign = ""
+  var seconds = secs
+  if seconds < 0:
+    sign = "-"
+    seconds = -seconds
+
+  let total_seconds = seconds
+  let m_float = total_seconds / 60.0
+  let h_float = m_float / 60.0
+
+  let h = int(h_float)
+  let m = int(m_float) mod 60
+  let s = total_seconds mod 60.0
+
+  case fmt:
+  of webvtt:
+    if h == 0:
+      return fmt"{sign}{m:02d}:{s:06.3f}"
+    return fmt"{sign}{h:02d}:{m:02d}:{s:06.3f}"
+  of srt, mov_text:
+    let s_str = fmt"{s:06.3f}".replace(".", ",")
+    return fmt"{sign}{h:02d}:{m:02d}:{s_str}"
+  of standard:
+    return fmt"{sign}{h:02d}:{m:02d}:{s:06.3f}"
+  of ass:
+    return fmt"{sign}{h:d}:{m:02d}:{s:05.2f}"
+  of rass:
+    return fmt"{sign}{h:d}:{m:02d}:{s:02.0f}"

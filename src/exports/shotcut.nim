@@ -1,7 +1,5 @@
 import std/xmltree
 import std/strformat
-import std/strutils
-import std/math
 import ../timeline
 import ../ffmpeg
 import ../log
@@ -16,38 +14,6 @@ https://mltframework.org/docs/mltxml/
 
 ]#
 
-
-proc to_timecode(secs: float, fmt: string): string =
-  var sign = ""
-  var seconds = secs
-  if seconds < 0:
-    sign = "-"
-    seconds = -seconds
-
-  let total_seconds = seconds
-  let m_float = total_seconds / 60.0
-  let h_float = m_float / 60.0
-
-  let h = int(h_float)
-  let m = int(m_float) mod 60
-  let s = total_seconds mod 60.0
-
-  case fmt:
-  of "webvtt":
-    if h == 0:
-      return fmt"{sign}{m:02d}:{s:06.3f}"
-    return fmt"{sign}{h:02d}:{m:02d}:{s:06.3f}"
-  of "srt", "mov_text":
-    let s_str = fmt"{s:06.3f}".replace(".", ",")
-    return fmt"{sign}{h:02d}:{m:02d}:{s_str}"
-  of "standard":
-    return fmt"{sign}{h:02d}:{m:02d}:{s:06.3f}"
-  of "ass":
-    return fmt"{sign}{h:d}:{m:02d}:{s:05.2f}"
-  of "rass":
-    return fmt"{sign}{h:d}:{m:02d}:{s:02.0f}"
-  else:
-    raise newException(ValueError, "to_timecode: Unreachable")
 
 proc shotcut_write_mlt*(output: string, tl: v3) =
   let mlt = newElement("mlt")
@@ -86,7 +52,7 @@ proc shotcut_write_mlt*(output: string, tl: v3) =
   playlist_bin.add(xml_retain_prop)
   mlt.add(playlist_bin)
 
-  let global_out = to_timecode(float(tl.len / tl.tb), "standard")
+  let global_out = toTimecode(float(tl.len / tl.tb), Code.standard)
 
   let producer = newElement("producer")
   producer.attrs = {"id": "bg"}.toXmlAttributes()
@@ -146,7 +112,7 @@ proc shotcut_write_mlt*(output: string, tl: v3) =
 
   for clip in clips:
     let src = clip.src[]
-    let length = to_timecode(float((clip.offset + clip.dur) / tb), "standard")
+    let length = to_timecode(float((clip.offset + clip.dur) / tb), Code.standard)
 
     var chain: XmlNode
     var resource: string
@@ -219,8 +185,8 @@ proc shotcut_write_mlt*(output: string, tl: v3) =
 
   producers = 0
   for i, clip in clips:
-    let in_time = to_timecode(float(clip.offset / tb), "standard")
-    let out_time = to_timecode(float((clip.offset + clip.dur) / tb), "standard")
+    let in_time = to_timecode(float(clip.offset / tb), Code.standard)
+    let out_time = to_timecode(float((clip.offset + clip.dur) / tb), Code.standard)
 
     var tag_name = fmt"chain{i}"
     if clip.speed != 1.0:

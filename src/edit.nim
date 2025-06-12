@@ -15,39 +15,7 @@ import analyze/[audio, motion]
 
 import imports/json
 import exports/[fcp7, fcp11, json, shotcut]
-
-proc mediaLength*(container: InputContainer): float64 =
-  # Get the mediaLength in seconds.
-
-  var format_ctx = container.formatContext
-  defer: container.close()
-
-  var audioStreamIndex = -1 # Get the first audio stream
-  for i in 0..<format_ctx.nb_streams:
-    if format_ctx.streams[i].codecpar.codec_type == ffmpeg.AVMEDIA_TYPE_AUDIO:
-      audioStreamIndex = int(i)
-      break
-
-  if audioStreamIndex != -1:
-    var time_base: AVRational
-    var packet = ffmpeg.av_packet_alloc()
-    var biggest_pts: int64
-
-    while ffmpeg.av_read_frame(format_ctx, packet) >= 0:
-      if packet.stream_index == audioStreamIndex:
-        if packet.pts != ffmpeg.AV_NOPTS_VALUE and packet.pts > biggest_pts:
-          biggest_pts = packet.pts
-
-      ffmpeg.av_packet_unref(packet)
-
-    if packet != nil:
-      ffmpeg.av_packet_free(addr packet)
-
-    time_base = format_ctx.streams[audioStreamIndex].time_base
-    return float64(biggest_pts.cdouble * time_base.cdouble)
-
-  error("No audio stream found")
-
+import preview
 
 proc parseExportString*(exportStr: string): (string, string, string) =
   var kind = exportStr
@@ -215,6 +183,7 @@ proc editMedia*(args: mainArgs) =
     else:
       # Make `timeline` from media file
       var container = av.open(args.input)
+      defer: container.close()
       var tb = AVRational(num: 30, den: 1)
       if container.video.len > 0:
         tb = makeSaneTimebase(container.video[0].avgRate)
@@ -240,7 +209,7 @@ proc editMedia*(args: mainArgs) =
         chunks = chunkify(hasLoud)
       elif editMethod == "none":
         let length = mediaLength(container)
-        let tbLength = int64(round(tb.cdouble * length))
+        let tbLength = (round((length * tb).float64)).int64
 
         if tbLength > 0:
           chunks.add((0'i64, tbLength, 1.0))
@@ -251,6 +220,10 @@ proc editMedia*(args: mainArgs) =
 
 
   let (exportKind, tlName, fcpVersion) = parseExportString(args.`export`)
+
+  if args.preview:
+    preview(tlV3)
+    return
 
   case exportKind:
   of "premiere":

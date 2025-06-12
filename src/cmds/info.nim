@@ -1,6 +1,6 @@
 import std/json
 import std/enumerate
-import std/[strformat, strutils]
+import std/strformat
 import std/parseopt
 
 import ../av

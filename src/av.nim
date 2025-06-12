@@ -54,6 +54,37 @@ func duration*(container: InputContainer): float64 =
 func bitRate*(container: InputContainer): int64 =
   return container.formatContext.bit_rate
 
+proc mediaLength*(container: InputContainer): AVRational =
+  # Get the mediaLength in seconds.
+
+  var format_ctx = container.formatContext
+
+  var audioStreamIndex = -1 # Get the first audio stream
+  for i in 0..<format_ctx.nb_streams:
+    if format_ctx.streams[i].codecpar.codec_type == ffmpeg.AVMEDIA_TYPE_AUDIO:
+      audioStreamIndex = int(i)
+      break
+
+  if audioStreamIndex != -1:
+    var time_base: AVRational
+    var packet = ffmpeg.av_packet_alloc()
+    var biggest_pts: int64
+
+    while ffmpeg.av_read_frame(format_ctx, packet) >= 0:
+      if packet.stream_index == audioStreamIndex:
+        if packet.pts != ffmpeg.AV_NOPTS_VALUE and packet.pts > biggest_pts:
+          biggest_pts = packet.pts
+
+      ffmpeg.av_packet_unref(packet)
+
+    if packet != nil:
+      ffmpeg.av_packet_free(addr packet)
+
+    time_base = format_ctx.streams[audioStreamIndex].time_base
+    return biggest_pts * time_base
+
+  error "No audio stream found"
+
 proc close*(container: InputContainer) =
   avformat_close_input(addr container.formatContext)
 

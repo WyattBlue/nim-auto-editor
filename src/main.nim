@@ -61,6 +61,8 @@ judge making cuts.
       args.quiet = true
     of "--debug":
       args.debug = true
+    of "--preview":
+      args.preview = true
     of "-dn", "-sn":
       discard
     of "-ex":
