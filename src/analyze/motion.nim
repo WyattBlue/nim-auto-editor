@@ -1,6 +1,6 @@
-import std/math
 import std/strformat
 import std/options
+import std/math
 
 import ../av
 import ../log
@@ -42,7 +42,6 @@ iterator motionness*(processor: var VideoProcessor): float32 =
   # Use the target timebase (processor.tb) as the stream timebase for the filter
   # This is more reliable than codecCtx.time_base which might be 0/1
   let timeBase = processor.tb
-  let floatTb = float64(timeBase)
 
   # Get pixel format name for buffer args
   let pixFmtName = av_get_pix_fmt_name(pixelFormat)
@@ -108,11 +107,11 @@ iterator motionness*(processor: var VideoProcessor): float32 =
   avfilter_inout_free(addr outputs)
 
   var totalPixels: int = 0
-  var frameIndex: int = 0
-  var prevIndex: int = -1
-
-  var prevFrame: seq[uint8] = @[]
-  var currentFrame: seq[uint8] = @[]
+  var firstTime: bool = true
+  var prev_index = -1
+  var index = 0
+  var prevFrame: ptr UncheckedArray[uint8] = nil
+  var currentFrame: ptr UncheckedArray[uint8] = nil
 
   # Main decoding loop
   while av_read_frame(processor.formatCtx, packet) >= 0:
@@ -133,44 +132,41 @@ iterator motionness*(processor: var VideoProcessor): float32 =
         if frame.pts == AV_NOPTS_VALUE:
           continue
 
-        # Calculate frame index based on timebase
-        # Convert frame PTS to the target timebase and get the frame index
-        let frameTime = float64(frame.pts) * floatTb
-        frameIndex = int(round(frameTime / floatTb))
+        let frameTime = (frame.pts * processor.formatCtx.streams[processor.videoIndex].time_base).float64
+        index = round(frameTime * timeBase.float64).int64
 
-        if av_buffersrc_add_frame_flags(bufferSrc, frame, AV_BUFFERSRC_FLAG_KEEP_REF) < 0:
+        if av_buffersrc_write_frame(bufferSrc, frame) < 0:
           error "Error adding frame to filter"
 
         ret = av_buffersink_get_frame(bufferSink, filteredFrame)
         if ret < 0:
           continue
 
-        # Initialize total pixels on first frame
         if totalPixels == 0:
           totalPixels = filteredFrame.width * filteredFrame.height
+          prevFrame = cast[ptr UncheckedArray[uint8]](alloc(totalPixels))
+          currentFrame = cast[ptr UncheckedArray[uint8]](alloc(totalPixels))
 
-        # Convert frame data to sequence
-        let dataSize = totalPixels
-        currentFrame.setLen(dataSize)
-        copyMem(addr currentFrame[0], filteredFrame.data[0], dataSize)
+        copyMem(currentFrame, filteredFrame.data[0], totalPixels)
 
-        var motionValue: float32 = 0.0
-        if prevFrame.len > 0:
+        var value: float32 = 0.0
+        if not firstTime:
           # Calculate motion by comparing with previous frame
           var diffCount: int32 = 0
           for i in 0 ..< totalPixels:
             if prevFrame[i] != currentFrame[i]:
               inc diffCount
 
-          motionValue = float32(diffCount) / float32(totalPixels)
+          value = float32(diffCount) / float32(totalPixels)
+        else:
+          value = 0.0
+          firstTime = false
 
-        # Yield motion value for this frame
-        yield motionValue
+        for i in 0 ..< index - prev_index:
+          yield value
 
-        # Update for next iteration
-        prevFrame = currentFrame
-        prevIndex = frameIndex
-
+        swap(prevFrame, currentFrame)
+        prev_index = index
         av_frame_unref(filteredFrame)
 
   # Flush decoder
@@ -179,33 +175,35 @@ iterator motionness*(processor: var VideoProcessor): float32 =
     if frame.pts == AV_NOPTS_VALUE:
       continue
 
-    let frameTime = float64(frame.pts) * av_q2d(timeBase)
-    frameIndex = int(round(frameTime / av_q2d(processor.tb)))
-
-    ret = av_buffersrc_add_frame_flags(bufferSrc, frame, AV_BUFFERSRC_FLAG_KEEP_REF)
+    ret = av_buffersrc_write_frame(bufferSrc, frame)
     if ret >= 0:
       ret = av_buffersink_get_frame(bufferSink, filteredFrame)
       if ret >= 0:
         if totalPixels == 0:
           totalPixels = filteredFrame.width * filteredFrame.height
+          prevFrame = cast[ptr UncheckedArray[uint8]](alloc(totalPixels))
+          currentFrame = cast[ptr UncheckedArray[uint8]](alloc(totalPixels))
 
-        let dataSize = totalPixels
-        currentFrame.setLen(dataSize)
-        copyMem(addr currentFrame[0], filteredFrame.data[0], dataSize)
+        copyMem(currentFrame, filteredFrame.data[0], totalPixels)
 
-        var motionValue: float32 = 0.0
-        if prevFrame.len > 0:
-          var diffCount: int = 0
+        if not firstTime:
+          var diffCount: int32 = 0
           for i in 0 ..< totalPixels:
             if prevFrame[i] != currentFrame[i]:
               inc diffCount
-          motionValue = float32(diffCount) / float32(totalPixels)
 
-        yield motionValue
+          yield float32(diffCount) / float32(totalPixels)
+        else:
+          yield 0.0
+          firstTime = false
 
-        prevFrame = currentFrame
-        prevIndex = frameIndex
+        swap(prevFrame, currentFrame)
         av_frame_unref(filteredFrame)
+
+  if prevFrame != nil:
+    dealloc(prevFrame)
+  if currentFrame != nil:
+    dealloc(currentFrame)
 
 proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
     stream: int32, width: int32, blur: int32): seq[float32] =

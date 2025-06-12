@@ -284,7 +284,8 @@ proc av_dict_get*(m: ptr AVDictionary, key: cstring,
 
 proc av_dict_set*(pm: ptr ptr AVDictionary, key: cstring, value: cstring,
                   flags: cint): cint {.importc, header: "<libavutil/dict.h>".}
-proc av_dict_free*(m: ptr ptr AVDictionary) {.importc, header: "<libavutil/dict.h>".}
+proc av_dict_free*(m: ptr ptr AVDictionary) {.importc,
+    header: "<libavutil/dict.h>".}
 
 proc av_channel_layout_describe*(ch_layout: ptr AVChannelLayout, buf: cstring,
     buf_size: csize_t): cint {.importc, header: "<libavutil/channel_layout.h>".}
@@ -640,7 +641,6 @@ type
 const
   AV_BUFFERSRC_FLAG_NO_CHECK_FORMAT* = 1
   AV_BUFFERSRC_FLAG_PUSH* = 4
-  AV_BUFFERSRC_FLAG_KEEP_REF* = 8
 
 # Filter graph management
 proc avfilter_graph_alloc*(): ptr AVFilterGraph {.importc,
@@ -668,8 +668,8 @@ proc avfilter_inout_free*(inout: ptr ptr AVFilterInOut) {.importc,
     header: "<libavfilter/avfilter.h>".}
 
 # Buffer source/sink operations
-proc av_buffersrc_add_frame_flags*(ctx: ptr AVFilterContext, frame: ptr AVFrame,
-    flags: cint): cint {.importc, header: "<libavfilter/buffersrc.h>".}
+proc av_buffersrc_write_frame*(ctx: ptr AVFilterContext,
+    frame: ptr AVFrame): cint {.importc, header: "<libavfilter/buffersrc.h>".}
 proc av_buffersrc_add_frame*(ctx: ptr AVFilterContext,
     frame: ptr AVFrame): cint {.importc, header: "<libavfilter/buffersrc.h>".}
 proc av_buffersink_get_frame*(ctx: ptr AVFilterContext,
