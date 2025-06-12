@@ -31,7 +31,7 @@ task cleanff, "Remove":
   rmDir("ffmpeg_build")
 
 
-let commonFlags = """
+var commonFlags = """
   --enable-version3 \
   --enable-static \
   --disable-shared \
@@ -48,8 +48,12 @@ let commonFlags = """
   --disable-encoder=avui,dca,mlp,opus,s302m,sonic,sonic_ls,truehd,vorbis \
   --enable-encoder=pcm_s16le \
   --disable-decoder=sonic \
-  --disable-autodetect
 """
+
+if defined(arm) or defined(arm64):
+  commonFlags &= "  --enable-neon \\\n"
+
+commonFlags &= "--disable-autodetect"
 
 task makeff, "Build FFmpeg from source":
   # Create directories
