@@ -18,6 +18,9 @@ type
     tb*: AVRational
 
 iterator motionness*(processor: var VideoProcessor): float32 =
+  processor.codecCtx.thread_count = 0 # Auto-detect CPU cores
+  processor.codecCtx.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
+
   var packet = av_packet_alloc()
   var frame = av_frame_alloc()
   var filteredFrame = av_frame_alloc()

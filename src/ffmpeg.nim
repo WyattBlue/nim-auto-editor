@@ -218,6 +218,8 @@ type
     sample_rate*: cint
     sample_fmt*: AVSampleFormat
     sample_aspect_ratio*: AVRational
+    thread_type*: cint
+    thread_count*: cint
 
     # ... other fields omitted for brevity
     color_range*: AVColorRange
@@ -236,6 +238,9 @@ const
   AVMEDIA_TYPE_ATTACHMENT* = AVMediaType(4)
   AV_TIME_BASE* = 1000000
   AV_NOPTS_VALUE* = -9223372036854775807'i64 - 1
+  FF_THREAD_FRAME* = 1
+  FF_THREAD_SLICE* = 2
+  AV_CODEC_FLAG2_FAST* = 1
 
 const
   AV_LOG_QUIET* = -8   # Print no output
