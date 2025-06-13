@@ -10,7 +10,8 @@ bin = @["main=auto-editor"]
 requires "nim >= 2.2.2"
 
 # Tasks
-import os
+import std/os
+import std/[strutils, strformat]
 
 task test, "Test the project":
   exec "nim c -r tests/rationals"
@@ -30,8 +31,27 @@ task cleanff, "Remove":
   rmDir("ffmpeg_sources")
   rmDir("ffmpeg_build")
 
+var disableDecoders: seq[string] = @[]
+var disableEncoders: seq[string] = @[]
+var disableDemuxers: seq[string] = @[]
+var disableMuxers: seq[string] = @[]
 
-var commonFlags = """
+# Marked as 'Experimental'
+disableDecoders.add "sonic"
+disableEncoders &= "avui,dca,mlp,opus,s302m,sonic,sonic_ls,truehd,vorbis".split(",")
+
+# Technically obsolete
+disableDecoders.add "flv"
+disableEncoders.add "flv"
+disableMuxers.add "flv"
+disableDemuxers &= @["flv", "live_flv", "kux"]
+
+let encodersDisabled = disableEncoders.join(",")
+let decodersDisabled = disableDecoders.join(",")
+let demuxersDisabled = disableDemuxers.join(",")
+let muxersDisabled = disableMuxers.join(",")
+
+var commonFlags = &"""
   --enable-version3 \
   --enable-static \
   --disable-shared \
@@ -45,9 +65,11 @@ var commonFlags = """
   --disable-filters \
   --enable-filter=scale,format,gblur \
   --disable-encoders \
-  --disable-encoder=avui,dca,mlp,opus,s302m,sonic,sonic_ls,truehd,vorbis \
+  --disable-encoder={encodersDisabled} \
   --enable-encoder=pcm_s16le \
-  --disable-decoder=sonic \
+  --disable-decoder={decodersDisabled} \
+  --disable-demuxer={demuxersDisabled} \
+  --disable-muxer={muxersDisabled} \
 """
 
 if defined(arm) or defined(arm64):
