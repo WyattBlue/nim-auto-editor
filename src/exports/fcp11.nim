@@ -79,7 +79,7 @@ proc fcp11_write_xml*(groupName, version, output: string, resolve: bool, tl: v3)
   func fraction(val: int): string =
     if val == 0:
       return "0s"
-    return &"{val.cint * tl.tb.den}/{tl.tb.num}s"
+    return &"{val * tl.tb.den.int}/{tl.tb.num}s"
 
   var verStr: string
   if version == "11":
