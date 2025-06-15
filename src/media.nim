@@ -5,7 +5,7 @@ import av
 import ffmpeg
 
 type
-  VideoStream* = ref object
+  VideoStream* = object
     duration*: float64
     bitrate*: int64
     codec*: string
@@ -23,7 +23,7 @@ type
     color_primaries*: cint
     color_transfer*: cint
 
-  AudioStream* = ref object
+  AudioStream* = object
     duration*: float64
     bitrate*: int64
     codec*: string
@@ -32,13 +32,13 @@ type
     channels*: cint
     layout*: string
 
-  SubtitleStream* = ref object
+  SubtitleStream* = object
     duration*: float64
     bitrate*: int64
     codec*: string
     lang*: string
 
-  DataStream* = ref object
+  DataStream* = object
     codec*: string
     timecode*: string
 
