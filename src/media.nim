@@ -6,9 +6,10 @@ import ffmpeg
 
 type
   VideoStream* = ref object
-    duration*: float64 = 0.0
-    bitrate*: int64 = 0
+    duration*: float64
+    bitrate*: int64
     codec*: string
+    timecode: string
     lang*: string
     width*: cint
     height*: cint
@@ -32,21 +33,20 @@ type
     layout*: string
 
   SubtitleStream* = ref object
-    duration*: float
+    duration*: float64
     bitrate*: int64
     codec*: string
     lang*: string
 
   DataStream* = ref object
-    duration*: float = 0.0
-    bitrate*: int64 = 0
     codec*: string
-    lang*: string = ""
+    timecode*: string
 
   MediaInfo* = object
     path*: string
     duration*: float64
     bitrate*: int64
+    timecode*: string # In SMPTE
     recommendedTimebase*: string
     v*: seq[VideoStream]
     a*: seq[AudioStream]
@@ -66,9 +66,16 @@ func get_res*(self: MediaInfo): (int64, int64) =
   else:
     return (1920, 1080)
 
+proc fourccToString*(fourcc: uint32): string =
+  var buf: array[5, char]
+  buf[0] = char(fourcc and 0xFF)
+  buf[1] = char((fourcc shr 8) and 0xFF)
+  buf[2] = char((fourcc shr 16) and 0xFF)
+  buf[3] = char((fourcc shr 24) and 0xFF)
+  buf[4] = '\0'
+  return $cast[cstring](addr buf[0])
 
-proc initMediaInfo*(formatContext: ptr AVFormatContext,
-    path: string): MediaInfo =
+proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo =
   result.path = path
   result.v = @[]
   result.a = @[]
@@ -81,19 +88,25 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext,
   else:
     result.duration = 0.0
 
-  var lang: string
+  func getTimecode(vs: seq[VideoStream], ds: seq[DataStream]): string =
+    for d in ds:
+      if d.timecode.len > 0:
+        return d.timecode
+    for v in vs:
+      if v.timecode.len > 0:
+        return v.timecode
+    return "00:00:00:00"
+
   for i in 0 ..< formatContext.nb_streams.int:
     let stream = formatContext.streams[i]
     let codecParameters = stream.codecpar
-    var codecContext = avcodec_alloc_context3(nil)
-    discard avcodec_parameters_to_context(codecContext, codecParameters)
+    var codecCtx = avcodec_alloc_context3(nil)
+    discard avcodec_parameters_to_context(codecCtx, codecParameters)
+    defer: avcodec_free_context(addr codecCtx)
 
-    var entry = av_dict_get(cast[ptr AVDictionary](stream.metadata), "language",
-        nil, 0)
-    if entry != nil:
-      lang = $entry.value
-    else:
-      lang = "und"
+    let metadata = cast[ptr AVDictionary](stream.metadata)
+    let entry = av_dict_get(metadata, "language", nil, 0)
+    let lang = (if entry == nil: "und" else: $entry.value)
 
     var duration: float64
     if stream.duration == AV_NOPTS_VALUE:
@@ -102,45 +115,54 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext,
       duration = stream.duration.float64 * av_q2d(stream.time_base)
 
     if codecParameters.codec_type == AVMEDIA_TYPE_VIDEO:
+      let timecodeEntry = av_dict_get(metadata, "timecode", nil, 0)
+      let timecodeStr = (if timecodeEntry == nil: "" else: $timecodeEntry.value)
+
       result.v.add(VideoStream(
         duration: duration,
-        bitrate: codecContext.bit_rate,
-        codec: $avcodec_get_name(codecContext.codec_id),
+        bitrate: codecCtx.bit_rate,
+        codec: $avcodec_get_name(codecCtx.codec_id),
+        timecode: timecodeStr,
         lang: lang,
-        width: codecContext.width,
-        height: codecContext.height,
+        width: codecCtx.width,
+        height: codecCtx.height,
         avg_rate: stream.avg_frame_rate,
         timebase: fmt"{stream.time_base.num}/{stream.time_base.den}",
-        sar: fmt"{codecContext.sample_aspect_ratio.num}:{codecContext.sample_aspect_ratio.den}",
-        pix_fmt: $av_get_pix_fmt_name(codecContext.pix_fmt),
-        color_range: codecContext.color_range,
-        color_space: codecContext.colorspace,
-        color_primaries: codecContext.color_primaries,
-        color_transfer: codecContext.color_trc,
+        sar: fmt"{codecCtx.sample_aspect_ratio.num}:{codecCtx.sample_aspect_ratio.den}",
+        pix_fmt: $av_get_pix_fmt_name(codecCtx.pix_fmt),
+        color_range: codecCtx.color_range,
+        color_space: codecCtx.colorspace,
+        color_primaries: codecCtx.color_primaries,
+        color_transfer: codecCtx.color_trc,
       ))
     elif codecParameters.codec_type == AVMEDIA_TYPE_AUDIO:
       var layout: array[64, char]
-      discard av_channel_layout_describe(addr codecContext.ch_layout, cast[
+      discard av_channel_layout_describe(addr codecCtx.ch_layout, cast[
           cstring](addr layout[0]), sizeof(layout).csize_t)
 
       result.a.add(AudioStream(
         duration: duration,
-        bitrate: codecContext.bit_rate,
-        codec: $avcodec_get_name(codecContext.codec_id),
+        bitrate: codecCtx.bit_rate,
+        codec: $avcodec_get_name(codecCtx.codec_id),
         lang: lang,
-        sampleRate: codecContext.sample_rate,
+        sampleRate: codecCtx.sample_rate,
         layout: $cast[cstring](addr layout[0]),
         channels: codecParameters.ch_layout.nb_channels,
       ))
     elif codecParameters.codec_type == AVMEDIA_TYPE_SUBTITLE:
       result.s.add(SubtitleStream(
         duration: duration,
-        bitrate: codecContext.bit_rate,
-        codec: $avcodec_get_name(codecContext.codec_id),
+        bitrate: codecCtx.bit_rate,
+        codec: $avcodec_get_name(codecCtx.codec_id),
         lang: lang,
       ))
+    elif codecParameters.codec_type == AVMEDIA_TYPE_DATA:
+      let timecodeEntry = av_dict_get(metadata, "timecode", nil, 0)
+      let timecodeStr = (if timecodeEntry == nil: "" else: $timecodeEntry.value)
+      let codec = $avcodec_get_name(codecCtx.codec_id) & " (" & fourccToString(codecCtx.codec_tag) & ")"
+      result.d.add(DataStream(codec: codec, timecode: timecodeStr))
 
-    avcodec_free_context(addr codecContext)
+  result.timecode = getTimecode(result.v, result.d)
 
 
 proc initMediaInfo*(path: string): MediaInfo =

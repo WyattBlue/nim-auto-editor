@@ -64,6 +64,13 @@ proc printYamlInfo(fileInfo: MediaInfo) =
     echo fmt"     - codec: {s.codec}"
     genericTrack(s.lang, s.bitrate)
 
+  if fileInfo.d.len > 0:
+    echo fmt" - data:"
+  for track, d in enumerate(fileInfo.d):
+    echo fmt"   - track {track}:"
+    echo fmt"     - codec: {d.codec}"
+    echo fmt"     - timecode: {d.timecode}"
+
   echo " - container:"
   if fileInfo.duration != 0.0:
     echo fmt"   - duration: {fileInfo.duration:.1f}"
