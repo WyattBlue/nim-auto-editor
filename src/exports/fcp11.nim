@@ -1,7 +1,7 @@
 import std/os
-import std/sets
 import std/xmltree
 import std/algorithm
+import std/[sets, tables]
 import std/[strformat, strutils]
 from std/math import round
 
@@ -90,7 +90,6 @@ proc fcp11_write_xml*(groupName, version, output: string, resolve: bool, tl: v3)
     error(&"Unknown final cut pro version: {version}")
 
   let fcpxml = <>fcpxml(version = verStr)
-
   let resources = newElement("resources")
   fcpxml.add(resources)
 
@@ -98,9 +97,12 @@ proc fcp11_write_xml*(groupName, version, output: string, resolve: bool, tl: v3)
   var tlDur = (if resolve: 0 else: tl.len)
   var projName: string
 
+  var ptrToMi = initTable[ptr string, MediaInfo]()
   var i = 0
+
   for ptrSrc in tl.uniqueSources:
     let mi = initMediaInfo(ptrSrc[])
+    ptrToMi[ptrSrc] = mi
 
     if i == 0:
       projName = splitFile(mi.path).name
@@ -120,8 +122,9 @@ proc fcp11_write_xml*(groupName, version, output: string, resolve: bool, tl: v3)
     let hasAudio = (if mi.a.len > 0: "1" else: "0")
     let audioChannels = (if mi.a.len == 0: "2" else: $mi.a[0].channels)
 
+    let startPoint = parseSMPTE(mi.timecode, tl.tb)
     let r2 = <>asset(id = id2, name = splitFile(mi.path).name,
-        start = "0s", hasVideo = hasVideo, format = id,
+        start = fraction(startPoint), hasVideo = hasVideo, format = id,
         hasAudio = hasAudio, audioSources = "1",
         audioChannels = audioChannels, duration = fraction(tlDur))
 
@@ -148,17 +151,19 @@ proc fcp11_write_xml*(groupName, version, output: string, resolve: bool, tl: v3)
   fcpxml.add lib
 
   proc make_clip(`ref`: string, clip: Clip) =
-    let clip_properties = {
+    let src = ptrToMi[clip.src]
+    let startPoint = parseSMPTE(src.timecode, tl.tb)
+
+    let asset = newElement("asset-clip")
+    asset.attrs = {
       "name": projName,
       "ref": `ref`,
-      "offset": fraction(clip.start),
+      "offset": fraction(clip.start + startPoint),
       "duration": fraction(clip.dur),
-      "start": fraction(clip.offset),
+      "start": fraction(clip.offset + startPoint),
       "tcFormat": "NDF"
     }.toXmlAttributes
 
-    let asset = <>asset_clip()
-    asset.attrs = clip_properties
     spine.add(asset)
 
     if clip.speed != 1:

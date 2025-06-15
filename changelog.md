@@ -1,8 +1,8 @@
-# 0.5.1
+# 0.5.2
 
 ## Major
 
 ## Features
 
 ## Fixes
-- Make `motion` fast
+- Fix fcp11 export when a media's timecode is not zero.
