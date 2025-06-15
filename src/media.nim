@@ -8,16 +8,15 @@ type
   VideoStream* = object
     duration*: float64
     bitrate*: int64
+    avg_rate*: AVRational
     codec*: string
     timecode: string
     lang*: string
-    width*: cint
-    height*: cint
-    avg_rate*: AVRational
     timebase*: string
     sar*: string
     pix_fmt*: string
-
+    width*: cint
+    height*: cint
     color_range*: cint
     color_space*: cint
     color_primaries*: cint
@@ -28,9 +27,9 @@ type
     bitrate*: int64
     codec*: string
     lang*: string
+    layout*: string
     sampleRate*: cint
     channels*: cint
-    layout*: string
 
   SubtitleStream* = object
     duration*: float64
@@ -121,15 +120,15 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo
       result.v.add(VideoStream(
         duration: duration,
         bitrate: codecCtx.bit_rate,
+        avg_rate: stream.avg_frame_rate,
         codec: $avcodec_get_name(codecCtx.codec_id),
         timecode: timecodeStr,
         lang: lang,
-        width: codecCtx.width,
-        height: codecCtx.height,
-        avg_rate: stream.avg_frame_rate,
         timebase: fmt"{stream.time_base.num}/{stream.time_base.den}",
         sar: fmt"{codecCtx.sample_aspect_ratio.num}:{codecCtx.sample_aspect_ratio.den}",
         pix_fmt: $av_get_pix_fmt_name(codecCtx.pix_fmt),
+        width: codecCtx.width,
+        height: codecCtx.height,
         color_range: codecCtx.color_range,
         color_space: codecCtx.colorspace,
         color_primaries: codecCtx.color_primaries,
@@ -145,8 +144,8 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo
         bitrate: codecCtx.bit_rate,
         codec: $avcodec_get_name(codecCtx.codec_id),
         lang: lang,
-        sampleRate: codecCtx.sample_rate,
         layout: $cast[cstring](addr layout[0]),
+        sampleRate: codecCtx.sample_rate,
         channels: codecParameters.ch_layout.nb_channels,
       ))
     elif codecParameters.codec_type == AVMEDIA_TYPE_SUBTITLE:

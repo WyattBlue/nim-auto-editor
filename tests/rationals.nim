@@ -6,6 +6,18 @@ import ../src/ffmpeg
 import ../src/edit
 import ../src/wavutil
 import ../src/cmds/info
+import ../src/media
+import ../src/timeline
+
+test "struct-sizes":
+  check(sizeof(AVRational) == 8)
+  check(sizeof(seq) == 16)
+  check(sizeof(string) == 16)
+  check(sizeof(ref string) == 8)
+  check(sizeof(ref seq) == 8)
+  check(sizeof(VideoStream) == 144)
+  check(sizeof(AudioStream) == 72)
+  check(sizeof(Clip) == 48)
 
 test "maths":
   let a = AVRational(num: 3, den: 4)
