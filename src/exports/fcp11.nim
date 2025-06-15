@@ -1,8 +1,9 @@
-import std/strformat
-import std/xmltree
-import std/sets
 import std/os
+import std/sets
+import std/xmltree
 import std/algorithm
+import std/[strformat, strutils]
+from std/math import round
 
 import ../media
 import ../log
@@ -39,7 +40,6 @@ func getColorspace(mi: MediaInfo): string =
 
   return "1-1-1 (Rec. 709)"
 
-
 func makeName(mi: MediaInfo, tb: AVRational): string =
   if mi.get_res()[1] == 720 and tb == 30:
     return "FFVideoFormat720p30"
@@ -50,8 +50,32 @@ func makeName(mi: MediaInfo, tb: AVRational): string =
 func pathToUri(a: string): string =
   return "file://" & a
 
-proc fcp11_write_xml*(groupName: string, version: string, output: string,
-    resolve: bool, tl: v3) =
+proc parseSMPTE(val: string, fps: AVRational): int =
+  if val.len == 0:
+    return 0
+
+  try:
+    var parts = val.split(":")
+    if len(parts) != 4:
+      raise newException(ValueError, &"Invalid SMPTE format: {val}")
+
+    let hours = parseInt(parts[0])
+    let minutes = parseInt(parts[1])
+    let seconds = parseInt(parts[2])
+    let frames = parseInt(parts[3])
+
+    if hours < 0 or minutes < 0 or minutes >= 60 or seconds < 0 or seconds >= 60 or frames < 0:
+      raise newException(ValueError, &"Invalid SMPTE values: {val}")
+
+    if frames >= fps:
+      raise newException(ValueError, &"Frame count {frames} exceeds fps {fps}")
+
+    var totalFrames = (hours * 3600 + minutes * 60 + seconds) * fps + frames
+    return int(round(totalFrames))
+  except ValueError as e:
+    error(&"Cannot parse SMPTE timecode '{val}': {e.msg}")
+
+proc fcp11_write_xml*(groupName, version, output: string, resolve: bool, tl: v3) =
   func fraction(val: int): string =
     if val == 0:
       return "0s"
@@ -70,19 +94,19 @@ proc fcp11_write_xml*(groupName: string, version: string, output: string,
   let resources = newElement("resources")
   fcpxml.add(resources)
 
-  var src_dur = 0
-  var tl_dur = (if resolve: 0 else: tl.len)
-  var proj_name: string
+  var srcDur = 0
+  var tlDur = (if resolve: 0 else: tl.len)
+  var projName: string
 
   var i = 0
   for ptrSrc in tl.uniqueSources:
     let mi = initMediaInfo(ptrSrc[])
 
     if i == 0:
-      proj_name = splitFile(mi.path).name
-      src_dur = int(mi.duration * tl.tb)
+      projName = splitFile(mi.path).name
+      srcDur = int(mi.duration * tl.tb)
       if resolve:
-        tl_dur = src_dur
+        tlDur = srcDur
 
     let id = "r" & $(i * 2 + 1)
     let width = $tl.res[0]
@@ -99,7 +123,7 @@ proc fcp11_write_xml*(groupName: string, version: string, output: string,
     let r2 = <>asset(id = id2, name = splitFile(mi.path).name,
         start = "0s", hasVideo = hasVideo, format = id,
         hasAudio = hasAudio, audioSources = "1",
-        audioChannels = audioChannels, duration = fraction(tl_dur))
+        audioChannels = audioChannels, duration = fraction(tlDur))
 
     let mediaRep = newElement("media-rep")
     mediaRep.attrs = {"kind": "original-media", "src": mi.path.absolutePath().pathToUri()}.toXmlAttributes
@@ -111,7 +135,7 @@ proc fcp11_write_xml*(groupName: string, version: string, output: string,
 
   let lib = <>library()
   let evt = <>event(name = group_name)
-  let proj = <>project(name = proj_name)
+  let proj = <>project(name = projName)
   let sequence = <>sequence(format = "r1", tcStart = "0s", tcFormat = "NDF",
       audioLayout = tl.layout, audioRate = (if tl.sr ==
       44100: "44.1k" else: "48k"))
@@ -125,7 +149,7 @@ proc fcp11_write_xml*(groupName: string, version: string, output: string,
 
   proc make_clip(`ref`: string, clip: Clip) =
     let clip_properties = {
-      "name": proj_name,
+      "name": projName,
       "ref": `ref`,
       "offset": fraction(clip.start),
       "duration": fraction(clip.dur),
@@ -149,8 +173,8 @@ proc fcp11_write_xml*(groupName: string, version: string, output: string,
 
       let timept2 = newElement("timept")
       timept2.attrs = {
-        "time": fraction(int(src_dur.float / clip.speed)),
-        "value": fraction(src_dur),
+        "time": fraction(int(srcDur.float / clip.speed)),
+        "value": fraction(srcDur),
         "interp": "smooth2"
       }.toXmlAttributes
       timemap.add(timept2)
