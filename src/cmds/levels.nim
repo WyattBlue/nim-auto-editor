@@ -7,15 +7,17 @@ import ../analyze/[audio, motion, subtitle]
 import ../log
 import ../cache
 
+import tinyre
+
 # TODO: Make a generic version
-proc parseEditString*(exportStr: string): (string, float32, int32, int32, int32, string) =
+proc parseEditString*(exportStr: string): (string, float32, int32, int32, int32, Re) =
   var
     kind = exportStr
     threshold: float32 = 0.04
     stream: int32 = 0
     width: int32 = 400
     blur: int32 = 9
-    pattern: string = ""
+    pattern: Re = re("")
 
   let colonPos = exportStr.find(':')
   if colonPos == -1:
@@ -72,7 +74,11 @@ proc parseEditString*(exportStr: string): (string, float32, int32, int32, int32,
       of "threshold": threshold = parseFloat(value).float32
       of "width": width = parseInt(value).int32
       of "blur": blur = parseInt(value).int32
-      of "pattern": pattern = value
+      of "pattern":
+        try:
+          pattern = re(value)
+        except ValueError:
+          error &"Invalid regex expression: {value}"
       else: error &"Unknown paramter: {paramName}"
 
     # Skip comma

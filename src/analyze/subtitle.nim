@@ -3,9 +3,8 @@ from std/math import round
 import ../[av, ffmpeg]
 import tinyre
 
-proc subtitle*(container: InputContainer, tb: AVRational, pattern: string, stream: int32): seq[bool] =
+proc subtitle*(container: InputContainer, tb: AVRational, pattern: Re, stream: int32): seq[bool] =
   let
-    rePattern = re(pattern)
     formatCtx = container.formatContext
     s = container.subtitle[stream].index
     codecCtx = initDecoder(formatCtx.streams[s].codecpar)
@@ -45,7 +44,7 @@ proc subtitle*(container: InputContainer, tb: AVRational, pattern: string, strea
           let rect = subtitle.rects[i]
           if rect.`type` == SUBTITLE_ASS and rect.ass != nil:
             var assText: string = $rect.ass
-            if match(assText.dialogue, rePattern).len > 0:
+            if match(assText.dialogue, pattern).len > 0:
               spans.add((start, `end`))
 
   result = newSeq[bool](length)
