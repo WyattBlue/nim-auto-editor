@@ -2,7 +2,7 @@ import unittest
 import std/os
 import std/tempfiles
 
-import ../src/ffmpeg
+import ../src/[av, ffmpeg]
 import ../src/edit
 import ../src/wavutil
 import ../src/cmds/info
@@ -39,17 +39,15 @@ test "strings":
   check(AVRational("6/8") == AVRational(num: 3, den: 4))
   check(AVRational("1.5") == AVRational(num: 3, den: 2))
 
+test "dialouge":
+  check("0,0,Default,,0,0,0,,oop".dialogue == "oop")
+  check("0,0,Default,,0,0,0,,boop".dialogue == "boop")
 
 test "exports":
   check(parseExportString("premiere:name=a,version=3") == ("premiere", "a", "3"))
   check(parseExportString("premiere:name=a") == ("premiere", "a", "11"))
   check(parseExportString("premiere:name=\"Hello \\\" World") == ("premiere", "Hello \" World", "11"))
   check(parseExportString("premiere:name=\"Hello \\\\ World") == ("premiere", "Hello \\ World", "11"))
-
-# test "tag":
-#   let path = "example.mp4"
-#   let tb = AVRational(30)
-#   discard procTag(path, tb, "audio", 0)
 
 test "info":
   main(@["example.mp4"])

@@ -11,7 +11,7 @@ import ffmpeg
 import timeline
 import util/bar
 import cmds/levels
-import analyze/[audio, motion]
+import analyze/[audio, motion, subtitle]
 
 import imports/json
 import exports/[fcp7, fcp11, json, shotcut]
@@ -184,14 +184,14 @@ proc editMedia*(args: mainArgs) =
       # Make `timeline` from media file
       var container = av.open(args.input)
       defer: container.close()
-      var tb = AVRational(num: 30, den: 1)
+      var tb = AVRational(30)
       if container.video.len > 0:
         tb = makeSaneTimebase(container.video[0].avgRate)
 
       var chunks: seq[(int64, int64, float64)] = @[]
       let src = initMediaInfo(container.formatContext, args.input)
 
-      let (editMethod, threshold, stream, width, blur) = parseEditString(args.edit)
+      let (editMethod, threshold, stream, width, blur, pattern) = parseEditString(args.edit)
 
       if editMethod in ["audio", "motion"]:
         let bar = initBar(args.progress)
@@ -203,6 +203,12 @@ proc editMedia*(args: mainArgs) =
         var hasLoud = newSeq[bool](levels.len)
         hasLoud = levels.mapIt(it >= threshold)
 
+        let startMargin = parseTime(args.margin[0], tb.float64)
+        let endMargin = parseTime(args.margin[1], tb.float64)
+        mutMargin(hasLoud, startMargin, endMargin)
+        chunks = chunkify(hasLoud)
+      elif editMethod == "subtitle":
+        var hasLoud = subtitle(container, tb, pattern, stream)
         let startMargin = parseTime(args.margin[0], tb.float64)
         let endMargin = parseTime(args.margin[1], tb.float64)
         mutMargin(hasLoud, startMargin, endMargin)

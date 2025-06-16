@@ -97,3 +97,34 @@ proc close*(container: InputContainer) =
 func avgRate*(stream: ptr AVStream): AVRational =
   return stream.avg_frame_rate
 
+func dialogue*(assText: string): string =
+  let textLen = assText.len
+  var
+    i: int64 = 0
+    curChar: char
+    nextChar: char
+    commaCount: int8 = 0
+    state = false
+
+  while commaCount < 8 and i < textLen:
+    if assText[i] == ',':
+      commaCount += 1
+    i += 1
+
+  while i < textLen:
+    curChar = assText[i]
+    nextChar = (if i + 1 >= textLen: '\0' else: assText[i + 1])
+
+    if curChar == '\\' and nextChar == 'N':
+      result &= "\n"
+      i += 2
+      continue
+
+    if not state:
+      if curChar == '{' and nextChar != '\\':
+        state = true
+      else:
+        result &= curChar
+    elif curChar == '}':
+      state = false
+    i += 1

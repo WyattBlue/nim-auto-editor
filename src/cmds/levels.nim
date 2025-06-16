@@ -3,22 +3,23 @@ import std/[strformat, strutils]
 
 import ../av
 import ../ffmpeg
-import ../analyze/[audio, motion]
+import ../analyze/[audio, motion, subtitle]
 import ../log
 import ../cache
 
 # TODO: Make a generic version
-proc parseEditString*(exportStr: string): (string, float32, int32, int32, int32) =
+proc parseEditString*(exportStr: string): (string, float32, int32, int32, int32, string) =
   var
     kind = exportStr
     threshold: float32 = 0.04
     stream: int32 = 0
     width: int32 = 400
     blur: int32 = 9
+    pattern: string = ""
 
   let colonPos = exportStr.find(':')
   if colonPos == -1:
-    return (kind, threshold, stream, width, blur)
+    return (kind, threshold, stream, width, blur, pattern)
 
   kind = exportStr[0..colonPos-1]
   let paramsStr = exportStr[colonPos+1..^1]
@@ -71,13 +72,14 @@ proc parseEditString*(exportStr: string): (string, float32, int32, int32, int32)
       of "threshold": threshold = parseFloat(value).float32
       of "width": width = parseInt(value).int32
       of "blur": blur = parseInt(value).int32
+      of "pattern": pattern = value
       else: error &"Unknown paramter: {paramName}"
 
     # Skip comma
     if i < paramsStr.len and paramsStr[i] == ',':
       inc i
 
-  return (kind, threshold, stream, width, blur)
+  return (kind, threshold, stream, width, blur, pattern)
 
 type levelArgs* = object
   timebase*: string = "30/1"
@@ -123,8 +125,8 @@ proc main*(strArgs: seq[string]) =
   av_log_set_level(AV_LOG_QUIET)
   let tb = AVRational(args.timebase)
   let chunkDuration: float64 = av_inv_q(tb)
-  let (editMethod, _, userStream, width, blur) = parseEditString(args.edit)
-  if editMethod notin ["audio", "motion"]:
+  let (editMethod, _, userStream, width, blur, pattern) = parseEditString(args.edit)
+  if editMethod notin ["audio", "motion", "subtitle"]:
     error fmt"Unknown editing method: {editMethod}"
 
   let cacheArgs = (if editMethod == "audio": $userStream else: &"{userStream},{width},{blur}")
@@ -191,5 +193,14 @@ proc main*(strArgs: seq[string]) =
       data.add value
     echo ""
 
-  if not args.noCache:
+  elif editMethod == "subtitle":
+    if container.subtitle.len == 0:
+      error "No Subtitle stream"
+    if container.subtitle.len <= userStream:
+      error fmt"Subtitle stream out of range: {userStream}"
+
+    for value in subtitle(container, tb, pattern, userStream):
+      echo (if value: "1" else: "0")
+
+  if editMethod != "subtitle" and not args.noCache:
     writeCache(data, inputFile, tb, editMethod, cacheArgs)
