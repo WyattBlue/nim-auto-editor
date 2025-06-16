@@ -44,13 +44,6 @@ auto-editor example.mp4
 
 ## Todos
 
-### Subcommands
-- [x] info
-- [x] desc
-- [x] subdump
-- [x] levels
-- [x] cache
-
 ### Exporting
 - [x] Final Cut Pro (.fcpxml)
 - [x] ShotCut (.mlt)
@@ -62,7 +55,7 @@ auto-editor example.mp4
 ### Editing Procedures
 - [x] "none"
 - [x] audio
-- [ ] motion
-- [ ] subtitle
+- [x] motion
+- [x] subtitle
 - [ ] or
 - [ ] and

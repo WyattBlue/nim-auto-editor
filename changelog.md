@@ -3,6 +3,7 @@
 ## Major
 
 ## Features
+- Add the `subtitle` editing procedure.
 
 ## Fixes
 - Fix fcp11 export when a media's timecode is not zero.
