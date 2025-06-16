@@ -22,43 +22,25 @@ proc main*(args: seq[string]) =
     except IOError as e:
       error(e.msg)
     defer: container.close()
-    let formatContext = container.formatContext
+    let formatCtx = container.formatContext
 
-    var subStreams: seq[int] = @[]
-
-    for i in 0..<formatContext.nb_streams.int:
-      if formatContext.streams[i].codecpar.codecType == AVMEDIA_TYPE_SUBTITLE:
-        subStreams.add i
+    var subStreams: seq[cint] = @[]
+    for s in container.subtitle:
+      subStreams.add s.index
 
     for i, s in subStreams.pairs:
-      let codecName = $avcodec_get_name(formatContext.streams[
-          s].codecpar.codec_id)
+      let codecName = $avcodec_get_name(formatCtx.streams[s].codecpar.codec_id)
       echo "file: " & inputFile & " (" & $i & ":" & codecName & ")"
 
-      let subtitleStream = formatContext.streams[s]
-      let codec = avcodec_find_decoder(subtitleStream.codecpar.codec_id)
-      if codec == nil:
-        continue
-
-      let codecContext = avcodec_alloc_context3(codec)
-      if codecContext == nil:
-        continue
-      defer: avcodec_free_context(addr codecContext)
-
-      if avcodec_parameters_to_context(codecContext, subtitleStream.codecpar) < 0:
-        continue
-      if avcodec_open2(codecContext, codec, nil) < 0:
-        continue
-
+      var codecCtx = initDecoder(formatCtx.streams[s].codecpar)
       var subtitle: AVSubtitle
-
-      while av_read_frame(formatContext, packet) >= 0:
+      while av_read_frame(formatCtx, packet) >= 0:
         defer: av_packet_unref(packet)
 
         if packet.stream_index == s.cint:
           var gotSubtitle: cint = 0
-          let ret = avcodec_decode_subtitle2(codecContext, addr subtitle,
-              addr gotSubtitle, packet)
+          let ret = avcodec_decode_subtitle2(codecCtx, addr subtitle,
+            addr gotSubtitle, packet)
 
           if ret >= 0 and gotSubtitle != 0:
             defer: avsubtitle_free(addr subtitle)
