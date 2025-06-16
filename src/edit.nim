@@ -160,11 +160,54 @@ proc mutMargin*(arr: var seq[bool], startM: int, endM: int) =
         arr[k] = false
 
 
+proc setOutput(userOut, userExport, path: string): (string, string) =
+  var dir, name, ext: string
+  if userOut == "" or userOut == "-":
+    if path == "":
+      error "`--output` must be set."  # When a timeline file is the input.
+    (dir, name, ext) = splitFile(path)
+  else:
+    (dir, name, ext) = splitFile(userOut)
+
+  let root = dir / name
+
+  if ext == "":
+    # Use `mp4` as the default, because it is most compatible.
+    ext = (if path == "": ".mp4" else: splitFile(path).ext)
+
+  var outExport = userExport
+
+  if userExport == "":
+    case ext:
+      of ".xml": outExport = "premiere"
+      of ".fcpxml": outExport = "final-cut-pro"
+      of ".mlt": outExport = "shotcut"
+      of ".json", ".v1": outExport = "v1"
+      of ".v3": outExport = "v3"
+      else: outExport = "default"
+
+  case userExport:
+    of "premiere", "resolve-fcp7": ext = ".xml"
+    of "final-cut-pro", "resolve": ext = ".fcpxml"
+    of "shotcut": ext = ".mlt"
+    of "v1": ext = ".v1"
+    of "v3": ext = ".v3"
+    else: discard
+
+  if userOut == "-":
+      return ("-", outExport)
+
+  if userOut == "":
+      return (&"{root}_ALTERED{ext}", outExport)
+
+  return (&"{root}{ext}", outExport)
+
 proc editMedia*(args: mainArgs) =
   av_log_set_level(AV_LOG_QUIET)
 
   var tlV3: v3
   var interner = newStringInterner()
+  var output: string
   defer: interner.cleanup()
 
   if args.progress == BarType.machine and args.output != "-":
@@ -220,12 +263,18 @@ proc editMedia*(args: mainArgs) =
         if tbLength > 0:
           chunks.add((0'i64, tbLength, 1.0))
       else:
-        error "Unknown edit method"
+        error &"Unknown edit method: {editMethod}"
 
       tlV3 = toNonLinear(addr args.input, tb, src, chunks)
 
-
-  let (exportKind, tlName, fcpVersion) = parseExportString(args.`export`)
+  var exportKind, tlName, fcpVersion: string
+  if args.`export` == "":
+    (output, exportKind) = setOutput(args.output, "", args.input)
+    tlName = "Auto-Editor Media Group"
+    fcpVersion = "11"
+  else:
+    (exportKind, tlName, fcpVersion) = parseExportString(args.`export`)
+    (output, _) = setOutput(args.output, exportKind, args.input)
 
   if args.preview:
     preview(tlV3)
@@ -233,17 +282,19 @@ proc editMedia*(args: mainArgs) =
 
   case exportKind:
   of "premiere":
-    fcp7_write_xml(tlName, args.output, false, tlV3)
+    fcp7_write_xml(tlName, output, false, tlV3)
   of "resolve-fcp7":
-    fcp7_write_xml(tlName, args.output, true, tlV3)
+    fcp7_write_xml(tlName, output, true, tlV3)
   of "final-cut-pro":
-    fcp11_write_xml(tlName, fcpVersion, args.output, false, tlV3)
+    fcp11_write_xml(tlName, fcpVersion, output, false, tlV3)
   of "resolve":
     tlV3.setStreamTo0(interner)
-    fcp11_write_xml(tlName, fcpVersion, args.output, true, tlV3)
+    fcp11_write_xml(tlName, fcpVersion, output, true, tlV3)
   of "v1", "v3":
-    exportJsonTl(tlV3, exportKind, args.output)
+    exportJsonTl(tlV3, exportKind, output)
   of "shotcut":
-    shotcut_write_mlt(args.output, tlV3)
+    shotcut_write_mlt(output, tlV3)
+  of "default":
+    error "Sorry, media rendering isn't implemented yet."
   else:
-    error("Unknown export format")
+    error &"Unknown export format: {exportKind}"

@@ -14,8 +14,8 @@ type mainArgs* = object
   quiet*: bool = false
   preview*: bool = false
   progress*: BarType = modern
-  output*: string = "-"
-  `export`*: string = "v3"
+  output*: string = ""
+  `export`*: string = "default"
   edit*: string = "audio"
   margin*: (string, string) = ("0.2s", "0.2s")
 
