@@ -86,16 +86,15 @@ proc parseExportString*(exportStr: string): (string, string, string) =
 
 
 proc chunkify(arr: seq[bool]): seq[(int64, int64, float64)] =
-  var arr_len: int64 = arr.len
   var start: int64 = 0
   var j: int64 = 1
-  while j < arr_len:
+  while j < arr.len:
     if arr[j] != arr[j - 1]:
       let speed = (if arr[j-1] == true: 1.0 else: 99999.0)
       result.add (start, j, speed)
       start = j
     inc j
-  result.add (start, arr_len, (if arr[j] == true: 1.0 else: 99999.0))
+  result.add (start, arr.len.int64, (if arr[j-1] == true: 1.0 else: 99999.0))
 
 
 proc splitNumStr(val: string): (float64, string) =

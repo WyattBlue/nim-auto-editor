@@ -26,6 +26,9 @@ proc conwrite*(msg: string) =
   stdout.flushFile()
 
 proc error*(msg: string) {.noreturn.} =
+  when defined(debug):
+    raise newException(ValueError, msg)
+
   conwrite("")
   stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)
   quit(1)
