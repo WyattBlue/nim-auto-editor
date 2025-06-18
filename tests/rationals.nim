@@ -40,11 +40,11 @@ test "strings":
   check(AVRational("1.5") == AVRational(num: 3, den: 2))
 
 test "encoder":
-  let (encoder, encoderCtx) = initEncoder("pcm_s16le")
+  let (_, encoderCtx) = initEncoder("pcm_s16le")
   check(encoderCtx.codec_type == AVMEDIA_TYPE_AUDIO)
   check(encoderCtx.bit_rate != 0)
 
-  let (encoder2, encoderCtx2) = initEncoder(AV_CODEC_ID_PCM_S16LE)
+  let (_, encoderCtx2) = initEncoder(AV_CODEC_ID_PCM_S16LE)
   check(encoderCtx2.codec_type == AVMEDIA_TYPE_AUDIO)
   check(encoderCtx2.bit_rate != 0)
 
@@ -83,4 +83,8 @@ test "wav":
   let tempDir = createTempDir("tmp", "")
   let outWav = tempDir / "out.wav"
   toS16Wav("example.mp4", outWav, 0)
+
+  let container = av.open(outWav)
+  defer: container.close()
+  check(container.audio.len == 1)
   removeDir(tempDir)

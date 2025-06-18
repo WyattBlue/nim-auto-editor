@@ -6,11 +6,7 @@ import log
 
 
 proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
-  var
-    outputCtx: ptr AVFormatContext = nil
-    outputStream: ptr AVStream = nil
-    ret: cint
-
+  var ret: cint
   var container: InputContainer
   try:
     container = av.open(inputPath)
@@ -29,21 +25,21 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
   let decoderCtx = initDecoder(inputStream.codecpar)
   defer: avcodec_free_context(addr decoderCtx)
 
+  let outputCtx: ptr AVFormatContext = nil
   ret = avformat_alloc_output_context2(addr outputCtx, nil, "wav",
       outputPath.cstring)
   if outputCtx == nil:
     error "Could not create output context"
 
   let (encoder, encoderCtx) = initEncoder("pcm_s16le")
-
   encoderCtx.sample_rate = decoderCtx.sample_rate
   encoderCtx.ch_layout = decoderCtx.ch_layout
   encoderCtx.sample_fmt = AV_SAMPLE_FMT_S16
-  encoderCtx.bit_rate = 0 # PCM doesn't need bitrate
+  encoderCtx.bit_rate = 0
   encoderCtx.time_base = AVRational(num: 1, den: decoderCtx.sample_rate)
-
   if avcodec_open2(encoderCtx, encoder, nil) < 0:
     error "Could not open encoder"
+  defer: avcodec_free_context(addr encoderCtx)
 
   var swrCtx: ptr SwrContext = swr_alloc()
   if swrCtx == nil:
@@ -73,7 +69,7 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
     error "Could not initialize resampler"
 
   # Add stream to output format
-  outputStream = avformat_new_stream(outputCtx, nil)
+  let outputStream: ptr AVStream = avformat_new_stream(outputCtx, nil)
   if outputStream == nil:
     error "Could not allocate output stream"
 
@@ -343,7 +339,6 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
 
   discard av_write_trailer(outputCtx)
 
-  if encoderCtx != nil: avcodec_free_context(addr encoderCtx)
   if outputCtx != nil:
     if (outputCtx.oformat.flags and AVFMT_NOFILE) == 0:
       discard avio_closep(addr outputCtx.pb)
