@@ -63,6 +63,8 @@ judge making cuts.
       args.debug = true
     of "--preview":
       args.preview = true
+    of "--no-open":
+      args.noOpen = true
     of "-dn", "-sn":
       discard
     of "-ex":

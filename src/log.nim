@@ -13,6 +13,7 @@ type mainArgs* = object
   debug*: bool = false
   quiet*: bool = false
   preview*: bool = false
+  noOpen*: bool = false
   progress*: BarType = modern
   output*: string = ""
   `export`*: string = "default"
