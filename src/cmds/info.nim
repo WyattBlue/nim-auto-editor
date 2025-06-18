@@ -1,7 +1,6 @@
 import std/json
 import std/enumerate
-import std/strformat
-import std/parseopt
+import std/[strformat, strutils]
 
 import ../av
 import ../ffmpeg
@@ -137,19 +136,13 @@ proc main*(args: seq[string]) =
   var isJson = false
   var inputFiles: seq[string] = @[]
 
-  for kind, key, val in getopt(args):
-    case kind
-    of cmdArgument:
-      inputFiles.add(key)
-    of cmdLongOption:
-      if key == "json":
-        isJson = true
-      else:
-        error(fmt"Unknown option: {key}")
-    of cmdShortOption:
-      error(fmt"Unknown option: {key}")
-    of cmdEnd:
-      discard
+  for key in args:
+    if key == "--json":
+      isJson = true
+    else:
+      if key.startsWith("--"):
+        error &"Unknown option: {key}"
+      inputFiles.add key
 
   var fileInfo: JsonNode = %* {}
   for inputFile in inputFiles:
