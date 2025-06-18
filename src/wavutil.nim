@@ -8,7 +8,6 @@ import log
 proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
   var
     outputCtx: ptr AVFormatContext = nil
-    encoderCtx: ptr AVCodecContext = nil
     outputStream: ptr AVStream = nil
     ret: cint
 
@@ -35,15 +34,8 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
   if outputCtx == nil:
     error "Could not create output context"
 
-  let encoder = avcodec_find_encoder(AV_CODEC_ID_PCM_S16LE)
-  if encoder == nil:
-    error "Could not find PCM encoder"
+  let (encoder, encoderCtx) = initEncoder("pcm_s16le")
 
-  encoderCtx = avcodec_alloc_context3(encoder)
-  if encoderCtx == nil:
-    error "Could not allocate encoder context"
-
-  encoderCtx.codec_type = AVMEDIA_TYPE_AUDIO
   encoderCtx.sample_rate = decoderCtx.sample_rate
   encoderCtx.ch_layout = decoderCtx.ch_layout
   encoderCtx.sample_fmt = AV_SAMPLE_FMT_S16

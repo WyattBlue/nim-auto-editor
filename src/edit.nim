@@ -16,6 +16,7 @@ import analyze/[audio, motion, subtitle]
 import imports/json
 import exports/[fcp7, fcp11, json, shotcut]
 import preview
+import render/format
 
 proc parseExportString*(exportStr: string): (string, string, string) =
   var kind = exportStr
@@ -283,18 +284,30 @@ proc editMedia*(args: mainArgs) =
   case exportKind:
   of "premiere":
     fcp7_write_xml(tlName, output, false, tlV3)
+    return
   of "resolve-fcp7":
     fcp7_write_xml(tlName, output, true, tlV3)
+    return
   of "final-cut-pro":
     fcp11_write_xml(tlName, fcpVersion, output, false, tlV3)
+    return
   of "resolve":
     tlV3.setStreamTo0(interner)
     fcp11_write_xml(tlName, fcpVersion, output, true, tlV3)
+    return
   of "v1", "v3":
     exportJsonTl(tlV3, exportKind, output)
+    return
   of "shotcut":
     shotcut_write_mlt(output, tlV3)
+    return
   of "default":
-    error "Sorry, media rendering isn't implemented yet."
+    discard
   else:
     error &"Unknown export format: {exportKind}"
+
+  if args.output == "-":
+    error "Exporting media files to stdout is not supported."
+
+  makeMedia(tlV3, output)
+

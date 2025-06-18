@@ -39,6 +39,15 @@ test "strings":
   check(AVRational("6/8") == AVRational(num: 3, den: 4))
   check(AVRational("1.5") == AVRational(num: 3, den: 2))
 
+test "encoder":
+  let (encoder, encoderCtx) = initEncoder("pcm_s16le")
+  check(encoderCtx.codec_type == AVMEDIA_TYPE_AUDIO)
+  check(encoderCtx.bit_rate != 0)
+
+  let (encoder2, encoderCtx2) = initEncoder(AV_CODEC_ID_PCM_S16LE)
+  check(encoderCtx2.codec_type == AVMEDIA_TYPE_AUDIO)
+  check(encoderCtx2.bit_rate != 0)
+
 test "dialouge":
   check("0,0,Default,,0,0,0,,oop".dialogue == "oop")
   check("0,0,Default,,0,0,0,,boop".dialogue == "boop")

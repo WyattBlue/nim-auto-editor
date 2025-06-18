@@ -1,6 +1,28 @@
 import ffmpeg
 import log
 
+proc initEncoder*(id: AVCodecID): (ptr AVCodec, ptr AVCodecContext) =
+  let codec: ptr AVCodec = avcodec_find_encoder(id)
+  if codec == nil:
+    error "Encoder not found: " & $id
+
+  let encoderCtx = avcodec_alloc_context3(codec)
+  if encoderCtx == nil:
+    error "Could not allocate encoder context"
+
+  return (codec, encoderCtx)
+
+proc initEncoder*(name: string): (ptr AVCodec, ptr AVCodecContext) =
+  let codec: ptr AVCodec = avcodec_find_encoder_by_name(name.cstring)
+  if codec == nil:
+    error "Encoder not found: " & name
+
+  let encoderCtx = avcodec_alloc_context3(codec)
+  if encoderCtx == nil:
+    error "Could not allocate encoder context"
+
+  return (codec, encoderCtx)
+
 proc initDecoder*(codecpar: ptr AVCodecParameters): ptr AVCodecContext =
   let codec: ptr AVCodec = avcodec_find_decoder(codecpar.codec_id)
   if codec == nil:
