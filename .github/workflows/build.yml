@@ -85,6 +85,8 @@ jobs:
         run: nimble makeffwin
       - name: Compile
         run: nimble windows
+      - name: Test
+        run: nimble test
       - name: Rename binary
         run: |
           mv auto-editor.exe auto-editor-windows-amd64.exe
