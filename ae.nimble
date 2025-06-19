@@ -231,8 +231,8 @@ task windows, "Cross-compile to Windows (requires mingw-w64)":
     exec "nim c -d:danger --os:windows --cpu:amd64 --cc:gcc " &
          "--gcc.exe:x86_64-w64-mingw32-gcc " &
          "--gcc.linkerexe:x86_64-w64-mingw32-gcc " &
-         "--passL:-lbcrypt " & # Add Windows Bcrypt library
-         "--passL:-static " &
+         "--passL:\"-lbcrypt -lkernel32 -luser32 -ladvapi32 -lshell32 -lole32 -loleaut32 -luuid -lwinmm -lws2_32 -lsynchronization\" " &
+         "--passL:\"-lmingw32 -lmingwex -lmsvcrt -lpthread -lm -static-libgcc -static\" " &
          "--out:auto-editor.exe src/main.nim"
 
     # Strip the Windows binary
