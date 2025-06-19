@@ -17,9 +17,6 @@ import std/[strutils, strformat]
 task test, "Test the project":
   exec "nim c -r tests/rationals"
 
-task build, "Build the project in debug mode":
-  exec "nim c -d:debug --out:auto-editor src/main.nim"
-
 task make, "Export the project":
   exec "nim c -d:danger --out:auto-editor src/main.nim"
   when defined(macosx):
@@ -27,10 +24,9 @@ task make, "Export the project":
   when defined(linux):
     exec "strip -s auto-editor"
 
-
 task cleanff, "Remove":
   rmDir("ffmpeg_sources")
-  rmDir("ffmpeg_build")
+  rmDir("build")
 
 var disableDecoders: seq[string] = @[]
 var disableEncoders: seq[string] = @[]
@@ -65,6 +61,7 @@ var commonFlags = &"""
   --disable-xlib \
   --disable-filters \
   --enable-filter=scale,format,gblur \
+  --enable-libmp3lame \
   --disable-encoder={encodersDisabled} \
   --disable-decoder={decodersDisabled} \
   --disable-demuxer={demuxersDisabled} \
@@ -76,69 +73,159 @@ if defined(arm) or defined(arm64):
 
 commonFlags &= "--disable-autodetect"
 
-task makeff, "Build FFmpeg from source":
+type Package = object
+  name: string
+  sourceUrl: string
+  location: string
+  sha256: string
+
+let lame = Package(
+  name: "lame",
+  sourceUrl: "http://deb.debian.org/debian/pool/main/l/lame/lame_3.100.orig.tar.gz",
+  location: "lame_3.100.orig.tar.gz",
+)
+let ffmpeg = Package(
+  name: "ffmpeg",
+  sourceUrl: "https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz",
+  location: "ffmpeg-7.1.1.tar.xz",
+)
+
+proc ffmpegSetup() =
   # Create directories
   mkDir("ffmpeg_sources")
-  mkDir("ffmpeg_build")
+  mkDir("build")
 
-  # Clone FFmpeg source
-  cd "ffmpeg_sources"
-  if not dirExists("ffmpeg"):
-    exec "git clone -b n7.1.1 --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg"
+  # Get absolute path for build
+  let buildPath = absolutePath("build")
+
+  withDir "ffmpeg_sources":
+    # Download and extract LAME
+    if not fileExists(lame.location):
+      exec &"curl -O -L {lame.sourceUrl}"
+    if not dirExists(lame.name):
+      exec &"tar -xzf {lame.location} && mv lame-3.100 lame"
+
+    # Build LAME
+    withDir "lame":
+      if not fileExists("Makefile"):
+        exec &"""./configure --prefix="{buildPath}" \
+          --disable-shared \
+          --enable-static \
+          --disable-frontend \
+          --disable-decoder \
+          --disable-gtktest"""
+
+      when defined(macosx):
+        exec "make -j$(sysctl -n hw.ncpu)"
+      elif defined(linux):
+        exec "make -j$(nproc)"
+      else:
+        exec "make -j4"
+
+      exec "make install"
+
+    # Download and extract FFmpeg
+    if not fileExists(ffmpeg.location):
+      exec &"curl -O -L {ffmpeg.sourceUrl}"
+    if not dirExists(ffmpeg.name):
+      exec &"tar -xJf {ffmpeg.location} && mv ffmpeg-7.1.1 ffmpeg"
+
+proc ffmpegSetupWindows() =
+  mkDir("ffmpeg_sources")
+  mkDir("build")
+
+  # Get absolute path for build
+  let buildPath = absolutePath("build")
+
+  withDir "ffmpeg_sources":
+    # Download and extract LAME
+    if not fileExists(lame.location):
+      exec &"curl -O -L {lame.sourceUrl}"
+    if not dirExists(lame.name):
+      exec &"tar -xzf {lame.location} && mv lame-3.100 lame"
+
+    # Build LAME for Windows cross-compilation
+    withDir "lame":
+      if not fileExists("Makefile"):
+        exec &"""./configure --prefix="{buildPath}" \
+          --host=x86_64-w64-mingw32 \
+          --disable-shared \
+          --enable-static \
+          --disable-frontend \
+          --disable-decoder \
+          --disable-gtktest \
+          CC=x86_64-w64-mingw32-gcc \
+          CXX=x86_64-w64-mingw32-g++ \
+          AR=x86_64-w64-mingw32-ar \
+          STRIP=x86_64-w64-mingw32-strip \
+          RANLIB=x86_64-w64-mingw32-ranlib"""
+
+      when defined(linux):
+        exec "make -j$(nproc)"
+      else:
+        exec "make -j4"
+
+      exec "make install"
+
+    # Download and extract FFmpeg
+    if not fileExists(ffmpeg.location):
+      exec &"curl -O -L {ffmpeg.sourceUrl}"
+    if not dirExists(ffmpeg.name):
+      exec &"tar -xJf {ffmpeg.location} && mv ffmpeg-7.1.1 ffmpeg"
+
+task makeff, "Build FFmpeg from source":
+  ffmpegSetup()
+
+  # Get absolute path for build
+  let buildPath = absolutePath("build")
 
   # Configure and build FFmpeg
-  cd "ffmpeg"
+  withDir "ffmpeg_sources/ffmpeg":
+    exec &"""./configure --prefix="{buildPath}" \
+      --pkg-config-flags="--static" \
+      --extra-cflags="-I{buildPath}/include" \
+      --extra-ldflags="-L{buildPath}/lib" \
+      --extra-libs="-lpthread -lm" \""" & "\n" & commonFlags
 
-  exec """./configure --prefix="../../ffmpeg_build" \
-    --pkg-config-flags="--static" \
-    --extra-cflags="-I../../ffmpeg_build/include" \
-    --extra-ldflags="-L../../ffmpeg_build/lib" \
-    --extra-libs="-lpthread -lm" \""" & "\n" & commonFlags
+    when defined(macosx):
+      exec "make -j$(sysctl -n hw.ncpu)"
+    elif defined(linux):
+      exec "make -j$(nproc)"
+    else:
+      exec "make -j4"
 
-  when defined(macosx):
-    exec "make -j$(sysctl -n hw.ncpu)"
-  elif defined(linux):
-    exec "make -j$(nproc)"
-  else:
-    exec "make -j4"
-
-  exec "make install"
+    exec "make install"
 
 task makeffwin, "Build FFmpeg for Windows cross-compilation":
-  # Create directories
-  mkDir("ffmpeg_sources")
-  mkDir("ffmpeg_build")
+  ffmpegSetupWindows()
 
-  # Clone FFmpeg source
-  cd "ffmpeg_sources"
-  if not dirExists("ffmpeg"):
-    exec "git clone -b n7.1.1 --depth 1 https://git.ffmpeg.org/ffmpeg.git ffmpeg"
+  # Get absolute path for build
+  let buildPath = absolutePath("build")
 
   # Configure and build FFmpeg with MinGW
-  cd "ffmpeg"
+  withDir "ffmpeg_sources/ffmpeg":
+    exec (&"""./configure --prefix="{buildPath}" \
+      --pkg-config-flags="--static" \
+      --extra-cflags="-I{buildPath}/include" \
+      --extra-ldflags="-L{buildPath}/lib" \
+      --extra-libs="-lpthread -lm" \
+      --arch=x86_64 \
+      --target-os=mingw32 \
+      --cross-prefix=x86_64-w64-mingw32- \
+      --enable-cross-compile \""" & "\n" & commonFlags)
 
-  exec ("""./configure --prefix="../../ffmpeg_build" \
-    --pkg-config-flags="--static" \
-    --extra-cflags="-I../../ffmpeg_build/include" \
-    --extra-ldflags="-L../../ffmpeg_build/lib" \
-    --extra-libs="-lpthread -lm" \
-    --arch=x86_64 \
-    --target-os=mingw32 \
-    --cross-prefix=x86_64-w64-mingw32- \
-    --enable-cross-compile \""" & "\n" & commonFlags)
+    # Build with multiple cores
+    when defined(linux):
+      exec "make -j$(nproc)"
+    else:
+      exec "make -j4" # Default to 4 cores
 
-  # Build with multiple cores
-  when defined(linux):
-    exec "make -j$(nproc)"
-  else:
-    exec "make -j4" # Default to 4 cores
-
-  exec "make install"
+    exec "make install"
 
 task windows, "Cross-compile to Windows (requires mingw-w64)":
   echo "Cross-compiling for Windows (64-bit)..."
   # First, make sure FFmpeg is built for Windows
-  if not dirExists("ffmpeg_build"):
+  if not dirExists("build"):
     echo "FFmpeg for Windows not found. Run 'nimble makeffwin' first."
   else:
     exec "nim c -d:danger --os:windows --cpu:amd64 --cc:gcc " &
@@ -147,7 +234,6 @@ task windows, "Cross-compile to Windows (requires mingw-w64)":
          "--passL:-lbcrypt " & # Add Windows Bcrypt library
          "--passL:-static " &
          "--out:auto-editor.exe src/main.nim"
-    
+
     # Strip the Windows binary
     exec "x86_64-w64-mingw32-strip -s auto-editor.exe"
-

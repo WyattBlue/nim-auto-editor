@@ -1,5 +1,5 @@
-{.passC: "-I./ffmpeg_build/include".}
-{.passL: "-L./ffmpeg_build/lib -lavfilter -lavformat -lavcodec -lswresample -lswscale -lavutil -lm".}
+{.passC: "-I./build/include".}
+{.passL: "-L./build/lib -lavfilter -lavformat -lavcodec -lswresample -lswscale -lavutil -lmp3lame -lm".}
 
 import std/posix
 

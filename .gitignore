@@ -2,7 +2,7 @@ auto-editor
 *.dylib
 *.o
 .DS_Store
-ffmpeg_build
+build
 ffmpeg_sources
 .vscode
 *.v3
