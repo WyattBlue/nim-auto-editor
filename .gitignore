@@ -6,6 +6,7 @@ ffmpeg_build
 ffmpeg_sources
 .vscode
 *.v3
+*_ALTERED*
 
 tests/*
 !tests/*.nim

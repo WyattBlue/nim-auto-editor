@@ -19,6 +19,7 @@ type Clip* = object
   dur*: int64
   offset*: int64
   speed*: float64
+  volume*: float64
   stream*: int32
 
 type v3* = object
@@ -68,7 +69,7 @@ func toNonLinear*(src: ptr string, tb: AvRational, mi: MediaInfo, chunks: seq[(
 
       if not (clips.len > 0 and clips[^1].start == start):
         clips.add(Clip(src: src, start: start, dur: dur, offset: offset,
-            speed: chunk[2]))
+            speed: chunk[2], volume: 1.0))
       start += dur
       i += 1
 

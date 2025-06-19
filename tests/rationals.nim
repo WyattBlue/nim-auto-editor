@@ -3,6 +3,7 @@ import std/os
 import std/tempfiles
 
 import ../src/[av, ffmpeg]
+import ../src/util/fun
 import ../src/edit
 import ../src/wavutil
 import ../src/cmds/info
@@ -17,7 +18,7 @@ test "struct-sizes":
   check(sizeof(ref seq) == 8)
   check(sizeof(VideoStream) == 144)
   check(sizeof(AudioStream) == 72)
-  check(sizeof(Clip) == 48)
+  check(sizeof(Clip) == 56)
 
 test "maths":
   let a = AVRational(num: 3, den: 4)

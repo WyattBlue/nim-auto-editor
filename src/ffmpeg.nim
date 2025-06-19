@@ -439,6 +439,7 @@ proc avcodec_open2*(avctx: ptr AVCodecContext, codec: ptr AVCodec,
     header: "<libavcodec/avcodec.h>".}
 proc avcodec_close*(avctx: ptr AVCodecContext): cint {.importc,
     header: "<libavcodec/avcodec.h>".}
+proc avcodec_flush_buffers*(avctx: ptr AVCodecContext) {.importc, header: "<libavcodec/avcodec.h>".}
 
 # Error
 proc AVERROR*(e: cint): cint {.inline.} = (-e)
@@ -681,3 +682,13 @@ proc av_buffersink_get_frame_flags*(ctx: ptr AVFilterContext,
 
 # String utilities for filters
 proc av_strdup*(s: cstring): cstring {.importc, header: "<libavutil/mem.h>".}
+
+# Seeking
+const
+  AVSEEK_FLAG_BACKWARD* = 1
+  AVSEEK_FLAG_BYTE* = 2
+  AVSEEK_FLAG_ANY* = 4
+  AVSEEK_FLAG_FRAME* = 8
+
+proc av_seek_frame*(s: ptr AVFormatContext, stream_index: cint, timestamp: int64, flags: cint): cint {.importc, header: "<libavformat/avformat.h>".}
+proc avformat_seek_file*(s: ptr AVFormatContext, stream_index: cint, min_ts: int64, ts: int64, max_ts: int64, flags: cint): cint {.importc, header: "<libavformat/avformat.h>".}
