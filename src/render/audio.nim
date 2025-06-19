@@ -368,12 +368,7 @@ proc makeNewAudio*(tl: v3, outputDir: string): seq[string] =
 
     conwrite("Creating audio")
 
-    # Process each clip in the layer
     for clip in layer:
-      # Skip clips with very high speed (these represent segments to be cut out)
-      if clip.speed >= 99999.0:
-        continue
-        
       let key = (clip.src[], clip.stream)
       if key notin samples:
         samples[key] = newGetter(clip.src[], clip.stream.int, tl.sr.int)
@@ -381,15 +376,11 @@ proc makeNewAudio*(tl: v3, outputDir: string): seq[string] =
     # Create output file for this layer
     let outputPath = outputDir / fmt"audio_layer_{i}.wav"
 
-    # Calculate total duration for this layer (only counting non-cut clips)
-    var totalDuration = 0'i64
-    for clip in layer:
-      if clip.speed < 99999.0:  # Only count clips that aren't cut
-        totalDuration = max(totalDuration, clip.start + clip.dur)
-    
+    # Calculate total duration for this layer.
     # If no duration calculated, use a minimal duration
-    if totalDuration == 0:
-      totalDuration = tl.sr.int64  # 1 second of silence
+    var totalDuration = tl.sr.int64
+    for clip in layer:
+      totalDuration = max(totalDuration, clip.start + clip.dur)
 
     # Create stereo audio data  
     let totalSamples = int(totalDuration * tl.sr.int64 * tl.tb.den div tl.tb.num)
@@ -403,10 +394,6 @@ proc makeNewAudio*(tl: v3, outputDir: string): seq[string] =
 
     # Process each clip and mix into the output
     for clip in layer:
-      # Skip clips with very high speed (these represent segments to be cut out)
-      if clip.speed >= 99999.0:
-        continue
-        
       let key = (clip.src[], clip.stream)
       if key in samples:
         let getter = samples[key]
@@ -414,7 +401,6 @@ proc makeNewAudio*(tl: v3, outputDir: string): seq[string] =
         # Calculate sample positions
         let startSample = int(clip.start * tl.sr.int64 * tl.tb.den div tl.tb.num)
         let durSamples = int(clip.dur * tl.sr.int64 * tl.tb.den div tl.tb.num)
-        let endSample = startSample + durSamples
 
         # Get audio data from source
         let srcStartSample = int(clip.offset * tl.sr.int64 * tl.tb.den div tl.tb.num)

@@ -56,7 +56,7 @@ proc makeMedia*(tl: v3, outputPath: string) =
 
 #[
 Python version for reference:
-Only do one audio stream. Hardcode the wav container and pcm_s16le codec.
+Only do one audio stream.
 
 
 def edit_media(paths: list[str], args: Args, log: Log) -> None:
