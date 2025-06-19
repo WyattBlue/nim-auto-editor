@@ -1,4 +1,4 @@
-import std/os
+import std/[os, osproc]
 import std/terminal
 import std/[strutils, strformat]
 import std/sequtils
@@ -247,3 +247,7 @@ proc editMedia*(args: mainArgs) =
 
   makeMedia(tlV3, output)
 
+  if not args.noOpen and exportKind == "default":
+    let process = startProcess("open", args=[output], options={poUsePath})
+    discard process.waitForExit()
+    process.close()
