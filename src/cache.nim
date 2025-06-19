@@ -1,6 +1,5 @@
-import std/times
 import std/options
-import std/[os, streams]
+import std/[os, times, streams]
 import std/[strutils, strformat]
 import std/[sha1, algorithm]
 import ffmpeg

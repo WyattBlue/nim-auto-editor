@@ -65,9 +65,7 @@ var commonFlags = &"""
   --disable-xlib \
   --disable-filters \
   --enable-filter=scale,format,gblur \
-  --disable-encoders \
   --disable-encoder={encodersDisabled} \
-  --enable-encoder=pcm_s16le \
   --disable-decoder={decodersDisabled} \
   --disable-demuxer={demuxersDisabled} \
   --disable-muxer={muxersDisabled} \

@@ -36,6 +36,10 @@ Options:
     -q, --quiet                   Display less output
     --preview, --stats            Show stats on how the input will be cut
                                   and halt
+
+  Audio Rendering:
+    -c:a, -acodec, --audio-codec ENCODER
+                                  Set audio codec for output media
   Miscellaneous:
     --no-open                     Do not open the output file after editing
                                   is done
@@ -105,6 +109,8 @@ judge making cuts.
       expecting = "output"
     of "-m":
       expecting = "margin"
+    of "-c:a", "-acodec", "--audio-codec":
+      expecting = "audio-codec"
     of "--edit", "--export", "--output", "--progress", "--margin":
       expecting = key[2..^1]
     else:
@@ -120,6 +126,8 @@ judge making cuts.
         args.`export` = key
       of "output":
         args.output = key
+      of "audio-codec":
+        args.audioCodec = key
       of "progress":
         try:
           args.progress = parseEnum[BarType](key)

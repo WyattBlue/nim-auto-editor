@@ -376,9 +376,7 @@ proc makeNewAudio*(tl: v3, outputDir: string): seq[string] =
     # Create output file for this layer
     let outputPath = outputDir / fmt"audio_layer_{i}.wav"
 
-    # Calculate total duration for this layer.
-    # If no duration calculated, use a minimal duration
-    var totalDuration = tl.sr.int64
+    var totalDuration = 0
     for clip in layer:
       totalDuration = max(totalDuration, clip.start + clip.dur)
 

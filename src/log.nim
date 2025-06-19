@@ -9,16 +9,26 @@ type BarType* = enum
 
 type mainArgs* = object
   input*: string = ""
-  version*: bool = false
+
+  # Editing Options
+  margin*: (string, string) = ("0.2s", "0.2s")
+  edit*: string = "audio"
+  `export`*: string = "default"
+  output*: string = ""
+
+  # Display Options
+  progress*: BarType = modern
   debug*: bool = false
   quiet*: bool = false
   preview*: bool = false
+
+  # Audio Rendering
+  audioCodec*: string = "auto"
+
+  # Misc.
+  version*: bool = false
   noOpen*: bool = false
-  progress*: BarType = modern
-  output*: string = ""
-  `export`*: string = "default"
-  edit*: string = "audio"
-  margin*: (string, string) = ("0.2s", "0.2s")
+
 
 proc conwrite*(msg: string) =
   let columns = terminalWidth()
