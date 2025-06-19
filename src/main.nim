@@ -15,6 +15,36 @@ proc ctrlc() {.noconv.} =
 
 setControlCHook(ctrlc)
 
+proc printHelp() {.noreturn.} =
+  echo """Usage: [file | url ...] [options]
+
+Commands:
+  info desc cache levels subdump
+
+Options:
+  Editing Options:
+    -m, --margin LENGTH           Set sections near "loud" as "loud" too if
+                                  section is less than LENGTH away
+    --edit METHOD                 Set an expression which determines how to
+                                  make auto edits
+    -ex, --export EXPORT:ATTRS?   Choose the export mode
+    -o, --output FILE             Set the name/path of the new output file
+
+  Display Options:
+    --progress PROGRESS           Set what type of progress bar to use
+    --debug                       Show debugging messages and values
+    -q, --quiet                   Display less output
+    --preview, --stats            Show stats on how the input will be cut
+                                  and halt
+  Miscellaneous:
+    --no-open                     Do not open the output file after editing
+                                  is done
+    -V, --version                 Display version and halt
+    -h, --help                    Show info about this program or option
+                                  then exit
+"""
+  quit(0)
+
 proc parseMargin(val: string): (string, string) =
   var vals = val.strip().split(",")
   if vals.len == 1:
@@ -55,13 +85,15 @@ judge making cuts.
 
   for key in commandLineParams():
     case key:
+    of "-h", "--help":
+      printHelp()
     of "-V", "--version":
       args.version = true
     of "-q", "--quiet":
       args.quiet = true
     of "--debug":
       args.debug = true
-    of "--preview":
+    of "--preview", "--stats":
       args.preview = true
     of "--no-open":
       args.noOpen = true
