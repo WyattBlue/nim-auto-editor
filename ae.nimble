@@ -84,25 +84,44 @@ let lame = Package(
   name: "lame",
   sourceUrl: "http://deb.debian.org/debian/pool/main/l/lame/lame_3.100.orig.tar.gz",
   location: "lame_3.100.orig.tar.gz",
+  sha256: "ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e",
 )
 let ffmpeg = Package(
   name: "ffmpeg",
   sourceUrl: "https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz",
   location: "ffmpeg-7.1.1.tar.xz",
+  sha256: "733984395e0dbbe5c046abda2dc49a5544e7e0e1e2366bba849222ae9e3a03b1",
 )
+
+proc getFileHash(filename: string): string =
+  let (existsOutput, existsCode) = gorgeEx("test -f " & filename)
+  if existsCode != 0:
+    raise newException(IOError, "File does not exist: " & filename)
+
+  let (output, exitCode) = gorgeEx("shasum -a 256 " & filename)
+  if exitCode != 0:
+    raise newException(IOError, "Cannot hash file: " & filename)
+  return output.split()[0]
+
+proc checkHash(package: Package, filename: string) =
+  let hash = getFileHash(filename)
+  if package.sha256 != hash:
+    echo filename
+    echo &"sha256 hash of {package.name} tarball do not match!\nExpected: {package.sha256}\nGot: {hash}"
+    quit(1)
 
 proc ffmpegSetup() =
   # Create directories
   mkDir("ffmpeg_sources")
   mkDir("build")
 
-  # Get absolute path for build
   let buildPath = absolutePath("build")
 
   withDir "ffmpeg_sources":
-    # Download and extract LAME
     if not fileExists(lame.location):
       exec &"curl -O -L {lame.sourceUrl}"
+      checkHash(lame, "ffmpeg_sources" / lame.location)
+
     if not dirExists(lame.name):
       exec &"tar -xzf {lame.location} && mv lame-3.100 lame"
 
@@ -122,12 +141,12 @@ proc ffmpegSetup() =
         exec "make -j$(nproc)"
       else:
         exec "make -j4"
-
       exec "make install"
 
-    # Download and extract FFmpeg
     if not fileExists(ffmpeg.location):
       exec &"curl -O -L {ffmpeg.sourceUrl}"
+      checkHash(ffmpeg, "ffmpeg_sources" / ffmpeg.location)
+
     if not dirExists(ffmpeg.name):
       exec &"tar -xJf {ffmpeg.location} && mv ffmpeg-7.1.1 ffmpeg"
 
@@ -135,7 +154,6 @@ proc ffmpegSetupWindows() =
   mkDir("ffmpeg_sources")
   mkDir("build")
 
-  # Get absolute path for build
   let buildPath = absolutePath("build")
 
   withDir "ffmpeg_sources":
@@ -165,10 +183,8 @@ proc ffmpegSetupWindows() =
         exec "make -j$(nproc)"
       else:
         exec "make -j4"
-
       exec "make install"
 
-    # Download and extract FFmpeg
     if not fileExists(ffmpeg.location):
       exec &"curl -O -L {ffmpeg.sourceUrl}"
     if not dirExists(ffmpeg.name):
@@ -194,13 +210,11 @@ task makeff, "Build FFmpeg from source":
       exec "make -j$(nproc)"
     else:
       exec "make -j4"
-
     exec "make install"
 
 task makeffwin, "Build FFmpeg for Windows cross-compilation":
   ffmpegSetupWindows()
 
-  # Get absolute path for build
   let buildPath = absolutePath("build")
 
   # Configure and build FFmpeg with MinGW
@@ -215,17 +229,14 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
       --cross-prefix=x86_64-w64-mingw32- \
       --enable-cross-compile \""" & "\n" & commonFlags)
 
-    # Build with multiple cores
     when defined(linux):
       exec "make -j$(nproc)"
     else:
-      exec "make -j4" # Default to 4 cores
-
+      exec "make -j4"
     exec "make install"
 
 task windows, "Cross-compile to Windows (requires mingw-w64)":
   echo "Cross-compiling for Windows (64-bit)..."
-  # First, make sure FFmpeg is built for Windows
   if not dirExists("build"):
     echo "FFmpeg for Windows not found. Run 'nimble makeffwin' first."
   else:
