@@ -9,6 +9,7 @@ bin = @["main=auto-editor"]
 # Dependencies
 requires "nim >= 2.2.2"
 requires "tinyre >= 1.6.0"
+requires "checksums"
 
 # Tasks
 import std/os

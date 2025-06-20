@@ -1,7 +1,8 @@
 import std/options
 import std/[os, times, streams]
 import std/[strutils, strformat]
-import std/[sha1, algorithm]
+import std/algorithm
+import checksums/sha1
 import ffmpeg
 import log
 import about
