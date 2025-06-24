@@ -2,25 +2,16 @@ import std/[times, math, strutils, strformat, terminal, osproc]
 
 import ../log
 
-type
-  Bar* = ref object
-    icon: string
-    chars: seq[string]
-    brackets: tuple[left, right: string]
-    machine: bool
-    hide: bool
-    partWidth: int
-    ampm: bool
-    stack: seq[tuple[title: string, lenTitle: int, total: float, begin: float]]
+type Bar* = ref object
+  icon: string
+  chars: seq[string]
+  brackets: tuple[left, right: string]
+  machine: bool
+  hide: bool
+  partWidth: int
+  ampm: bool
+  stack: seq[tuple[title: string, lenTitle: int, total: float, begin: float]]
 
-proc getStdoutBytes(cmd: seq[string]): string =
-  try:
-    let (output, exitCode) = execCmdEx(cmd.join(" "))
-    if exitCode != 0:
-      raise newException(OSError, "Command execution failed")
-    result = output
-  except:
-    raise newException(OSError, "Command execution failed")
 
 proc initBar*(barType: BarType): Bar =
   var icon = "⏳"
@@ -51,10 +42,9 @@ proc initBar*(barType: BarType): Bar =
   when defined(macosx):
     if barType in {modern, classic, ascii}:
       try:
-        let dateFormat = getStdoutBytes(@["defaults", "read",
-            "com.apple.menuextra.clock", "Show24Hour"])
+        let (dateFormat, _) = execCmdEx("defaults read com.apple.menuextra.clock Show24Hour")
         ampm = dateFormat == "0\n"
-      except OSError:
+      except:
         discard
 
   result = Bar(

@@ -96,6 +96,7 @@ judge making cuts.
     quit(0)
 
   var args = mainArgs()
+  var showVersion: bool = false
   var expecting: string = ""
 
   for key in commandLineParams():
@@ -103,9 +104,9 @@ judge making cuts.
     of "-h", "--help":
       printHelp()
     of "-V", "--version":
-      args.version = true
+      showVersion = true
     of "-q", "--quiet":
-      args.quiet = true
+      quiet = true
     of "--debug":
       args.debug = true
     of "--preview", "--stats":
@@ -118,7 +119,7 @@ judge making cuts.
       expecting = "export"
     of "-o":
       expecting = "output"
-    of "-m":
+    of "-m", "--frame-margin":
       expecting = "margin"
     of "-s", "--silent-speed":
       expecting = "silent-speed"
@@ -130,7 +131,7 @@ judge making cuts.
       expecting = key[2..^1]
     else:
       if key.startsWith("--"):
-        error(fmt"Unknown option: {key}")
+        error(&"Unknown option: {key}")
 
       case expecting
       of "":
@@ -159,7 +160,7 @@ judge making cuts.
   if expecting != "":
     error(&"--{expecting} needs argument.")
 
-  if args.version:
+  if showVersion:
     echo version
     quit(0)
 

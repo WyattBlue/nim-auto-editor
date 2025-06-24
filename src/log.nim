@@ -21,22 +21,22 @@ type mainArgs* = object
   # Display Options
   progress*: BarType = modern
   debug*: bool = false
-  quiet*: bool = false
   preview*: bool = false
 
   # Audio Rendering
   audioCodec*: string = "auto"
 
   # Misc.
-  version*: bool = false
   noOpen*: bool = false
 
+var quiet* = false
 
 proc conwrite*(msg: string) =
-  let columns = terminalWidth()
-  let buffer: string = " ".repeat(columns - msg.len - 3)
-  stdout.write("  " & msg & buffer & "\r")
-  stdout.flushFile()
+  if not quiet:
+    let columns = terminalWidth()
+    let buffer: string = " ".repeat(columns - msg.len - 3)
+    stdout.write("  " & msg & buffer & "\r")
+    stdout.flushFile()
 
 proc error*(msg: string) {.noreturn.} =
   when defined(debug):
