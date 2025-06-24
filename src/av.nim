@@ -18,7 +18,12 @@ proc initEncoder*(id: AVCodecID): (ptr AVCodec, ptr AVCodecContext) =
   return (codec, initEnCtx(codec))
 
 proc initEncoder*(name: string): (ptr AVCodec, ptr AVCodecContext) =
-  let codec: ptr AVCodec = avcodec_find_encoder_by_name(name.cstring)
+  var codec: ptr AVCodec = avcodec_find_encoder_by_name(name.cstring)
+  if codec == nil:
+    let desc = avcodec_descriptor_get_by_name(name.cstring)
+    if desc != nil:
+      codec = avcodec_find_encoder(desc.id)
+
   if codec == nil:
     error "Encoder not found: " & name
   return (codec, initEnCtx(codec))
