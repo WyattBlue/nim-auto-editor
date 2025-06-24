@@ -197,19 +197,10 @@ proc muxAudio*(inputPath, outputPath: string, streamIndex: int64) =
   defer:
     outputCtx.close()
 
-  let useMp3 = outputPath.endsWith("mp3")
-  let useAac = outputPath.endsWith("aac") or outputPath.endsWith("m4a")
-
-  let codecName = if useMp3: "mp3"
-                  elif useAac: "aac"
-                  else: "pcm_s16le"
-
-  let (encoder, encoderCtx) = initEncoder(codecName)
+  let (encoder, encoderCtx) = initEncoder(outputCtx.oformat.audio_codec)
   encoderCtx.sample_rate = decoderCtx.sample_rate
   encoderCtx.ch_layout = decoderCtx.ch_layout
   encoderCtx.time_base = AVRational(num: 1, den: encoderCtx.sample_rate)
-  if useMp3 or useAac:
-    encoderCtx.bit_rate = 128000
 
   if (outputCtx.oformat.flags and AVFMT_GLOBALHEADER) != 0:
     encoderCtx.flags = encoderCtx.flags or AV_CODEC_FLAG_GLOBAL_HEADER
