@@ -137,7 +137,7 @@ proc setStreamTo0*(tl: var v3, interner: var StringInterner) =
 
     let newtrack: string = folder / (path.stem & "_" & $i & ".wav")
     if newtrack notin cache:
-      toS16Wav(path, newtrack, i)
+      muxAudio(path, newtrack, i)
       cache[newtrack] = initMediaInfo(newtrack)
     return cache[newtrack]
 

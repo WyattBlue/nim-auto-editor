@@ -49,10 +49,6 @@ test "encoder":
   check(encoderCtx2.codec_type == AVMEDIA_TYPE_AUDIO)
   check(encoderCtx2.bit_rate != 0)
 
-test "dialouge":
-  check("0,0,Default,,0,0,0,,oop".dialogue == "oop")
-  check("0,0,Default,,0,0,0,,boop".dialogue == "boop")
-
 test "exports":
   check(parseExportString("premiere:name=a,version=3") == ("premiere", "a", "3"))
   check(parseExportString("premiere:name=a") == ("premiere", "a", "11"))
@@ -80,12 +76,39 @@ test "margin":
   mutMargin(levels, 2, 2)
   check(levels == @[true, true, true, true, true])
 
-test "wav":
+test "wav1":
   let tempDir = createTempDir("tmp", "")
-  let outWav = tempDir / "out.wav"
-  toS16Wav("example.mp4", outWav, 0)
+  defer: removeDir(tempDir)
+  let outFile = tempDir / "out.wav"
+  muxAudio("example.mp4", outFile, 0)
 
-  let container = av.open(outWav)
+  let container = av.open(outFile)
   defer: container.close()
   check(container.audio.len == 1)
-  removeDir(tempDir)
+  check($container.audio[0].name == "pcm_s16le")
+
+test "mp3":
+  let tempDir = createTempDir("tmp", "")
+  defer: removeDir(tempDir)
+  let outFile = tempDir / "out.mp3"
+  muxAudio("example.mp4", outFile, 0)
+
+  let container = av.open(outFile)
+  defer: container.close()
+  check(container.audio.len == 1)
+  check($container.audio[0].name in ["mp3", "mp3float"])
+
+test "aac":
+  let tempDir = createTempDir("tmp", "")
+  defer: removeDir(tempDir)
+  let outFile = tempDir / "out.aac"
+  muxAudio("example.mp4", outFile, 0)
+
+  let container = av.open(outFile)
+  defer: container.close()
+  check(container.audio.len == 1)
+  check($container.audio[0].name == "aac")
+
+test "dialouge":
+  check("0,0,Default,,0,0,0,,oop".dialogue == "oop")
+  check("0,0,Default,,0,0,0,,boop".dialogue == "boop")

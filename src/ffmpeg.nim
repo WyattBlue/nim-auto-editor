@@ -224,6 +224,7 @@ type
     coded_width*, coded_height*: cint
     ch_layout*: AVChannelLayout
     gop_size*: cint
+    frame_size*: cint
     pix_fmt*: AVPixelFormat
     # ... other fields omitted for brevity
     sample_rate*: cint
@@ -247,6 +248,8 @@ const
   AVMEDIA_TYPE_DATA* = AVMediaType(2)
   AVMEDIA_TYPE_SUBTITLE* = AVMediaType(3)
   AVMEDIA_TYPE_ATTACHMENT* = AVMediaType(4)
+  AVFMT_GLOBALHEADER* = 0x0040
+  AV_CODEC_FLAG_GLOBAL_HEADER* = 4194304 # 1 << 22
   AV_TIME_BASE* = 1000000
   AV_NOPTS_VALUE* = -9223372036854775807'i64 - 1
   FF_THREAD_FRAME* = 1
@@ -266,6 +269,9 @@ const
 
 proc av_log_set_level*(level: cint) {.importc, header: "<libavutil/log.h>".}
 
+proc av_samples_set_silence*(audio_data: ptr ptr uint8, offset: cint, nb_samples: cint,
+                            nb_channels: cint, sample_fmt: AVSampleFormat): cint {.importc,
+    header: "<libavutil/samplefmt.h>".}
 # Procedure declarations remain the same
 proc avformat_open_input*(ps: ptr ptr AVFormatContext, filename: cstring,
     fmt: pointer, options: pointer): cint {.importc,

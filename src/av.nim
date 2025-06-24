@@ -124,6 +124,21 @@ proc close*(container: InputContainer) =
 func avgRate*(stream: ptr AVStream): AVRational =
   return stream.avg_frame_rate
 
+func name*(stream: ptr AVStream): string =
+  if stream == nil or stream.codecpar == nil:
+    return ""
+
+  let codec = avcodec_find_decoder(stream.codecpar.codec_id)
+  if codec != nil and codec.name != nil:
+    return $codec.name
+
+  # Fallback to codec descriptor if codec not found
+  # let desc = avcodec_descriptor_get(stream.codecpar.codec_id)
+  # if desc != nil and desc.name != nil:
+  #   return $desc.name
+
+  return ""
+
 func dialogue*(assText: string): string =
   let textLen = assText.len
   var
