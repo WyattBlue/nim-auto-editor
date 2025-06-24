@@ -188,13 +188,11 @@ proc main*(strArgs: seq[string]) =
     var processor = VideoProcessor(
       formatCtx: container.formatContext,
       codecCtx: initDecoder(videoStream.codecpar),
-      videoIndex: videoStream.index,
-      width: width,
-      blur: blur,
       tb: tb,
+      videoIndex: videoStream.index,
     )
 
-    for value in processor.motionness():
+    for value in processor.motionness(width, blur):
       echo value
       data.add value
     echo ""

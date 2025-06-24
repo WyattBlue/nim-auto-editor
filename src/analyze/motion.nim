@@ -12,14 +12,11 @@ type
   VideoProcessor* = object
     formatCtx*: ptr AVFormatContext
     codecCtx*: ptr AVCodecContext
-    videoIndex*: cint
-    width*: int32
-    blur*: int32
     tb*: AVRational
+    videoIndex*: cint
 
-
-proc videoPipeline(timeBase: AVRational, pixFmtName: cstring,
-    codecCtx: ptr AVCodecContext, filterDesc: string): (ptr AVFilterGraph,
+proc createFilterGraph(timeBase: AVRational, pixFmtName: cstring,
+    codecCtx: ptr AVCodecContext, filter: string): (ptr AVFilterGraph,
     ptr AVFilterContext, ptr AVFilterContext) =
   var filterGraph: ptr AVFilterGraph = avfilter_graph_alloc()
   var bufferSrc: ptr AVFilterContext = nil
@@ -64,8 +61,8 @@ proc videoPipeline(timeBase: AVRational, pixFmtName: cstring,
   inputs.pad_idx = 0
   inputs.next = nil
 
-  ret = avfilter_graph_parse_ptr(filterGraph, filterDesc.cstring, addr inputs,
-      addr outputs, nil)
+  let filterC = filter.cstring
+  ret = avfilter_graph_parse_ptr(filterGraph, filterC, addr inputs, addr outputs, nil)
   if ret < 0:
     error "Could not parse filter graph"
 
@@ -78,7 +75,7 @@ proc videoPipeline(timeBase: AVRational, pixFmtName: cstring,
 
   return (filterGraph, bufferSrc, bufferSink)
 
-iterator motionness*(processor: var VideoProcessor): float32 =
+iterator videoPipeline*(processor: VideoProcessor, filter: string): ptr AVFrame =
   var packet = av_packet_alloc()
   var frame = av_frame_alloc()
   var filteredFrame = av_frame_alloc()
@@ -94,8 +91,6 @@ iterator motionness*(processor: var VideoProcessor): float32 =
     if processor.codecCtx != nil:
       avcodec_free_context(addr processor.codecCtx)
 
-  # Use the target timebase (processor.tb) as the stream timebase for the filter
-  # This is more reliable than codecCtx.time_base which might be 0/1
   let timeBase = processor.tb
 
   let pixelFormat = processor.codecCtx.pix_fmt
@@ -103,22 +98,14 @@ iterator motionness*(processor: var VideoProcessor): float32 =
   if pixFmtName == nil:
     error &"Could not get pixel format name for format: {ord(pixelFormat)}"
 
-  # Setup video filter chain: scale -> format=gray -> gblur
-  let (filterGraph, bufferSrc, bufferSink) = videoPipeline(
-    timeBase, pixFmtName, processor.codecCtx, &"scale={processor.width}:-1,format=gray,gblur=sigma={processor.blur}"
+  let (filterGraph, bufferSrc, bufferSink) = createFilterGraph(
+    timeBase, pixFmtName, processor.codecCtx, filter
   )
+
   defer:
     if filterGraph != nil:
       avfilter_graph_free(addr filterGraph)
 
-  var totalPixels: int = 0
-  var firstTime: bool = true
-  var prev_index = -1
-  var index = 0
-  var prevFrame: ptr UncheckedArray[uint8] = nil
-  var currentFrame: ptr UncheckedArray[uint8] = nil
-
-  # Main decoding loop
   while av_read_frame(processor.formatCtx, packet) >= 0:
     defer: av_packet_unref(packet)
 
@@ -132,14 +119,10 @@ iterator motionness*(processor: var VideoProcessor): float32 =
         if ret == AVERROR_EAGAIN or ret == AVERROR_EOF:
           break
         elif ret < 0:
-          error fmt"Error receiving frame from decoder: {ret}"
+          error &"Error receiving frame from decoder: {ret}"
 
         if frame.pts == AV_NOPTS_VALUE:
           continue
-
-        let frameTime = (frame.pts * processor.formatCtx.streams[
-            processor.videoIndex].time_base).float64
-        index = round(frameTime * timeBase.float64).int64
 
         if av_buffersrc_write_frame(bufferSrc, frame) < 0:
           error "Error adding frame to filter"
@@ -148,34 +131,9 @@ iterator motionness*(processor: var VideoProcessor): float32 =
         if ret < 0:
           continue
 
-        if totalPixels == 0:
-          totalPixels = filteredFrame.width * filteredFrame.height
-          prevFrame = cast[ptr UncheckedArray[uint8]](alloc(totalPixels))
-          currentFrame = cast[ptr UncheckedArray[uint8]](alloc(totalPixels))
-
-        copyMem(currentFrame, filteredFrame.data[0], totalPixels)
-
-        var value: float32 = 0.0
-        if not firstTime:
-          # Calculate motion by comparing with previous frame
-          var diffCount: int32 = 0
-          for i in 0 ..< totalPixels:
-            if prevFrame[i] != currentFrame[i]:
-              inc diffCount
-
-          value = float32(diffCount) / float32(totalPixels)
-        else:
-          value = 0.0
-          firstTime = false
-
-        for i in 0 ..< index - prev_index:
-          yield value
-
-        swap(prevFrame, currentFrame)
-        prev_index = index
+        yield filteredFrame
         av_frame_unref(filteredFrame)
 
-  # Flush decoder
   discard avcodec_send_packet(processor.codecCtx, nil)
   while avcodec_receive_frame(processor.codecCtx, frame) >= 0:
     if frame.pts == AV_NOPTS_VALUE:
@@ -185,34 +143,57 @@ iterator motionness*(processor: var VideoProcessor): float32 =
     if ret >= 0:
       ret = av_buffersink_get_frame(bufferSink, filteredFrame)
       if ret >= 0:
-        if totalPixels == 0:
-          totalPixels = filteredFrame.width * filteredFrame.height
-          prevFrame = cast[ptr UncheckedArray[uint8]](alloc(totalPixels))
-          currentFrame = cast[ptr UncheckedArray[uint8]](alloc(totalPixels))
-
-        copyMem(currentFrame, filteredFrame.data[0], totalPixels)
-
-        if not firstTime:
-          var diffCount: int32 = 0
-          for i in 0 ..< totalPixels:
-            if prevFrame[i] != currentFrame[i]:
-              inc diffCount
-
-          yield float32(diffCount) / float32(totalPixels)
-        else:
-          yield 0.0
-          firstTime = false
-
-        swap(prevFrame, currentFrame)
+        yield filteredFrame
         av_frame_unref(filteredFrame)
 
-  if prevFrame != nil:
-    dealloc(prevFrame)
-  if currentFrame != nil:
-    dealloc(currentFrame)
+iterator motionness*(processor: var VideoProcessor, width, blur: int32): float32 =
+  var totalPixels: int = 0
+  var firstTime: bool = true
+  var prev_index = -1
+  var prevFrame: ptr UncheckedArray[uint8] = nil
+  var currentFrame: ptr UncheckedArray[uint8] = nil
+
+  defer:
+    if prevFrame != nil:
+      dealloc(prevFrame)
+    if currentFrame != nil:
+      dealloc(currentFrame)
+
+  let filter = &"scale={width}:-1,format=gray,gblur=sigma={blur}"
+  for filteredFrame in processor.videoPipeline(filter):
+    let frameTime = (filteredFrame.pts * processor.formatCtx.streams[
+        processor.videoIndex].time_base).float64
+    let index = round(frameTime * processor.tb.float64).int64
+
+    if totalPixels == 0:
+      totalPixels = filteredFrame.width * filteredFrame.height
+      prevFrame = cast[ptr UncheckedArray[uint8]](alloc(totalPixels))
+      currentFrame = cast[ptr UncheckedArray[uint8]](alloc(totalPixels))
+
+    copyMem(currentFrame, filteredFrame.data[0], totalPixels)
+
+    var value: float32 = 0.0
+    if not firstTime:
+      # Calculate motion by comparing with previous frame
+      var diffCount: int32 = 0
+      for i in 0 ..< totalPixels:
+        if prevFrame[i] != currentFrame[i]:
+          inc diffCount
+
+      value = float32(diffCount) / float32(totalPixels)
+    else:
+      value = 0.0
+      firstTime = false
+
+    # Yield value for each frame index between previous and current
+    for i in 0 ..< index - prev_index:
+      yield value
+
+    swap(prevFrame, currentFrame)
+    prev_index = index
 
 proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
-    stream: int32, width: int32, blur: int32): seq[float32] =
+  stream, width, blur: int32): seq[float32] =
   let cacheArgs = &"{stream},{width},{blur}"
   let cacheData = readCache(path, tb, "motion", cacheArgs)
   if cacheData.isSome:
@@ -226,10 +207,8 @@ proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
   var processor = VideoProcessor(
     formatCtx: container.formatContext,
     codecCtx: initDecoder(videoStream.codecpar),
-    videoIndex: videoStream.index,
-    width: width,
-    blur: blur,
     tb: tb,
+    videoIndex: videoStream.index,
   )
 
   var inaccurateDur: float = 1024.0
@@ -240,7 +219,7 @@ proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
 
   bar.start(inaccurateDur, "Analyzing motion")
   var i: float = 0
-  for value in processor.motionness():
+  for value in processor.motionness(width, blur):
     result.add value
     bar.tick(i)
     i += 1
