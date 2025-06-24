@@ -1,5 +1,7 @@
 import std/os
+import std/strformat
 
+import ../about
 import ../timeline
 import audio
 
@@ -16,44 +18,21 @@ import audio
 #   a.index < b.index
 
 proc makeMedia*(tl: v3, outputPath: string) =
-  # This focuses on audio-only output for now
-  # The full implementation would handle video and subtitles as well
-
-  let tempDir = getTempDir() / "nim_auto_editor"
+  let tempDir = getTempDir() / &"ae-{version}"
   createDir(tempDir)
+  defer:
+    try:
+      removeDir(tempDir)
+    except OSError:
+      discard
 
   if tl.a.len > 0:
     let audioPaths = makeNewAudio(tl, tempDir)
-
     if audioPaths.len > 0:
-      # For now, just use the first audio layer or mix multiple layers
       if audioPaths.len == 1:
-        # Single audio file - just copy it
         copyFile(audioPaths[0], outputPath)
       else:
-        # Multiple audio files - mix them
-        mixAudioFiles(tl.sr.int, audioPaths, outputPath)
-    else:
-      # No audio generated - create a short silence file
-      let emptyAudio = @[newSeq[int16](tl.sr.int), newSeq[int16](
-          tl.sr.int)] # 1 second of silence
-      ndArrayToFile(emptyAudio, tl.sr.int, outputPath)
-  else:
-    # No audio tracks - create a short silence file
-    let emptyAudio = @[newSeq[int16](tl.sr.int), newSeq[int16](
-        tl.sr.int)] # 1 second of silence
-    ndArrayToFile(emptyAudio, tl.sr.int, outputPath)
-
-  # Clean up temp directory
-  try:
-    removeDir(tempDir)
-  except OSError:
-    discard # Don't error if cleanup fails
-
-# The complete Python implementation from the comments:
-# def make_media(tl: v3, output_path: str) -> None:
-#     # ... [Original Python code] ...
-# This Nim version is simplified but shows the structure needed for a full port
+        mixAudioFiles(tl.sr, audioPaths, outputPath)
 
 
 #[
