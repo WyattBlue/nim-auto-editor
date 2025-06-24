@@ -1,5 +1,4 @@
 import std/strformat
-import std/strutils
 
 import av
 import ffmpeg

@@ -17,35 +17,10 @@ type
     blur*: int32
     tb*: AVRational
 
-iterator motionness*(processor: var VideoProcessor): float32 =
-  var packet = av_packet_alloc()
-  var frame = av_frame_alloc()
-  var filteredFrame = av_frame_alloc()
 
-  if packet == nil or frame == nil or filteredFrame == nil:
-    error "Could not allocate packet/frame"
-
-  defer:
-    av_packet_free(addr packet)
-    av_frame_free(addr frame)
-    av_frame_free(addr filteredFrame)
-    if processor.codecCtx != nil:
-      avcodec_free_context(addr processor.codecCtx)
-
-  let originalWidth = processor.codecCtx.width
-  let originalHeight = processor.codecCtx.height
-  let pixelFormat = processor.codecCtx.pix_fmt
-
-  # Use the target timebase (processor.tb) as the stream timebase for the filter
-  # This is more reliable than codecCtx.time_base which might be 0/1
-  let timeBase = processor.tb
-
-  # Get pixel format name for buffer args
-  let pixFmtName = av_get_pix_fmt_name(pixelFormat)
-  if pixFmtName == nil:
-    error fmt"Could not get pixel format name for format: {ord(pixelFormat)}"
-
-  # Initialize filter graph for grayscale conversion and blur
+proc videoPipeline(timeBase: AVRational, pixFmtName: cstring,
+    codecCtx: ptr AVCodecContext, filterDesc: string): (ptr AVFilterGraph,
+    ptr AVFilterContext, ptr AVFilterContext) =
   var filterGraph: ptr AVFilterGraph = avfilter_graph_alloc()
   var bufferSrc: ptr AVFilterContext = nil
   var bufferSink: ptr AVFilterContext = nil
@@ -53,20 +28,18 @@ iterator motionness*(processor: var VideoProcessor): float32 =
   if filterGraph == nil:
     error "Could not allocate filter graph"
 
-  defer:
-    if filterGraph != nil:
-      avfilter_graph_free(addr filterGraph)
-
-  # Setup video filter chain: scale -> format=gray -> gblur
-  let filterDesc = fmt"scale={processor.width}:-1,format=gray,gblur=sigma={processor.blur}"
+  let width = codecCtx.width
+  let height = codecCtx.height
 
   # Create buffer source with proper arguments
-  let bufferArgs = fmt"video_size={originalWidth}x{originalHeight}:pix_fmt={pixFmtName}:time_base={timeBase.num}/{timeBase.den}:pixel_aspect=1/1"
+  let bufferArgs = cstring(
+    &"video_size={width}x{height}:pix_fmt={pixFmtName}:time_base={timeBase.num}/{timeBase.den}:pixel_aspect=1/1"
+  )
 
   var ret = avfilter_graph_create_filter(addr bufferSrc, avfilter_get_by_name("buffer"),
-                                        "in", bufferArgs.cstring, nil, filterGraph)
+                                        "in", bufferArgs, nil, filterGraph)
   if ret < 0:
-    error fmt"Cannot create buffer source with args: {bufferArgs}, error code: {ret}"
+    error &"Cannot create buffer source with args: {bufferArgs}, error code: {ret}"
 
   # Create buffer sink
   ret = avfilter_graph_create_filter(addr bufferSink, avfilter_get_by_name("buffersink"),
@@ -102,6 +75,41 @@ iterator motionness*(processor: var VideoProcessor): float32 =
 
   avfilter_inout_free(addr inputs)
   avfilter_inout_free(addr outputs)
+
+  return (filterGraph, bufferSrc, bufferSink)
+
+iterator motionness*(processor: var VideoProcessor): float32 =
+  var packet = av_packet_alloc()
+  var frame = av_frame_alloc()
+  var filteredFrame = av_frame_alloc()
+  var ret: cint
+
+  if packet == nil or frame == nil or filteredFrame == nil:
+    error "Could not allocate packet/frame"
+
+  defer:
+    av_packet_free(addr packet)
+    av_frame_free(addr frame)
+    av_frame_free(addr filteredFrame)
+    if processor.codecCtx != nil:
+      avcodec_free_context(addr processor.codecCtx)
+
+  # Use the target timebase (processor.tb) as the stream timebase for the filter
+  # This is more reliable than codecCtx.time_base which might be 0/1
+  let timeBase = processor.tb
+
+  let pixelFormat = processor.codecCtx.pix_fmt
+  let pixFmtName = av_get_pix_fmt_name(pixelFormat)
+  if pixFmtName == nil:
+    error &"Could not get pixel format name for format: {ord(pixelFormat)}"
+
+  # Setup video filter chain: scale -> format=gray -> gblur
+  let (filterGraph, bufferSrc, bufferSink) = videoPipeline(
+    timeBase, pixFmtName, processor.codecCtx, &"scale={processor.width}:-1,format=gray,gblur=sigma={processor.blur}"
+  )
+  defer:
+    if filterGraph != nil:
+      avfilter_graph_free(addr filterGraph)
 
   var totalPixels: int = 0
   var firstTime: bool = true
