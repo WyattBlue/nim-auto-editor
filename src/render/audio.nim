@@ -27,7 +27,7 @@ type
     rate*: int
 
 proc newAudioResampler*(format: AVSampleFormat, layout: string,
-    rate: int): AudioResampler =
+  rate: int): AudioResampler =
   result = new(AudioResampler)
   result.swrCtx = swr_alloc()
   result.outputFormat = format
@@ -241,8 +241,7 @@ proc processAudioClip*(clip: Clip, data: seq[seq[int16]], sr: int): seq[seq[int1
 
 proc ndArrayToFile*(audioData: seq[seq[int16]], rate: int, outputPath: string) =
   var outputCtx: ptr AVFormatContext
-  if avformat_alloc_output_context2(addr outputCtx, nil, "wav",
-      outputPath.cstring) < 0:
+  if avformat_alloc_output_context2(addr outputCtx, nil, "wav", outputPath.cstring) < 0:
     error "Could not create output context"
   defer:
     outputCtx.close()
@@ -360,15 +359,10 @@ proc mixAudioFiles*(sr: int, audioPaths: seq[string], outputPath: string) =
   copyFile(audioPaths[0], outputPath)
 
 proc makeNewAudio*(tl: v3, outputDir: string): seq[string] =
-  # This is a simplified version of the audio processing
-  # In a full implementation, you'd process each audio layer
-
-  result = @[]
   var samples: Table[(string, int32), Getter]
 
-  # If no audio layers, return empty
-  if tl.a.len == 0:
-    return result
+  if tl.a.len == 0 or tl.a[0].len == 0:
+    error "Trying to render empty audio timeline"
 
   for i, layer in tl.a:
     if layer.len == 0:
@@ -381,17 +375,13 @@ proc makeNewAudio*(tl: v3, outputDir: string): seq[string] =
       if key notin samples:
         samples[key] = newGetter(clip.src[], clip.stream.int, tl.sr.int)
 
-    # Create output file for this layer
-    let outputPath = outputDir / fmt"audio_layer_{i}.wav"
-
+    let outputPath = outputDir / &"new{i}.wav"
     var totalDuration = 0
     for clip in layer:
       totalDuration = max(totalDuration, clip.start + clip.dur)
 
     # Create stereo audio data
-    let totalSamples = int(totalDuration * tl.sr.int64 *
-        tl.tb.den div tl.tb.num)
-
+    let totalSamples = int(totalDuration * tl.sr.int64 * tl.tb.den div tl.tb.num)
     var audioData = @[newSeq[int16](totalSamples), newSeq[int16](totalSamples)]
 
     # Initialize with silence
@@ -405,35 +395,22 @@ proc makeNewAudio*(tl: v3, outputDir: string): seq[string] =
       if key in samples:
         let getter = samples[key]
 
-        # Calculate sample positions
         let startSample = int(clip.start * tl.sr.int64 * tl.tb.den div tl.tb.num)
         let durSamples = int(clip.dur * tl.sr.int64 * tl.tb.den div tl.tb.num)
-
-        # Get audio data from source
         let srcStartSample = int(clip.offset * tl.sr.int64 * tl.tb.den div tl.tb.num)
-        let srcEndSample = srcStartSample + durSamples
+        let srcData = getter.get(srcStartSample, srcStartSample + durSamples)
+        let processedData = processAudioClip(clip, srcData, tl.sr.int)
 
-        try:
-          let srcData = getter.get(srcStartSample, srcEndSample)
-
-          # Process the clip (apply volume, etc.)
-          let processedData = processAudioClip(clip, srcData, tl.sr.int)
-
-          # Mix into output
-          if processedData.len > 0:
-            for ch in 0..<min(audioData.len, processedData.len):
-              for i in 0..<min(durSamples, processedData[ch].len):
-                let outputIndex = startSample + i
-                if outputIndex < audioData[ch].len:
-                  # Mix audio by adding with proper overflow protection
-                  let currentSample = audioData[ch][outputIndex].int32
-                  let newSample = processedData[ch][i].int32
-                  let mixed = currentSample + newSample
-                  # Clamp to 16-bit range to prevent overflow distortion
-                  audioData[ch][outputIndex] = int16(max(-32768, min(32767, mixed)))
-        except:
-          # If we can't read the source, that segment remains silent
-          discard
+        if processedData.len > 0:
+          for ch in 0 ..< min(audioData.len, processedData.len):
+            for i in 0 ..< min(durSamples, processedData[ch].len):
+              let outputIndex = startSample + i
+              if outputIndex < audioData[ch].len:
+                let currentSample = audioData[ch][outputIndex].int32
+                let newSample = processedData[ch][i].int32
+                let mixed = currentSample + newSample
+                # Clamp to 16-bit range to prevent overflow distortion
+                audioData[ch][outputIndex] = int16(max(-32768, min(32767, mixed)))
 
     # Write the processed audio to file
     result.add(outputPath)
