@@ -142,6 +142,17 @@ type
     metadata*: pointer
     avg_frame_rate*: AVRational
 
+  AVCodec* {.importc, header: "<libavcodec/codec.h>", bycopy.} = object
+    name*: cstring
+    `type`*: AVMediaType
+    id*: AVCodecID
+    capabilities*: cint
+    max_lowres*: uint8
+    supported_framerates*: ptr AVRational
+    pix_fmts*: ptr UncheckedArray[AVPixelFormat]
+    supported_samplerates*: ptr cint
+    sample_fmts*: ptr UncheckedArray[AVSampleFormat]
+
   AVCodecParameters* {.importc, header: "<libavcodec/avcodec.h>".} = object
     codec_type*: AVMediaType
     codec_id*: AVCodecID
@@ -193,7 +204,7 @@ type
     av_class*: pointer
     log_level_offset*: cint
     codec_type*: AVMediaType
-    codec*: pointer
+    codec*: ptr AVCodec
     codec_id*: AVCodecID
     codec_tag*: cuint
     priv_data*: pointer
@@ -290,9 +301,6 @@ proc av_dict_free*(m: ptr ptr AVDictionary) {.importc,
 proc av_channel_layout_describe*(ch_layout: ptr AVChannelLayout, buf: cstring,
     buf_size: csize_t): cint {.importc, header: "<libavutil/channel_layout.h>".}
 
-type AVCodec* {.importc, header: "<libavcodec/codec.h>", bycopy.} = object
-  capabilities*: cint
-  `type`*: AVMediaType
 
 type
   AVPacket* {.importc, header: "<libavcodec/packet.h>", bycopy.} = object
