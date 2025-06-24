@@ -2,6 +2,7 @@ import std/[os, osproc]
 import std/terminal
 import std/[strutils, strformat]
 import std/sequtils
+import std/tables
 from std/math import round
 
 import av
@@ -85,16 +86,17 @@ proc parseExportString*(exportStr: string): (string, string, string) =
   return (kind, name, version)
 
 
-proc chunkify(arr: seq[bool]): seq[(int64, int64, float64)] =
+# Turn long silent/loud array to formatted chunk list.
+# Example: [1, 1, 1, 2, 2], {1: 1.0, 2: 1.5} => [(0, 3, 1.0), (3, 5, 1.5)]
+proc chunkify(arr: seq[int], smap: Table[int, float64]): seq[(int64, int64, float64)] =
   var start: int64 = 0
   var j: int64 = 1
   while j < arr.len:
     if arr[j] != arr[j - 1]:
-      let speed = (if arr[j-1] == true: 1.0 else: 99999.0)
-      result.add (start, j, speed)
+      result.add (start, j, smap[arr[j - 1]])
       start = j
     inc j
-  result.add (start, arr.len.int64, (if arr[j-1] == true: 1.0 else: 99999.0))
+  result.add (start, arr.len.int64, smap[arr[j - 1]])
 
 
 proc setOutput(userOut, userExport, path: string): (string, string) =
@@ -168,6 +170,7 @@ proc editMedia*(args: mainArgs) =
       if container.video.len > 0:
         tb = makeSaneTimebase(container.video[0].avgRate)
 
+      var hasLoud: seq[bool]
       var chunks: seq[(int64, int64, float64)] = @[]
       let src = initMediaInfo(container.formatContext, args.input)
 
@@ -180,27 +183,26 @@ proc editMedia*(args: mainArgs) =
           else:
           motion(bar, container, args.input, tb, stream, width, blur)
         )
-        var hasLoud = newSeq[bool](levels.len)
         hasLoud = levels.mapIt(it >= threshold)
-
-        let startMargin = parseTime(args.margin[0], tb.float64)
-        let endMargin = parseTime(args.margin[1], tb.float64)
-        mutMargin(hasLoud, startMargin, endMargin)
-        chunks = chunkify(hasLoud)
       elif editMethod == "subtitle":
-        var hasLoud = subtitle(container, tb, pattern, stream)
-        let startMargin = parseTime(args.margin[0], tb.float64)
-        let endMargin = parseTime(args.margin[1], tb.float64)
-        mutMargin(hasLoud, startMargin, endMargin)
-        chunks = chunkify(hasLoud)
+        hasLoud = subtitle(container, tb, pattern, stream)
       elif editMethod == "none":
         let length = mediaLength(container)
         let tbLength = (round((length * tb).float64)).int64
 
         if tbLength > 0:
-          chunks.add((0'i64, tbLength, 1.0))
+          chunks.add((0'i64, tbLength, args.videoSpeed))
       else:
         error &"Unknown edit method: {editMethod}"
+
+      if editMethod != "none":
+        let startMargin = parseTime(args.margin[0], tb.float64)
+        let endMargin = parseTime(args.margin[1], tb.float64)
+        mutMargin(hasLoud, startMargin, endMargin)
+
+        var speedHash = {0: args.silentSpeed, 1: args.videoSpeed}.toTable
+        var speedIndex: seq[int] = hasLoud.map(proc(x: bool): int = int(x))
+        chunks = chunkify(speedIndex, speedHash)
 
       tlV3 = toNonLinear(addr args.input, tb, src, chunks)
 

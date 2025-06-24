@@ -29,6 +29,11 @@ Options:
                                   make auto edits
     -ex, --export EXPORT:ATTRS?   Choose the export mode
     -o, --output FILE             Set the name/path of the new output file
+    -s, --silent-speed NUM        Set speed of sections marked "silent" to
+                                  NUM
+    -v, --sounded-speed, --video-speed NUM
+                                  Set speed of sections marked "loud" to
+                                  NUM
 
   Display Options:
     --progress PROGRESS           Set what type of progress bar to use
@@ -40,6 +45,7 @@ Options:
   Audio Rendering:
     -c:a, -acodec, --audio-codec ENCODER
                                   Set audio codec for output media
+
   Miscellaneous:
     --no-open                     Do not open the output file after editing
                                   is done
@@ -56,6 +62,11 @@ proc parseMargin(val: string): (string, string) =
   if vals.len != 2:
     error "--margin has too many arguments."
   return (vals[0], vals[1])
+
+proc parseSpeed(val: string): float64 =
+  result = parseFloat(val)
+  if result <= 0.0 or result > 99999.0:
+    result = 99999.0
 
 proc main() =
   if paramCount() < 1:
@@ -109,6 +120,10 @@ judge making cuts.
       expecting = "output"
     of "-m":
       expecting = "margin"
+    of "-s", "--silent-speed":
+      expecting = "silent-speed"
+    of "-v", "--video-speed", "--sounded-speed":
+      expecting = "video-speed"
     of "-c:a", "-acodec", "--audio-codec":
       expecting = "audio-codec"
     of "--edit", "--export", "--output", "--progress", "--margin":
@@ -126,6 +141,10 @@ judge making cuts.
         args.`export` = key
       of "output":
         args.output = key
+      of "silent-speed":
+        args.silentSpeed = parseSpeed(key)
+      of "video-speed":
+        args.videoSpeed = parseSpeed(key)
       of "audio-codec":
         args.audioCodec = key
       of "progress":
@@ -138,7 +157,7 @@ judge making cuts.
       expecting = ""
 
   if expecting != "":
-    error(fmt"--{expecting} needs argument.")
+    error(&"--{expecting} needs argument.")
 
   if args.version:
     echo version

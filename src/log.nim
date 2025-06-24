@@ -15,6 +15,8 @@ type mainArgs* = object
   edit*: string = "audio"
   `export`*: string = "default"
   output*: string = ""
+  silentSpeed*: float64 = 99999.0
+  videoSpeed*: float64 = 1.0
 
   # Display Options
   progress*: BarType = modern
