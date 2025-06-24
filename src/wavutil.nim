@@ -14,14 +14,11 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
     error e.msg
   defer: container.close()
 
-  let inputCtx: ptr AVFormatContext = container.formatContext
+  if streamIndex < 0 or streamIndex >= container.audio.len:
+    error "Stream index out of range"
 
-  if container.audio.len == 0:
-    error "No audio streams"
-
-  let inputStream: ptr AVStream = container.audio[0]
+  let inputStream: ptr AVStream = container.audio[streamIndex]
   let audioStreamIdx = inputStream.index
-
   let decoderCtx = initDecoder(inputStream.codecpar)
   defer: avcodec_free_context(addr decoderCtx)
 
@@ -30,6 +27,10 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
       outputPath.cstring)
   if outputCtx == nil:
     error "Could not create output context"
+  defer:
+    if (outputCtx.oformat.flags and AVFMT_NOFILE) == 0:
+      discard avio_closep(addr outputCtx.pb)
+    avformat_free_context(outputCtx)
 
   let (encoder, encoderCtx) = initEncoder("pcm_s16le")
   encoderCtx.sample_rate = decoderCtx.sample_rate
@@ -108,7 +109,7 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
   var currentPts: int64 = 0
 
   # Read and process frames
-  while av_read_frame(inputCtx, packet) >= 0:
+  while av_read_frame(container.formatContext, packet) >= 0:
     defer: av_packet_unref(packet)
 
     if packet.stream_index == audioStreamIdx:
@@ -123,7 +124,7 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
         if ret == AVERROR_EAGAIN or ret == AVERROR_EOF:
           break
         elif ret < 0:
-          error fmt"Error during decoding: {ret}"
+          error &"Error during decoding: {ret}"
 
         # Calculate output frame size
         let delay = swr_get_delay(swrCtx, decoderCtx.sample_rate.int64)
@@ -142,7 +143,7 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
 
         ret = av_frame_get_buffer(convertedFrame, 0)
         if ret < 0:
-          error fmt"Error allocating converted frame buffer: {ret}"
+          error &"Error allocating converted frame buffer: {ret}"
 
         let convertedSamples = swr_convert(swrCtx,
                                           cast[ptr ptr uint8](
@@ -162,7 +163,7 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
           # Encode converted frame
           ret = avcodec_send_frame(encoderCtx, convertedFrame)
           if ret < 0 and ret != AVERROR_EAGAIN:
-            error fmt"Error sending frame to encoder: {ret}"
+            error &"Error sending frame to encoder: {ret}"
 
           while true:
             var outPacket = av_packet_alloc()
@@ -171,9 +172,7 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
               av_packet_free(addr outPacket)
               break
             elif ret < 0:
-              echo fmt"Error during encoding: {ret}"
-              av_packet_free(addr outPacket)
-              break
+              error &"Error during encoding: {ret}"
 
             outPacket.stream_index = outputStream.index
             outPacket.duration = convertedSamples # Set packet duration
@@ -183,7 +182,7 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
             ret = av_interleaved_write_frame(outputCtx, outPacket)
             av_packet_free(addr outPacket)
             if ret < 0:
-              echo fmt"Warning: Error muxing packet: {ret}"
+              echo &"Warning: Error muxing packet: {ret}"
 
         av_frame_unref(convertedFrame)
         av_frame_unref(frame)
@@ -215,9 +214,7 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
 
       ret = av_frame_get_buffer(convertedFrame, 0)
       if ret < 0:
-        echo fmt"Error allocating converted frame buffer in flush: {ret}"
-        av_frame_unref(frame)
-        continue
+        error &"Error allocating converted frame buffer in flush: {ret}"
 
       let convertedSamples = swr_convert(swrCtx,
                                         cast[ptr ptr uint8](
@@ -277,8 +274,7 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
 
     ret = av_frame_get_buffer(convertedFrame, 0)
     if ret < 0:
-      echo fmt"Error allocating converted frame buffer in resampler flush: {ret}"
-      break
+      error &"Error allocating converted frame buffer in resampler flush: {ret}"
 
     let convertedSamples = swr_convert(swrCtx,
                                       cast[ptr ptr uint8](
@@ -338,8 +334,3 @@ proc toS16Wav*(inputPath: string, outputPath: string, streamIndex: int64) =
       av_packet_free(addr outPacket)
 
   discard av_write_trailer(outputCtx)
-
-  if outputCtx != nil:
-    if (outputCtx.oformat.flags and AVFMT_NOFILE) == 0:
-      discard avio_closep(addr outputCtx.pb)
-    avformat_free_context(outputCtx)
