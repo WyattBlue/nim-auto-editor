@@ -270,7 +270,8 @@ const
 proc av_log_set_level*(level: cint) {.importc, header: "<libavutil/log.h>".}
 
 proc av_samples_set_silence*(audio_data: ptr ptr uint8, offset: cint, nb_samples: cint,
-                            nb_channels: cint, sample_fmt: AVSampleFormat): cint {.importc,
+                            nb_channels: cint,
+                                sample_fmt: AVSampleFormat): cint {.importc,
     header: "<libavutil/samplefmt.h>".}
 # Procedure declarations remain the same
 proc avformat_open_input*(ps: ptr ptr AVFormatContext, filename: cstring,
@@ -453,7 +454,8 @@ proc avcodec_open2*(avctx: ptr AVCodecContext, codec: ptr AVCodec,
     header: "<libavcodec/avcodec.h>".}
 proc avcodec_close*(avctx: ptr AVCodecContext): cint {.importc,
     header: "<libavcodec/avcodec.h>".}
-proc avcodec_flush_buffers*(avctx: ptr AVCodecContext) {.importc, header: "<libavcodec/avcodec.h>".}
+proc avcodec_flush_buffers*(avctx: ptr AVCodecContext) {.importc,
+    header: "<libavcodec/avcodec.h>".}
 
 # Error
 proc AVERROR*(e: cint): cint {.inline.} = (-e)
@@ -578,8 +580,10 @@ proc avformat_new_stream*(s: ptr AVFormatContext,
     c: pointer): ptr AVStream {.importc, header: "<libavformat/avformat.h>".}
 proc avcodec_find_encoder*(id: AVCodecID): ptr AVCodec {.importc,
     header: "<libavcodec/avcodec.h>".}
-proc avcodec_find_encoder_by_name*(name: cstring): ptr AVCodec {.importc, header: "<libavcodec/avcodec.h>".}
-proc avcodec_descriptor_get_by_name*(name: cstring): ptr AVCodecDescriptor {.importc, header: "<libavcodec/avcodec.h>".}
+proc avcodec_find_encoder_by_name*(name: cstring): ptr AVCodec {.importc,
+    header: "<libavcodec/avcodec.h>".}
+proc avcodec_descriptor_get_by_name*(name: cstring): ptr AVCodecDescriptor {.importc,
+    header: "<libavcodec/avcodec.h>".}
 proc avcodec_parameters_from_context*(par: ptr AVCodecParameters,
     codec: ptr AVCodecContext): cint {.importc,
         header: "<libavcodec/avcodec.h>".}
@@ -709,5 +713,9 @@ const
   AVSEEK_FLAG_ANY* = 4
   AVSEEK_FLAG_FRAME* = 8
 
-proc av_seek_frame*(s: ptr AVFormatContext, stream_index: cint, timestamp: int64, flags: cint): cint {.importc, header: "<libavformat/avformat.h>".}
-proc avformat_seek_file*(s: ptr AVFormatContext, stream_index: cint, min_ts: int64, ts: int64, max_ts: int64, flags: cint): cint {.importc, header: "<libavformat/avformat.h>".}
+proc av_seek_frame*(s: ptr AVFormatContext, stream_index: cint,
+    timestamp: int64, flags: cint): cint {.importc,
+    header: "<libavformat/avformat.h>".}
+proc avformat_seek_file*(s: ptr AVFormatContext, stream_index: cint,
+    min_ts: int64, ts: int64, max_ts: int64, flags: cint): cint {.importc,
+    header: "<libavformat/avformat.h>".}

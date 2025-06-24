@@ -74,7 +74,8 @@ proc fourccToString*(fourcc: uint32): string =
   buf[4] = '\0'
   return $cast[cstring](addr buf[0])
 
-proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo =
+proc initMediaInfo*(formatContext: ptr AVFormatContext,
+    path: string): MediaInfo =
   result.path = path
   result.v = @[]
   result.a = @[]
@@ -158,7 +159,8 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext, path: string): MediaInfo
     elif codecParameters.codec_type == AVMEDIA_TYPE_DATA:
       let timecodeEntry = av_dict_get(metadata, "timecode", nil, 0)
       let timecodeStr = (if timecodeEntry == nil: "" else: $timecodeEntry.value)
-      let codec = $avcodec_get_name(codecCtx.codec_id) & " (" & fourccToString(codecCtx.codec_tag) & ")"
+      let codec = $avcodec_get_name(codecCtx.codec_id) & " (" & fourccToString(
+          codecCtx.codec_tag) & ")"
       result.d.add(DataStream(codec: codec, timecode: timecodeStr))
 
   result.timecode = getTimecode(result.v, result.d)

@@ -7,7 +7,8 @@ import ffmpeg
 import timeline
 import log
 
-proc timeFrame(title: string, ticks: float, tb: float, per: string = ""): string =
+proc timeFrame(title: string, ticks: float, tb: float,
+    per: string = ""): string =
   let tc = toTimecode(ticks / tb, Code.ass)
   let tp = (if tc.startsWith("-"): 9 else: 10)
   let tcp = (if tc.startsWith("-"): 12 else: 11)
@@ -42,4 +43,5 @@ proc preview*(tl: v3) =
 
   let outputPercent = fmt"{round((outputLength / inputLength) * 100, 2)}%"
   echo timeFrame("output", outputLength.float64, tb, outputPercent)
-  echo timeFrame("diff", diff.float64, tb, fmt"{round((diff / inputLength) * 100, 2)}%")
+  echo timeFrame("diff", diff.float64, tb,
+      fmt"{round((diff / inputLength) * 100, 2)}%")

@@ -64,7 +64,8 @@ proc parseSMPTE(val: string, fps: AVRational): int =
     let seconds = parseInt(parts[2])
     let frames = parseInt(parts[3])
 
-    if hours < 0 or minutes < 0 or minutes >= 60 or seconds < 0 or seconds >= 60 or frames < 0:
+    if hours < 0 or minutes < 0 or minutes >= 60 or seconds < 0 or seconds >=
+        60 or frames < 0:
       raise newException(ValueError, &"Invalid SMPTE values: {val}")
 
     if frames >= fps:

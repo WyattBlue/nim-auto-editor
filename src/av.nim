@@ -121,6 +121,13 @@ proc mediaLength*(container: InputContainer): AVRational =
 proc close*(container: InputContainer) =
   avformat_close_input(addr container.formatContext)
 
+proc close*(outputCtx: ptr AVFormatContext) =
+  discard av_write_trailer(outputCtx)
+
+  if (outputCtx.oformat.flags and AVFMT_NOFILE) == 0:
+    discard avio_closep(addr outputCtx.pb)
+  avformat_free_context(outputCtx)
+
 func avgRate*(stream: ptr AVStream): AVRational =
   return stream.avg_frame_rate
 

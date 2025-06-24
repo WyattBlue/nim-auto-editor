@@ -22,13 +22,13 @@ proc parseBitrate*(input: string): int =
   let (val, unit) = split_num_str(input)
 
   if unit.toLowerAscii() == "k":
-      return int(val * 1000)
+    return int(val * 1000)
   if unit == "M":
-      return int(val * 1_000_000)
+    return int(val * 1_000_000)
   if unit == "G":
-      return int(val * 1_000_000_000)
+    return int(val * 1_000_000_000)
   if unit == "":
-      return int(val)
+    return int(val)
 
   error &"Unknown bitrate: {input}"
 

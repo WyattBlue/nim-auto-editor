@@ -43,7 +43,8 @@ proc readCache*(path: string, tb: AVRational, kind, args: string): Option[seq[fl
 
 type CacheEntry = tuple[path: string, mtime: Time]
 
-proc writeCache*(data: seq[float32], path: string, tb: AVRational, kind, args: string) =
+proc writeCache*(data: seq[float32], path: string, tb: AVRational, kind,
+    args: string) =
   let workdir = getTempDir() / fmt"ae-{version}"
   try:
     createDir(workdir)

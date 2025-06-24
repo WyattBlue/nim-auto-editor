@@ -129,7 +129,8 @@ iterator motionness*(processor: var VideoProcessor): float32 =
         if frame.pts == AV_NOPTS_VALUE:
           continue
 
-        let frameTime = (frame.pts * processor.formatCtx.streams[processor.videoIndex].time_base).float64
+        let frameTime = (frame.pts * processor.formatCtx.streams[
+            processor.videoIndex].time_base).float64
         index = round(frameTime * timeBase.float64).int64
 
         if av_buffersrc_write_frame(bufferSrc, frame) < 0:

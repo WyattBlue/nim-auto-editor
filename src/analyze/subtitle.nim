@@ -3,7 +3,8 @@ from std/math import round
 import ../[av, ffmpeg]
 import tinyre
 
-proc subtitle*(container: InputContainer, tb: AVRational, pattern: Re, stream: int32): seq[bool] =
+proc subtitle*(container: InputContainer, tb: AVRational, pattern: Re,
+    stream: int32): seq[bool] =
   let
     formatCtx = container.formatContext
     s = container.subtitle[stream].index

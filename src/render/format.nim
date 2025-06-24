@@ -18,7 +18,7 @@ import audio
 proc makeMedia*(tl: v3, outputPath: string) =
   # This focuses on audio-only output for now
   # The full implementation would handle video and subtitles as well
-  
+
   let tempDir = getTempDir() / "nim_auto_editor"
   createDir(tempDir)
 
@@ -35,18 +35,20 @@ proc makeMedia*(tl: v3, outputPath: string) =
         mixAudioFiles(tl.sr.int, audioPaths, outputPath)
     else:
       # No audio generated - create a short silence file
-      let emptyAudio = @[newSeq[int16](tl.sr.int), newSeq[int16](tl.sr.int)]  # 1 second of silence
+      let emptyAudio = @[newSeq[int16](tl.sr.int), newSeq[int16](
+          tl.sr.int)] # 1 second of silence
       ndArrayToFile(emptyAudio, tl.sr.int, outputPath)
   else:
     # No audio tracks - create a short silence file
-    let emptyAudio = @[newSeq[int16](tl.sr.int), newSeq[int16](tl.sr.int)]  # 1 second of silence
+    let emptyAudio = @[newSeq[int16](tl.sr.int), newSeq[int16](
+        tl.sr.int)] # 1 second of silence
     ndArrayToFile(emptyAudio, tl.sr.int, outputPath)
 
   # Clean up temp directory
   try:
     removeDir(tempDir)
   except OSError:
-    discard  # Don't error if cleanup fails
+    discard # Don't error if cleanup fails
 
 # The complete Python implementation from the comments:
 # def make_media(tl: v3, output_path: str) -> None:

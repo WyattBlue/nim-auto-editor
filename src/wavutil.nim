@@ -9,23 +9,27 @@ type AudioBuffer = object
   fifo: ptr AVAudioFifo
   frameSize: cint
 
-proc initAudioBuffer(sampleFmt: AVSampleFormat, channels: cint, frameSize: cint): AudioBuffer =
+proc initAudioBuffer(sampleFmt: AVSampleFormat, channels: cint,
+    frameSize: cint): AudioBuffer =
   result.fifo = av_audio_fifo_alloc(sampleFmt, channels, frameSize * 2) # Buffer extra space
   result.frameSize = frameSize
   if result.fifo == nil:
     error "Could not allocate audio FIFO"
 
 proc addSamplesToBuffer(buffer: var AudioBuffer, frame: ptr AVFrame): cint =
-  return av_audio_fifo_write(buffer.fifo, cast[ptr pointer](addr frame.data[0]), frame.nb_samples)
+  return av_audio_fifo_write(buffer.fifo, cast[ptr pointer](addr frame.data[0]),
+      frame.nb_samples)
 
 proc getBufferedSamplesCount(buffer: AudioBuffer): cint =
   return av_audio_fifo_size(buffer.fifo)
 
-proc readSamplesFromBuffer(buffer: var AudioBuffer, outputFrame: ptr AVFrame): bool =
+proc readSamplesFromBuffer(buffer: var AudioBuffer,
+    outputFrame: ptr AVFrame): bool =
   if av_audio_fifo_size(buffer.fifo) < buffer.frameSize:
     return false
 
-  let samplesRead = av_audio_fifo_read(buffer.fifo, cast[ptr pointer](addr outputFrame.data[0]), buffer.frameSize)
+  let samplesRead = av_audio_fifo_read(buffer.fifo, cast[ptr pointer](
+      addr outputFrame.data[0]), buffer.frameSize)
   if samplesRead != buffer.frameSize:
     return false
 
@@ -40,7 +44,8 @@ proc processAndEncodeFrame(
   inputData: ptr ptr uint8 = nil): bool =
 
   var ret: cint
-  let decoderSampleRate = if inputData != nil: encoderCtx.sample_rate else: inputFrame.sample_rate
+  let decoderSampleRate = if inputData !=
+      nil: encoderCtx.sample_rate else: inputFrame.sample_rate
 
   # Handle input data - either from frame or raw data
   if inputFrame != nil:
@@ -67,9 +72,11 @@ proc processAndEncodeFrame(
       error &"Error allocating converted frame buffer: {ret}"
 
     let convertedSamples = swr_convert(swrCtx,
-                                      cast[ptr ptr uint8](addr convertedFrame.data[0]),
+                                      cast[ptr ptr uint8](
+                                          addr convertedFrame.data[0]),
                                       maxDstNbSamples,
-                                      cast[ptr ptr uint8](addr inputFrame.data[0]),
+                                      cast[ptr ptr uint8](addr inputFrame.data[
+                                          0]),
                                       inputFrame.nb_samples)
     if convertedSamples <= 0:
       return false
@@ -100,7 +107,8 @@ proc processAndEncodeFrame(
       return false
 
     let convertedSamples = swr_convert(swrCtx,
-                                      cast[ptr ptr uint8](addr convertedFrame.data[0]),
+                                      cast[ptr ptr uint8](
+                                          addr convertedFrame.data[0]),
                                       maxDstNbSamples,
                                       inputData,
                                       inputSamples)
@@ -151,7 +159,8 @@ proc processAndEncodeFrame(
         break
 
       outPacket.stream_index = outputStream.index
-      av_packet_rescale_ts(outPacket, encoderCtx.time_base, outputStream.time_base)
+      av_packet_rescale_ts(outPacket, encoderCtx.time_base,
+          outputStream.time_base)
 
       ret = av_interleaved_write_frame(outputCtx, outPacket)
       av_packet_free(addr outPacket)
@@ -180,13 +189,13 @@ proc muxAudio*(inputPath, outputPath: string, streamIndex: int64) =
   defer: avcodec_free_context(addr decoderCtx)
 
   let outputCtx: ptr AVFormatContext = nil
-  ret = avformat_alloc_output_context2(addr outputCtx, nil, nil, outputPath.cstring)
+  ret = avformat_alloc_output_context2(addr outputCtx, nil, nil,
+      outputPath.cstring)
   if outputCtx == nil:
     error "Could not create output context"
+
   defer:
-    if (outputCtx.oformat.flags and AVFMT_NOFILE) == 0:
-      discard avio_closep(addr outputCtx.pb)
-    avformat_free_context(outputCtx)
+    outputCtx.close()
 
   let useMp3 = outputPath.endsWith("mp3")
   let useAac = outputPath.endsWith("aac") or outputPath.endsWith("m4a")
@@ -198,11 +207,9 @@ proc muxAudio*(inputPath, outputPath: string, streamIndex: int64) =
   let (encoder, encoderCtx) = initEncoder(codecName)
   encoderCtx.sample_rate = decoderCtx.sample_rate
   encoderCtx.ch_layout = decoderCtx.ch_layout
-
+  encoderCtx.time_base = AVRational(num: 1, den: encoderCtx.sample_rate)
   if useMp3 or useAac:
     encoderCtx.bit_rate = 128000
-
-  encoderCtx.time_base = AVRational(num: 1, den: encoderCtx.sample_rate)
 
   if (outputCtx.oformat.flags and AVFMT_GLOBALHEADER) != 0:
     encoderCtx.flags = encoderCtx.flags or AV_CODEC_FLAG_GLOBAL_HEADER
@@ -211,7 +218,8 @@ proc muxAudio*(inputPath, outputPath: string, streamIndex: int64) =
     error "Could not open encoder"
   defer: avcodec_free_context(addr encoderCtx)
 
-  let requiredFrameSize = if encoderCtx.frame_size > 0: encoderCtx.frame_size else: 1024
+  let requiredFrameSize = if encoderCtx.frame_size >
+      0: encoderCtx.frame_size else: 1024
 
   var audioBuffer = initAudioBuffer(
     encoderCtx.sample_fmt, encoderCtx.ch_layout.nb_channels, requiredFrameSize
@@ -292,7 +300,8 @@ proc muxAudio*(inputPath, outputPath: string, streamIndex: int64) =
         elif ret < 0:
           error &"Error during decoding: {ret}"
 
-        discard processAndEncodeFrame(swrCtx, encoderCtx, outputCtx, outputStream,
+        discard processAndEncodeFrame(swrCtx, encoderCtx, outputCtx,
+          outputStream,
           audioBuffer, currentPts, frame)
         av_frame_unref(frame)
 
@@ -337,7 +346,8 @@ proc muxAudio*(inputPath, outputPath: string, streamIndex: int64) =
                                         encoderCtx.ch_layout.nb_channels,
                                         encoderCtx.sample_fmt)
 
-          discard processAndEncodeFrame(swrCtx, encoderCtx, outputCtx, outputStream,
+          discard processAndEncodeFrame(swrCtx, encoderCtx, outputCtx,
+            outputStream,
             audioBuffer, currentPts, silenceFrame)
 
         av_frame_free(addr silenceFrame)
@@ -356,8 +366,7 @@ proc muxAudio*(inputPath, outputPath: string, streamIndex: int64) =
         break
 
       outPacket.stream_index = outputStream.index
-      av_packet_rescale_ts(outPacket, encoderCtx.time_base, outputStream.time_base)
+      av_packet_rescale_ts(outPacket, encoderCtx.time_base,
+          outputStream.time_base)
       discard av_interleaved_write_frame(outputCtx, outPacket)
       av_packet_free(addr outPacket)
-
-  discard av_write_trailer(outputCtx)

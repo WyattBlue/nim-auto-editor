@@ -103,7 +103,7 @@ proc setOutput(userOut, userExport, path: string): (string, string) =
   var dir, name, ext: string
   if userOut == "" or userOut == "-":
     if path == "":
-      error "`--output` must be set."  # When a timeline file is the input.
+      error "`--output` must be set." # When a timeline file is the input.
     (dir, name, ext) = splitFile(path)
   else:
     (dir, name, ext) = splitFile(userOut)
@@ -134,10 +134,10 @@ proc setOutput(userOut, userExport, path: string): (string, string) =
     else: discard
 
   if userOut == "-":
-      return ("-", outExport)
+    return ("-", outExport)
 
   if userOut == "":
-      return (&"{root}_ALTERED{ext}", outExport)
+    return (&"{root}_ALTERED{ext}", outExport)
 
   return (&"{root}{ext}", outExport)
 
@@ -174,7 +174,8 @@ proc editMedia*(args: mainArgs) =
       var chunks: seq[(int64, int64, float64)] = @[]
       let src = initMediaInfo(container.formatContext, args.input)
 
-      let (editMethod, threshold, stream, width, blur, pattern) = parseEditString(args.edit)
+      let (editMethod, threshold, stream, width, blur,
+        pattern) = parseEditString(args.edit)
 
       if editMethod in ["audio", "motion"]:
         let bar = initBar(args.progress)
@@ -250,6 +251,6 @@ proc editMedia*(args: mainArgs) =
   makeMedia(tlV3, output)
 
   if not args.noOpen and exportKind == "default":
-    let process = startProcess("open", args=[output], options={poUsePath})
+    let process = startProcess("open", args = [output], options = {poUsePath})
     discard process.waitForExit()
     process.close()
