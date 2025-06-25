@@ -223,56 +223,229 @@ proc get*(getter: Getter, start: int, endSample: int): seq[seq[int16]] =
       for i in 0..<result[0].len:
         result[1][i] = result[0][i]
 
-proc processAudioClip*(clip: Clip, data: seq[seq[int16]], sr: int): seq[seq[int16]] =
-  result = data
+proc createAudioFilterGraph(clip: Clip, sr: int, channels: int): (ptr AVFilterGraph, ptr AVFilterContext, ptr AVFilterContext) =
+  var filterGraph: ptr AVFilterGraph = avfilter_graph_alloc()
+  var bufferSrc: ptr AVFilterContext = nil
+  var bufferSink: ptr AVFilterContext = nil
 
-  # Apply volume change first
+  if filterGraph == nil:
+    error "Could not allocate audio filter graph"
+
+  # Create buffer source
+  let channelLayoutStr = if channels == 1: "mono" else: "stereo"
+  let bufferArgs = fmt"sample_rate={sr}:sample_fmt=s16p:channel_layout={channelLayoutStr}:time_base=1/{sr}"
+
+  var ret = avfilter_graph_create_filter(addr bufferSrc, avfilter_get_by_name("abuffer"),
+                                        "in", bufferArgs.cstring, nil, filterGraph)
+  if ret < 0:
+    error fmt"Cannot create audio buffer source: {ret}"
+
+  # Create buffer sink
+  ret = avfilter_graph_create_filter(addr bufferSink, avfilter_get_by_name("abuffersink"),
+                                    "out", nil, nil, filterGraph)
+  if ret < 0:
+    error fmt"Cannot create audio buffer sink: {ret}"
+
+  # The buffer sink will output in the same format as input by default
+
+  # Create and link filters manually
+  var currentFilter = bufferSrc
+  var needsFilters = false
+
+  if clip.speed != 1.0:
+    needsFilters = true
+    # Clamp speed to atempo filter's valid range [0.5 100.0]
+    let clampedSpeed = max(0.5, min(100.0, clip.speed))
+    var atempoFilter: ptr AVFilterContext = nil
+    ret = avfilter_graph_create_filter(addr atempoFilter, avfilter_get_by_name("atempo"),
+                                      "atempo", nil, nil, filterGraph)
+    if ret < 0:
+      error fmt"Cannot create atempo filter: {ret}"
+    
+    ret = av_opt_set(atempoFilter, "tempo", fmt"{clampedSpeed}", AV_OPT_SEARCH_CHILDREN)
+    if ret < 0:
+      error fmt"Cannot set atempo tempo parameter: {ret}"
+    
+    ret = avfilter_link(currentFilter, 0, atempoFilter, 0)
+    if ret < 0:
+      error fmt"Cannot link atempo filter: {ret}"
+    
+    currentFilter = atempoFilter
+
+  # Handle volume changes
   if clip.volume != 1.0:
-    for ch in 0..<result.len:
-      for i in 0..<result[ch].len:
-        let sample = result[ch][i].float * clip.volume
-        # Clamp to prevent overflow/underflow
-        result[ch][i] = int16(max(-32768.0, min(32767.0, sample)))
+    needsFilters = true
+    var volumeFilter: ptr AVFilterContext = nil
+    ret = avfilter_graph_create_filter(addr volumeFilter, avfilter_get_by_name("volume"),
+                                      "volume", nil, nil, filterGraph)
+    if ret < 0:
+      error fmt"Cannot create volume filter: {ret}"
 
-  # Apply speed change if needed
-  if clip.speed != 1.0 and clip.speed > 0.0:
-    let speedFactor = clip.speed
-    let outputLength = int(result[0].len.float / speedFactor)
+    # Set the volume parameter
+    ret = av_opt_set(volumeFilter, "volume", fmt"{clip.volume}", AV_OPT_SEARCH_CHILDREN)
+    if ret < 0:
+      error fmt"Cannot set volume parameter: {ret}"
 
-    if outputLength <= 0:
-      # If speed is so high that we get no samples, return empty
-      for ch in 0..<result.len:
-        result[ch] = @[]
-      return result
+    ret = avfilter_link(currentFilter, 0, volumeFilter, 0)
+    if ret < 0:
+      error fmt"Cannot link volume filter: {ret}"
 
-    # Create new arrays for speed-adjusted audio
-    var speedAdjusted: seq[seq[int16]] = @[]
-    for ch in 0..<result.len:
-      speedAdjusted.add(newSeq[int16](outputLength))
+    currentFilter = volumeFilter
 
-    # Simple linear interpolation for speed change
-    # For higher quality, we'd use proper resampling algorithms
-    for ch in 0..<result.len:
-      if result[ch].len > 0:
-        for i in 0..<outputLength:
-          let sourcePos = i.float * speedFactor
-          let sourceIndex = int(sourcePos)
-          let fraction = sourcePos - sourceIndex.float
+  # Connect final filter to sink
+  ret = avfilter_link(currentFilter, 0, bufferSink, 0)
+  if ret < 0:
+    error fmt"Cannot link to buffer sink: {ret}"
 
-          if sourceIndex >= result[ch].len - 1:
-            # Near end of source, just copy last sample
-            speedAdjusted[ch][i] = result[ch][result[ch].len - 1]
-          elif sourceIndex < 0:
-            # Before start of source, use first sample
-            speedAdjusted[ch][i] = result[ch][0]
-          else:
-            # Linear interpolation between adjacent samples
-            let sample1 = result[ch][sourceIndex].float
-            let sample2 = result[ch][sourceIndex + 1].float
-            let interpolated = sample1 + (sample2 - sample1) * fraction
-            speedAdjusted[ch][i] = int16(max(-32768.0, min(32767.0, interpolated)))
+  # Configure the filter graph
+  ret = avfilter_graph_config(filterGraph, nil)
+  if ret < 0:
+    error fmt"Could not configure audio filter graph: {ret}"
 
-    result = speedAdjusted
+  return (filterGraph, bufferSrc, bufferSink)
+
+proc processAudioClip*(clip: Clip, data: seq[seq[int16]], sr: int): seq[seq[int16]] =
+  # If both speed and volume are unchanged, return original data
+  if clip.speed == 1.0 and clip.volume == 1.0:
+    return data
+
+  if data.len == 0 or data[0].len == 0:
+    return data
+
+  let actualChannels = data.len
+  let channels = if actualChannels == 1: 1 else: 2 # Determine if we have mono or stereo
+  let samples = data[0].len
+
+  # Create filter graph
+  let (filterGraph, bufferSrc, bufferSink) = createAudioFilterGraph(clip, sr, channels)
+  defer:
+    if filterGraph != nil:
+      avfilter_graph_free(addr filterGraph)
+
+  # Create audio frame with input data
+  var inputFrame = av_frame_alloc()
+  if inputFrame == nil:
+    error "Could not allocate input audio frame"
+  defer: av_frame_free(addr inputFrame)
+
+  inputFrame.nb_samples = samples.cint
+  inputFrame.format = AV_SAMPLE_FMT_S16P.cint
+  inputFrame.ch_layout.nb_channels = channels.cint
+  inputFrame.ch_layout.order = 0
+  if channels == 1:
+    inputFrame.ch_layout.u.mask = 1 # AV_CH_LAYOUT_MONO
+  else:
+    inputFrame.ch_layout.u.mask = 3 # AV_CH_LAYOUT_STEREO
+  inputFrame.sample_rate = sr.cint
+  inputFrame.pts = AV_NOPTS_VALUE  # Let the filter handle timing
+
+  if av_frame_get_buffer(inputFrame, 0) < 0:
+    error "Could not allocate input audio frame buffer"
+
+  # Copy input data to frame (planar format)
+  for ch in 0..<channels:
+    let channelData = cast[ptr UncheckedArray[int16]](inputFrame.data[ch])
+    for i in 0..<samples:
+      if ch == 0:
+        # Always copy first channel
+        if i < data[0].len:
+          channelData[i] = data[0][i]
+        else:
+          channelData[i] = 0
+      elif ch == 1:
+        # For second channel: use second channel if available, otherwise duplicate first
+        if actualChannels >= 2 and i < data[1].len:
+          channelData[i] = data[1][i]
+        elif i < data[0].len:
+          channelData[i] = data[0][i]  # Duplicate mono to stereo
+        else:
+          channelData[i] = 0
+      else:
+        # Should not happen with our logic, but just in case
+        channelData[i] = 0
+
+  # Process through filter graph
+  var outputFrames: seq[ptr AVFrame] = @[]
+  defer:
+    for frame in outputFrames:
+      av_frame_free(addr frame)
+
+  # Send frame to filter
+  if av_buffersrc_write_frame(bufferSrc, inputFrame) < 0:
+    error "Error adding frame to audio filter"
+
+  # Flush filter by sending null frame
+  if av_buffersrc_write_frame(bufferSrc, nil) < 0:
+    error "Error flushing audio filter"
+
+  # Collect output frames
+  while true:
+    var outputFrame = av_frame_alloc()
+    if outputFrame == nil:
+      error "Could not allocate output audio frame"
+
+    let ret = av_buffersink_get_frame(bufferSink, outputFrame)
+    if ret < 0:
+      av_frame_free(addr outputFrame)
+      break
+
+    outputFrames.add(outputFrame)
+
+  # Convert output frames back to seq[seq[int16]]
+  if outputFrames.len == 0:
+    # No output frames, return empty data
+    result = @[newSeq[int16](0), newSeq[int16](0)]
+    return
+
+  # Calculate total output samples
+  var totalSamples = 0
+  for frame in outputFrames:
+    totalSamples += frame.nb_samples.int
+
+
+
+  # Initialize result with proper size
+  result = @[newSeq[int16](totalSamples), newSeq[int16](totalSamples)]
+
+  # Copy data from output frames
+  var sampleOffset = 0
+  for frame in outputFrames:
+    let frameSamples = frame.nb_samples.int
+    let frameChannels = min(frame.ch_layout.nb_channels.int, 2)
+
+    # Handle different output formats from the filter
+    if frame.format == AV_SAMPLE_FMT_S16P.cint:
+      # Planar format - each channel has its own data array
+      for ch in 0..<min(result.len, frameChannels):
+        if frame.data[ch] != nil:
+          let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
+          for i in 0..<frameSamples:
+            if sampleOffset + i < result[ch].len:
+              result[ch][sampleOffset + i] = channelData[i]
+    elif frame.format == AV_SAMPLE_FMT_S16.cint:
+      # Interleaved format - all channels in one data array
+      let audioData = cast[ptr UncheckedArray[int16]](frame.data[0])
+      for i in 0..<frameSamples:
+        for ch in 0..<min(result.len, frameChannels):
+          if sampleOffset + i < result[ch].len:
+            result[ch][sampleOffset + i] = audioData[i * frameChannels + ch]
+    else:
+      # Unsupported format - skip this frame or convert
+      error fmt"Unsupported output frame format: {frame.format}"
+
+    sampleOffset += frameSamples
+
+  # If we have mono input, duplicate to second channel
+  if result.len >= 2 and result[0].len > 0 and result[1].len > 0:
+    var isSecondChannelEmpty = true
+    for i in 0..<min(100, result[1].len):
+      if result[1][i] != 0:
+        isSecondChannelEmpty = false
+        break
+
+    if isSecondChannelEmpty:
+      for i in 0..<result[0].len:
+        result[1][i] = result[0][i]
 
 proc ndArrayToFile*(audioData: seq[seq[int16]], rate: int, outputPath: string) =
   var outputCtx: ptr AVFormatContext

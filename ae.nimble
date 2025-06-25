@@ -61,7 +61,7 @@ var commonFlags = &"""
   --disable-outdevs \
   --disable-xlib \
   --disable-filters \
-  --enable-filter=scale,format,gblur \
+  --enable-filter=scale,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume \
   --enable-libmp3lame \
   --disable-encoder={encodersDisabled} \
   --disable-decoder={decodersDisabled} \

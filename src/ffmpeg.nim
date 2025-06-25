@@ -513,6 +513,8 @@ proc av_opt_set_sample_fmt*(obj: pointer, name: cstring, fmt: AVSampleFormat,
 proc av_opt_set_chlayout*(obj: pointer, name: cstring,
     layout: ptr AVChannelLayout, search_flags: cint): cint {.importc,
         header: "<libavutil/opt.h>".}
+proc av_opt_set*(obj: pointer, name: cstring, val: cstring,
+    search_flags: cint): cint {.importc, header: "<libavutil/opt.h>".}
 
 # Subtitles
 type
@@ -568,6 +570,7 @@ const
   AV_CODEC_ID_PCM_S16LE* = AVCodecID(65536)
   AVFMT_NOFILE* = 0x0001
   AVIO_FLAG_WRITE* = 2
+  AV_OPT_SEARCH_CHILDREN* = 0x0001
 
 type AVCodecDescriptor* {.importc, header: "<libavcodec/avcodec.h>".} = object
   id*: AVCodecID
@@ -679,8 +682,14 @@ proc avfilter_graph_create_filter*(filt_ctx: ptr ptr AVFilterContext,
 proc avfilter_graph_parse_ptr*(graph: ptr AVFilterGraph, filters: cstring,
     inputs: ptr ptr AVFilterInOut, outputs: ptr ptr AVFilterInOut,
     log_ctx: pointer): cint {.importc, header: "<libavfilter/avfilter.h>".}
+proc avfilter_graph_parse2*(graph: ptr AVFilterGraph, filters: cstring,
+    inputs: ptr ptr AVFilterInOut, outputs: ptr ptr AVFilterInOut): cint {.importc,
+    header: "<libavfilter/avfilter.h>".}
 proc avfilter_graph_config*(graphctx: ptr AVFilterGraph,
     log_ctx: pointer): cint {.importc, header: "<libavfilter/avfilter.h>".}
+proc avfilter_link*(src: ptr AVFilterContext, srcpad: cuint,
+    dst: ptr AVFilterContext, dstpad: cuint): cint {.importc,
+    header: "<libavfilter/avfilter.h>".}
 
 # Filter lookup
 proc avfilter_get_by_name*(name: cstring): ptr AVFilter {.importc,
