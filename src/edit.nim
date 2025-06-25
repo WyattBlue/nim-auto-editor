@@ -1,5 +1,4 @@
-import std/[os, osproc]
-import std/terminal
+import std/[os, terminal, browsers]
 import std/[strutils, strformat]
 import std/sequtils
 import std/tables
@@ -251,6 +250,4 @@ proc editMedia*(args: mainArgs) =
   makeMedia(tlV3, output)
 
   if not args.noOpen and exportKind == "default":
-    let process = startProcess("open", args = [output], options = {poUsePath})
-    discard process.waitForExit()
-    process.close()
+    openDefaultBrowser(output)
