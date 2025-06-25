@@ -224,20 +224,55 @@ proc get*(getter: Getter, start: int, endSample: int): seq[seq[int16]] =
         result[1][i] = result[0][i]
 
 proc processAudioClip*(clip: Clip, data: seq[seq[int16]], sr: int): seq[seq[int16]] =
-  # This is a simplified version - in a full implementation you'd use libavfilter
-  # for speed and volume changes
-
   result = data
 
-  # Apply volume change
+  # Apply volume change first
   if clip.volume != 1.0:
     for ch in 0..<result.len:
       for i in 0..<result[ch].len:
-        result[ch][i] = int16(result[ch][i].float * clip.volume)
+        let sample = result[ch][i].float * clip.volume
+        # Clamp to prevent overflow/underflow
+        result[ch][i] = int16(max(-32768.0, min(32767.0, sample)))
 
-  # Speed change would require more complex resampling
-  # For now, we'll just return the data as-is
-  # In a full implementation, you'd use the atempo filter
+  # Apply speed change if needed
+  if clip.speed != 1.0 and clip.speed > 0.0:
+    let speedFactor = clip.speed
+    let outputLength = int(result[0].len.float / speedFactor)
+
+    if outputLength <= 0:
+      # If speed is so high that we get no samples, return empty
+      for ch in 0..<result.len:
+        result[ch] = @[]
+      return result
+
+    # Create new arrays for speed-adjusted audio
+    var speedAdjusted: seq[seq[int16]] = @[]
+    for ch in 0..<result.len:
+      speedAdjusted.add(newSeq[int16](outputLength))
+
+    # Simple linear interpolation for speed change
+    # For higher quality, we'd use proper resampling algorithms
+    for ch in 0..<result.len:
+      if result[ch].len > 0:
+        for i in 0..<outputLength:
+          let sourcePos = i.float * speedFactor
+          let sourceIndex = int(sourcePos)
+          let fraction = sourcePos - sourceIndex.float
+
+          if sourceIndex >= result[ch].len - 1:
+            # Near end of source, just copy last sample
+            speedAdjusted[ch][i] = result[ch][result[ch].len - 1]
+          elif sourceIndex < 0:
+            # Before start of source, use first sample
+            speedAdjusted[ch][i] = result[ch][0]
+          else:
+            # Linear interpolation between adjacent samples
+            let sample1 = result[ch][sourceIndex].float
+            let sample2 = result[ch][sourceIndex + 1].float
+            let interpolated = sample1 + (sample2 - sample1) * fraction
+            speedAdjusted[ch][i] = int16(max(-32768.0, min(32767.0, interpolated)))
+
+    result = speedAdjusted
 
 proc ndArrayToFile*(audioData: seq[seq[int16]], rate: int, outputPath: string) =
   var outputCtx: ptr AVFormatContext
@@ -393,14 +428,15 @@ proc makeNewAudio*(tl: v3, outputDir: string): seq[string] =
     for clip in layer:
       let key = (clip.src[], clip.stream)
       if key in samples:
+        let sampStart = int(clip.offset.float64 * clip.speed * tl.sr.float64 / tl.tb)
+        let sampEnd = int(float64(clip.offset + clip.dur) * clip.speed * tl.sr.float64 / tl.tb)
+
         let getter = samples[key]
+        let srcData = getter.get(sampStart, sampEnd)
 
         let startSample = int(clip.start * tl.sr.int64 * tl.tb.den div tl.tb.num)
         let durSamples = int(clip.dur * tl.sr.int64 * tl.tb.den div tl.tb.num)
-        let srcStartSample = int(clip.offset * tl.sr.int64 * tl.tb.den div tl.tb.num)
-        let srcData = getter.get(srcStartSample, srcStartSample + durSamples)
         let processedData = processAudioClip(clip, srcData, tl.sr.int)
-
         if processedData.len > 0:
           for ch in 0 ..< min(audioData.len, processedData.len):
             for i in 0 ..< min(durSamples, processedData[ch].len):
