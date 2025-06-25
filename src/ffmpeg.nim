@@ -3,10 +3,9 @@
 
 import std/posix
 
-type
-  AVRational* {.importc, header: "<libavutil/rational.h>", bycopy.} = object
-    num*: cint
-    den*: cint
+type AVRational* {.importc, header: "<libavutil/rational.h>", bycopy.} = object
+  num*: cint
+  den*: cint
 
 proc av_mul_q(b: AVRational, c: AVRational): AVRational {.importc,
     header: "<libavutil/rational.h>".}
@@ -16,14 +15,10 @@ proc av_add_q(b: AVRational, c: AVRational): AVRational {.importc,
     header: "<libavutil/rational.h>".}
 proc av_sub_q(b: AVRational, c: AVRational): AVRational {.importc,
     header: "<libavutil/rational.h>".}
-proc av_q2d*(a: AVRational): cdouble {.importc,
-    header: "<libavutil/rational.h>".}
-proc av_inv_q*(a: AVRational): AVRational {.importc,
-    header: "<libavutil/rational.h>".}
-proc av_parse_ratio(q: ptr AVRational, str: cstring, max: cint,
-    log_offset: cint, log_ctx: pointer): cint {.importc,
-
-header: "<libavutil/parseutils.h>".}
+proc av_q2d*(a: AVRational): cdouble {.importc, header: "<libavutil/rational.h>".}
+proc av_inv_q*(a: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
+proc av_parse_ratio(q: ptr AVRational, str: cstring, max: cint, log_offset: cint,
+    log_ctx: pointer): cint {.importc, header: "<libavutil/parseutils.h>".}
 
 proc `+`*(a, b: AVRational): AVRational =
   av_add_q(a, b)
@@ -196,9 +191,6 @@ type
     AV_SAMPLE_FMT_S32P,
     AV_SAMPLE_FMT_FLTP,
     AV_SAMPLE_FMT_DBLP
-
-  # SwrContext for audio resampling/conversion
-  SwrContext* {.importc, header: "<libswresample/swresample.h>".} = object
 
   AVCodecContext* {.importc, header: "<libavcodec/avcodec.h>".} = object
     av_class*: pointer
@@ -462,24 +454,20 @@ proc AVERROR*(e: cint): cint {.inline.} = (-e)
 const AVERROR_EOF* = AVERROR(0x10000051)
 let AVERROR_EAGAIN* = AVERROR(EAGAIN)
 
-# FIFO
-type
-  AVAudioFifo* {.importc, header: "<libavutil/audio_fifo.h>".} = object
-
 # Audio FIFO function declarations
+type AVAudioFifo* {.importc, header: "<libavutil/audio_fifo.h>".} = object
+
 proc av_audio_fifo_alloc*(sample_fmt: AVSampleFormat, channels: cint,
     nb_samples: cint): ptr AVAudioFifo {.importc, cdecl,
     header: "<libavutil/audio_fifo.h>".}
 proc av_audio_fifo_free*(af: ptr AVAudioFifo) {.importc, cdecl.}
 proc av_audio_fifo_write*(af: ptr AVAudioFifo, data: pointer,
-    nb_samples: cint): cint {.importc, cdecl,
-    header: "<libavutil/audio_fifo.h>".}
+    nb_samples: cint): cint {.importc, cdecl, header: "<libavutil/audio_fifo.h>".}
 proc av_audio_fifo_read*(af: ptr AVAudioFifo, data: pointer,
     nb_samples: cint): cint {.importc, cdecl,
     header: "<libavutil/audio_fifo.h>".}
 proc av_audio_fifo_size*(af: ptr AVAudioFifo): cint {.importc, cdecl.}
-proc av_audio_fifo_drain*(af: ptr AVAudioFifo,
-    nb_samples: cint): cint {.importc, cdecl.}
+proc av_audio_fifo_drain*(af: ptr AVAudioFifo, nb_samples: cint): cint {.importc, cdecl.}
 proc av_audio_fifo_reset*(af: ptr AVAudioFifo) {.importc, cdecl.}
 
 proc av_get_bytes_per_sample*(sample_fmt: AVSampleFormat): cint {.importc, cdecl.}
@@ -494,9 +482,9 @@ proc av_samples_alloc*(audio_data: ptr ptr uint8, linesize: ptr cint,
 
 proc av_freep*(`ptr`: pointer) {.importc, header: "<libavutil/mem.h>".}
 
-# SwrContext functions for audio resampling/conversion
-proc swr_alloc*(): ptr SwrContext {.importc,
-    header: "<libswresample/swresample.h>".}
+type SwrContext* {.importc, header: "<libswresample/swresample.h>".} = object
+
+proc swr_alloc*(): ptr SwrContext {.importc, header: "<libswresample/swresample.h>".}
 proc swr_init*(s: ptr SwrContext): cint {.importc,
     header: "<libswresample/swresample.h>".}
 proc swr_free*(s: ptr ptr SwrContext) {.importc,
@@ -504,15 +492,16 @@ proc swr_free*(s: ptr ptr SwrContext) {.importc,
 proc swr_convert*(s: ptr SwrContext, output: ptr ptr uint8, out_count: cint,
     input: ptr ptr uint8, in_count: cint): cint {.importc,
     header: "<libswresample/swresample.h>".}
+proc swr_get_delay*(s: ptr SwrContext, base: int64): int64 {.importc,
+    header: "<libswresample/swresample.h>".}
 
 # SwrContext option setting
 proc av_opt_set_int*(obj: pointer, name: cstring, val: int64,
     search_flags: cint): cint {.importc, header: "<libavutil/opt.h>".}
 proc av_opt_set_sample_fmt*(obj: pointer, name: cstring, fmt: AVSampleFormat,
     search_flags: cint): cint {.importc, header: "<libavutil/opt.h>".}
-proc av_opt_set_chlayout*(obj: pointer, name: cstring,
-    layout: ptr AVChannelLayout, search_flags: cint): cint {.importc,
-        header: "<libavutil/opt.h>".}
+proc av_opt_set_chlayout*(obj: pointer, name: cstring, layout: ptr AVChannelLayout,
+    search_flags: cint): cint {.importc, header: "<libavutil/opt.h>".}
 proc av_opt_set*(obj: pointer, name: cstring, val: cstring,
     search_flags: cint): cint {.importc, header: "<libavutil/opt.h>".}
 
@@ -548,10 +537,7 @@ proc avcodec_decode_subtitle2*(avctx: ptr AVCodecContext, sub: ptr AVSubtitle,
     got_sub_ptr: ptr cint, avpkt: ptr AVPacket): cint {.importc,
     header: "<libavcodec/avcodec.h>".}
 
-proc avsubtitle_free*(sub: ptr AVSubtitle) {.importc,
-    header: "<libavcodec/avcodec.h>".}
-
-
+proc avsubtitle_free*(sub: ptr AVSubtitle) {.importc, header: "<libavcodec/avcodec.h>".}
 proc av_get_sample_fmt_name*(sample_fmt: cint): cstring {.importc,
     header: "<libavutil/samplefmt.h>".}
 
@@ -608,11 +594,6 @@ proc av_interleaved_write_frame*(s: ptr AVFormatContext,
     pkt: ptr AVPacket): cint {.importc, header: "<libavformat/avformat.h>".}
 proc av_packet_rescale_ts*(pkt: ptr AVPacket, tb_src: AVRational,
     tb_dst: AVRational) {.importc, header: "<libavcodec/packet.h>".}
-
-
-proc swr_get_delay*(s: ptr SwrContext, base: int64): int64 {.importc,
-    header: "<libswresample/swresample.h>".}
-
 
 # Filters
 type
@@ -722,9 +703,8 @@ const
   AVSEEK_FLAG_ANY* = 4
   AVSEEK_FLAG_FRAME* = 8
 
-proc av_seek_frame*(s: ptr AVFormatContext, stream_index: cint,
-    timestamp: int64, flags: cint): cint {.importc,
-    header: "<libavformat/avformat.h>".}
-proc avformat_seek_file*(s: ptr AVFormatContext, stream_index: cint,
-    min_ts: int64, ts: int64, max_ts: int64, flags: cint): cint {.importc,
+proc av_seek_frame*(s: ptr AVFormatContext, stream_index: cint, timestamp: int64,
+    flags: cint): cint {.importc, header: "<libavformat/avformat.h>".}
+proc avformat_seek_file*(s: ptr AVFormatContext, stream_index: cint, min_ts: int64,
+    ts: int64, max_ts: int64, flags: cint): cint {.importc,
     header: "<libavformat/avformat.h>".}

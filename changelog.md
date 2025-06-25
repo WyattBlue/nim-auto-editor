@@ -1,10 +1,8 @@
-# 0.6.0
+# 0.6.1
 
 ## Major
 
 ## Features
-- Add `--video-speed` and `--silent-speed`.
-- Add `--help` screen.
-- Implement audio rendering (no fancy features).
+- Opening the new file now works on Windows and Linux.
 
 ## Fixes
