@@ -1,10 +1,10 @@
-# 0.5.2
+# 0.6.0
 
 ## Major
 
 ## Features
-- Add the `subtitle` editing procedure.
-- Set output name automatically.
+- Add `--video-speed` and `--silent-speed`.
+- Add `--help` screen.
+- Implement audio rendering (no fancy features).
 
 ## Fixes
-- Fix fcp11 export when a media's timecode is not zero.

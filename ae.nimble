@@ -1,5 +1,5 @@
 # Package
-version = "0.5.2"
+version = "0.6.0"
 author = "WyattBlue"
 description = "Auto-Editor: Efficient media analysis and rendering"
 license = "Unlicense"
