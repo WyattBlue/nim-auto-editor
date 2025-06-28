@@ -49,21 +49,10 @@ proc parseTime*(val: string): PackedInt =
     error &"'{val}': Time format expects an integer"
   return pack(false, num.int64)
 
-proc parseTime*(val: string, tb: float64): int64 =
-  let (num, unit) = splitNumStr(val)
-  if unit in ["s", "sec", "secs", "second", "seconds"]:
-    return round(num * tb).int64
-  if unit in ["min", "mins", "minute", "minutes"]:
-    return round(num * tb * 60).int64
-  if unit == "hour":
-    return round(num * tb * 3600).int64
-  if unit != "":
-    error &"'{val}': Time format got unknown unit: `{unit}`"
-
-  if num != trunc(num):
-    error &"'{val}': Time format expects an integer"
-  return num.int64
-
+proc toTb*(val: PackedInt, tb: float64): int64 =
+  if val.getFlag:
+    return int64(val.getNumber / 1000 * tb)
+  return val.getNumber
 
 proc mutMargin*(arr: var seq[bool], startM: int, endM: int) =
   # Find start and end indexes

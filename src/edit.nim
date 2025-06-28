@@ -200,8 +200,8 @@ proc editMedia*(args: mainArgs) =
         error &"Unknown edit method: {editMethod}"
 
       if editMethod != "none":
-        let startMargin = parseTime(args.margin[0], tb.float64)
-        let endMargin = parseTime(args.margin[1], tb.float64)
+        let startMargin = toTb(args.margin[0], tb.float64)
+        let endMargin = toTb(args.margin[1], tb.float64)
         mutMargin(hasLoud, startMargin, endMargin)
 
       var speedIndex = hasLoud.map(proc(x: bool): int = int(x))
@@ -216,26 +216,23 @@ proc editMedia*(args: mainArgs) =
         return speedMap.len - 1
 
       for myRange in args.cutOut:
-        var start = myRange[0].getNumber
-        var stop = myRange[1].getNumber
-        if myRange[0].getFlag:
-          start = int64(start / 1000 * tb)
-        if myRange[1].getFlag:
-          stop = int64(stop / 1000 * tb)
-
+        let start = toTb(myRange[0], tb.float64)
+        let stop = toTb(myRange[1], tb.float64)
         for i in countup(start, stop-1):
           speedIndex[i] = getSpeedIndex(99999.0)
 
       for myRange in args.addIn:
-        var start = myRange[0].getNumber
-        var stop = myRange[1].getNumber
-        if myRange[0].getFlag:
-          start = int64(start / 1000 * tb)
-        if myRange[1].getFlag:
-          stop = int64(stop / 1000 * tb)
-
+        let start = toTb(myRange[0], tb.float64)
+        let stop = toTb(myRange[1], tb.float64)
         for i in countup(start, stop-1):
           speedIndex[i] = 1 # Video speed
+
+      for speedRange in args.setSpeedForRange:
+        let start = toTb(speedRange[0], tb.float64)
+        let stop = toTb(speedRange[1], tb.float64)
+        let speed = speedRange[2]
+        for i in countup(start, stop-1):
+          speedIndex[i] = getSpeedIndex(speed)
 
       chunks = chunkify(speedIndex, speedHash)
       tlV3 = toNonLinear(addr args.input, tb, src, chunks)

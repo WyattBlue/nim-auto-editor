@@ -28,7 +28,7 @@ type mainArgs* = object
   input*: string = ""
 
   # Editing Options
-  margin*: (string, string) = ("0.2s", "0.2s")
+  margin*: (PackedInt, PackedInt) = (pack(true, 200), pack(true, 200)) # 0.2s
   edit*: string = "audio"
   `export`*: string = "default"
   output*: string = ""
@@ -36,6 +36,7 @@ type mainArgs* = object
   videoSpeed*: float64 = 1.0
   cutOut*: seq[(PackedInt, PackedInt)]
   addIn*: seq[(PackedInt, PackedInt)]
+  setSpeedForRange*: seq[(PackedInt, PackedInt, float64)]
 
   # Display Options
   progress*: BarType = modern

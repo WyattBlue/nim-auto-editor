@@ -62,13 +62,13 @@ Options:
 """
   quit(0)
 
-proc parseMargin(val: string): (string, string) =
+proc parseMargin(val: string): (PackedInt, PackedInt) =
   var vals = val.strip().split(",")
   if vals.len == 1:
     vals.add vals[0]
   if vals.len != 2:
     error "--margin has too many arguments."
-  return (vals[0], vals[1])
+  return (parseTime(vals[0]), parseTime(vals[1]))
 
 proc parseTimeRange(val, opt: string): (PackedInt, PackedInt) =
   var vals = val.strip().split(",")
@@ -82,6 +82,15 @@ proc parseSpeed(val: string): float64 =
   result = parseFloat(val)
   if result <= 0.0 or result > 99999.0:
     result = 99999.0
+
+proc parseSpeedRange(val: string): (PackedInt, PackedInt, float64) =
+  var vals = val.strip().split(",")
+  if vals.len < 3:
+    error &"--set-speed-for-range: Too few arguments"
+  if vals.len > 3:
+    error &"--set-speed-for-range: Too many arguments"
+  return (parseTime(vals[0]), parseTime(vals[1]), parseSpeed(vals[2]))
+
 
 proc main() =
   if paramCount() < 1:
@@ -142,7 +151,7 @@ judge making cuts.
       expecting = "video-speed"
     of "-c:a", "-acodec", "--audio-codec":
       expecting = "audio-codec"
-    of "--edit", "--progress", "--add-in", "--cut-out":
+    of "--edit", "--progress", "--add-in", "--cut-out", "--set-speed-for-range":
       expecting = key[2..^1]
     else:
       if key.startsWith("--"):
@@ -165,6 +174,8 @@ judge making cuts.
         args.addIn.add parseTimeRange(key, expecting)
       of "cut-out":
         args.cutOut.add parseTimeRange(key, expecting)
+      of "set-speed-for-range":
+        args.setSpeedForRange.add parseSpeedRange(key)
       of "audio-codec":
         args.audioCodec = key
       of "progress":
