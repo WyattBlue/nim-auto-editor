@@ -262,7 +262,7 @@ proc createAudioFilterGraph(clip: Clip, sr: int, channels: int): (ptr AVFilterGr
     if ret < 0:
       error fmt"Cannot create atempo filter: {ret}"
     
-    ret = av_opt_set(atempoFilter, "tempo", fmt"{clampedSpeed}", AV_OPT_SEARCH_CHILDREN)
+    ret = av_opt_set(atempoFilter, "tempo", cstring($clampedSpeed), AV_OPT_SEARCH_CHILDREN)
     if ret < 0:
       error fmt"Cannot set atempo tempo parameter: {ret}"
     
@@ -282,7 +282,7 @@ proc createAudioFilterGraph(clip: Clip, sr: int, channels: int): (ptr AVFilterGr
       error fmt"Cannot create volume filter: {ret}"
 
     # Set the volume parameter
-    ret = av_opt_set(volumeFilter, "volume", fmt"{clip.volume}", AV_OPT_SEARCH_CHILDREN)
+    ret = av_opt_set(volumeFilter, "volume", cstring($clip.volume), AV_OPT_SEARCH_CHILDREN)
     if ret < 0:
       error fmt"Cannot set volume parameter: {ret}"
 

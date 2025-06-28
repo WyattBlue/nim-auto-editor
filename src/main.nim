@@ -4,10 +4,11 @@ import std/strformat
 import std/strutils
 import std/terminal
 
-import cmds/[info, desc, cache, levels, subdump]
+import about
 import edit
 import log
-import about
+import cmds/[info, desc, cache, levels, subdump]
+import util/fun
 
 
 proc ctrlc() {.noconv.} =
@@ -24,16 +25,22 @@ Commands:
 Options:
   Editing Options:
     -m, --margin LENGTH           Set sections near "loud" as "loud" too if
-                                  section is less than LENGTH away
+                                  section is less than LENGTH away. (default is
+                                  "0.2s")
     --edit METHOD                 Set an expression which determines how to
                                   make auto edits
-    -ex, --export EXPORT:ATTRS?   Choose the export mode
+    -ex, --export EXPORT:ATTRS?   Choose the export mode. (default is
+                                  "audio")
     -o, --output FILE             Set the name/path of the new output file
     -s, --silent-speed NUM        Set speed of sections marked "silent" to
-                                  NUM
+                                  NUM. (default is 99999)
     -v, --sounded-speed, --video-speed NUM
                                   Set speed of sections marked "loud" to
-                                  NUM
+                                  NUM. (default is 1)
+    --cut-out [START,STOP ...]    The range of media that will be removed
+                                  (cut out) completely
+    --add-in [START,STOP ...]     The range of media that will be added in,
+                                  will apply --video-speed
 
   Display Options:
     --progress PROGRESS           Set what type of progress bar to use
@@ -62,6 +69,14 @@ proc parseMargin(val: string): (string, string) =
   if vals.len != 2:
     error "--margin has too many arguments."
   return (vals[0], vals[1])
+
+proc parseTimeRange(val, opt: string): (PackedInt, PackedInt) =
+  var vals = val.strip().split(",")
+  if vals.len < 2:
+    error &"--{opt}: Too few arguments"
+  if vals.len > 2:
+    error &"--{opt}: Too many arguments"
+  return (parseTime(vals[0]), parseTime(vals[1]))
 
 proc parseSpeed(val: string): float64 =
   result = parseFloat(val)
@@ -115,11 +130,11 @@ judge making cuts.
       args.noOpen = true
     of "-dn", "-sn":
       discard
-    of "-ex":
+    of "-ex", "--export":
       expecting = "export"
-    of "-o":
+    of "-o", "--output":
       expecting = "output"
-    of "-m", "--frame-margin":
+    of "-m", "--margin", "--frame-margin":
       expecting = "margin"
     of "-s", "--silent-speed":
       expecting = "silent-speed"
@@ -127,7 +142,7 @@ judge making cuts.
       expecting = "video-speed"
     of "-c:a", "-acodec", "--audio-codec":
       expecting = "audio-codec"
-    of "--edit", "--export", "--output", "--progress", "--margin":
+    of "--edit", "--progress", "--add-in", "--cut-out":
       expecting = key[2..^1]
     else:
       if key.startsWith("--"):
@@ -146,6 +161,10 @@ judge making cuts.
         args.silentSpeed = parseSpeed(key)
       of "video-speed":
         args.videoSpeed = parseSpeed(key)
+      of "add-in":
+        args.addIn.add parseTimeRange(key, expecting)
+      of "cut-out":
+        args.cutOut.add parseTimeRange(key, expecting)
       of "audio-codec":
         args.audioCodec = key
       of "progress":

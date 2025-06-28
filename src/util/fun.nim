@@ -32,6 +32,23 @@ proc parseBitrate*(input: string): int =
 
   error &"Unknown bitrate: {input}"
 
+proc parseTime*(val: string): PackedInt =
+  let tb = 1000.0
+
+  let (num, unit) = splitNumStr(val)
+  if unit in ["s", "sec", "secs", "second", "seconds"]:
+    return pack(true, round(num * tb).int64)
+  if unit in ["min", "mins", "minute", "minutes"]:
+    return pack(true, round(num * tb * 60).int64)
+  if unit == "hour":
+    return pack(true, round(num * tb * 3600).int64)
+  if unit != "":
+    error &"'{val}': Time format got unknown unit: `{unit}`"
+
+  if num != trunc(num):
+    error &"'{val}': Time format expects an integer"
+  return pack(false, num.int64)
+
 proc parseTime*(val: string, tb: float64): int64 =
   let (num, unit) = splitNumStr(val)
   if unit in ["s", "sec", "secs", "second", "seconds"]:

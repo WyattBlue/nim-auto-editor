@@ -190,8 +190,12 @@ proc editMedia*(args: mainArgs) =
         let length = mediaLength(container)
         let tbLength = (round((length * tb).float64)).int64
 
-        if tbLength > 0:
-          chunks.add((0'i64, tbLength, args.videoSpeed))
+        hasLoud = newSeqWith(tbLength, true)
+      elif editMethod in ["all", "all/e"]:
+        let length = mediaLength(container)
+        let tbLength = (round((length * tb).float64)).int64
+
+        hasLoud = newSeqWith(tbLength, false)
       else:
         error &"Unknown edit method: {editMethod}"
 
@@ -200,10 +204,40 @@ proc editMedia*(args: mainArgs) =
         let endMargin = parseTime(args.margin[1], tb.float64)
         mutMargin(hasLoud, startMargin, endMargin)
 
-        var speedHash = {0: args.silentSpeed, 1: args.videoSpeed}.toTable
-        var speedIndex: seq[int] = hasLoud.map(proc(x: bool): int = int(x))
-        chunks = chunkify(speedIndex, speedHash)
+      var speedIndex = hasLoud.map(proc(x: bool): int = int(x))
+      var speedMap = @[args.silentSpeed, args.videoSpeed]
+      var speedHash = {0: args.silentSpeed, 1: args.videoSpeed}.toTable
 
+      proc getSpeedIndex(speed: float64): int =
+        if speed in speedMap:
+          return speedMap.find(speed)
+        speedMap.add(speed)
+        speedHash[speedMap.len - 1] = speed
+        return speedMap.len - 1
+
+      for myRange in args.cutOut:
+        var start = myRange[0].getNumber
+        var stop = myRange[1].getNumber
+        if myRange[0].getFlag:
+          start = int64(start / 1000 * tb)
+        if myRange[1].getFlag:
+          stop = int64(stop / 1000 * tb)
+
+        for i in countup(start, stop-1):
+          speedIndex[i] = getSpeedIndex(99999.0)
+
+      for myRange in args.addIn:
+        var start = myRange[0].getNumber
+        var stop = myRange[1].getNumber
+        if myRange[0].getFlag:
+          start = int64(start / 1000 * tb)
+        if myRange[1].getFlag:
+          stop = int64(stop / 1000 * tb)
+
+        for i in countup(start, stop-1):
+          speedIndex[i] = 1 # Video speed
+
+      chunks = chunkify(speedIndex, speedHash)
       tlV3 = toNonLinear(addr args.input, tb, src, chunks)
 
   var exportKind, tlName, fcpVersion: string

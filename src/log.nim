@@ -7,6 +7,23 @@ import std/math
 type BarType* = enum
   modern, classic, ascii, machine, none
 
+type PackedInt* = distinct int64
+
+proc pack*(flag: bool, number: int64): PackedInt =
+  let maskedNumber = number and 0x7FFFFFFFFFFFFFFF'i64
+  let flagBit = if flag: 0x8000000000000000'i64 else: 0'i64
+  PackedInt(flagBit or maskedNumber)
+
+proc getFlag*(packed: PackedInt): bool =
+  int64(packed) < 0
+
+proc getNumber*(packed: PackedInt): int64 =
+  let raw = int64(packed) and 0x7FFFFFFFFFFFFFFF'i64
+  if (raw and 0x4000000000000000'i64) != 0:
+    raw or 0x8000000000000000'i64
+  else:
+    raw
+
 type mainArgs* = object
   input*: string = ""
 
@@ -17,6 +34,8 @@ type mainArgs* = object
   output*: string = ""
   silentSpeed*: float64 = 99999.0
   videoSpeed*: float64 = 1.0
+  cutOut*: seq[(PackedInt, PackedInt)]
+  addIn*: seq[(PackedInt, PackedInt)]
 
   # Display Options
   progress*: BarType = modern
@@ -41,10 +60,10 @@ proc conwrite*(msg: string) =
 proc error*(msg: string) {.noreturn.} =
   when defined(debug):
     raise newException(ValueError, msg)
-
-  conwrite("")
-  stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)
-  quit(1)
+  else:
+    conwrite("")
+    stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)
+    quit(1)
 
 
 type StringInterner* = object
