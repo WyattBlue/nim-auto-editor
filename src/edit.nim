@@ -227,10 +227,10 @@ proc editMedia*(args: mainArgs) =
         for i in countup(start, stop-1):
           speedIndex[i] = 1 # Video speed
 
-      for speedRange in args.setSpeedForRange:
-        let start = toTb(speedRange[0], tb.float64)
-        let stop = toTb(speedRange[1], tb.float64)
-        let speed = speedRange[2]
+      for speedRange in args.setSpeed:
+        let speed = speedRange[0]
+        let start = toTb(speedRange[1], tb.float64)
+        let stop = toTb(speedRange[2], tb.float64)
         for i in countup(start, stop-1):
           speedIndex[i] = getSpeedIndex(speed)
 

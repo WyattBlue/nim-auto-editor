@@ -36,7 +36,7 @@ type mainArgs* = object
   videoSpeed*: float64 = 1.0
   cutOut*: seq[(PackedInt, PackedInt)]
   addIn*: seq[(PackedInt, PackedInt)]
-  setSpeedForRange*: seq[(PackedInt, PackedInt, float64)]
+  setSpeed*: seq[(float64, PackedInt, PackedInt)]
 
   # Display Options
   progress*: BarType = modern

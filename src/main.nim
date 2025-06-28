@@ -41,6 +41,8 @@ Options:
                                   (cut out) completely
     --add-in [START,STOP ...]     The range of media that will be added in,
                                   will apply --video-speed
+    --set-speed, --set-speed-for-range [SPEED,START,STOP ...]
+                                  Set the SPEED for a given range
 
   Display Options:
     --progress PROGRESS           Set what type of progress bar to use
@@ -78,19 +80,30 @@ proc parseTimeRange(val, opt: string): (PackedInt, PackedInt) =
     error &"--{opt}: Too many arguments"
   return (parseTime(vals[0]), parseTime(vals[1]))
 
-proc parseSpeed(val: string): float64 =
-  result = parseFloat(val)
+proc parseSpeed(val, opt: string): float64 =
+  let (num, unit) = splitNumStr(val)
+  if unit == "%":
+    result = num / 100.0
+  elif unit == "":
+    result = num
+  else:
+    error &"--{opt}: unknown unit: {unit}"
+
   if result <= 0.0 or result > 99999.0:
     result = 99999.0
 
-proc parseSpeedRange(val: string): (PackedInt, PackedInt, float64) =
+proc parseSpeedRange(val: string): (float64, PackedInt, PackedInt) =
   var vals = val.strip().split(",")
   if vals.len < 3:
-    error &"--set-speed-for-range: Too few arguments"
+    error &"--set-speed: Too few arguments"
   if vals.len > 3:
-    error &"--set-speed-for-range: Too many arguments"
-  return (parseTime(vals[0]), parseTime(vals[1]), parseSpeed(vals[2]))
+    error &"--set-speed: Too many arguments"
+  return (parseSpeed(vals[0], "set-speed"), parseTime(vals[1]), parseTime(vals[2]))
 
+func handleKey(val: string): string =
+  if val.startsWith("--") and val.len >= 3:
+    return val[0 ..< 3] & val[3 .. ^1].replace("_", "-")
+  return val
 
 proc main() =
   if paramCount() < 1:
@@ -123,7 +136,8 @@ judge making cuts.
   var showVersion: bool = false
   var expecting: string = ""
 
-  for key in commandLineParams():
+  for rawKey in commandLineParams():
+    let key = handleKey(rawKey)
     case key:
     of "-h", "--help":
       printHelp()
@@ -141,6 +155,14 @@ judge making cuts.
       discard
     of "-ex", "--export":
       expecting = "export"
+    of "-exp", "--export-to-premiere":
+      args.`export` = "premiere"
+    of "-exr", "--export-to-resolve":
+      args.`export` = "resolve"
+    of "-exf", "--export-to-final-cut-pro":
+      args.`export` = "final-cut-pro"
+    of "-exs", "--export-to-shotcut":
+      args.`export` = "shotcut"
     of "-o", "--output":
       expecting = "output"
     of "-m", "--margin", "--frame-margin":
@@ -151,7 +173,11 @@ judge making cuts.
       expecting = "video-speed"
     of "-c:a", "-acodec", "--audio-codec":
       expecting = "audio-codec"
-    of "--edit", "--progress", "--add-in", "--cut-out", "--set-speed-for-range":
+    of "--edit", "--edit-based-on":
+      expecting = "edit"
+    of "--set-speed", "--set-speed-for-range":
+      expecting = "set-speed"
+    of "--progress", "--add-in", "--cut-out":
       expecting = key[2..^1]
     else:
       if key.startsWith("--"):
@@ -167,15 +193,15 @@ judge making cuts.
       of "output":
         args.output = key
       of "silent-speed":
-        args.silentSpeed = parseSpeed(key)
+        args.silentSpeed = parseSpeed(key, expecting)
       of "video-speed":
-        args.videoSpeed = parseSpeed(key)
+        args.videoSpeed = parseSpeed(key, expecting)
       of "add-in":
         args.addIn.add parseTimeRange(key, expecting)
       of "cut-out":
         args.cutOut.add parseTimeRange(key, expecting)
-      of "set-speed-for-range":
-        args.setSpeedForRange.add parseSpeedRange(key)
+      of "set-speed":
+        args.setSpeed.add parseSpeedRange(key)
       of "audio-codec":
         args.audioCodec = key
       of "progress":
