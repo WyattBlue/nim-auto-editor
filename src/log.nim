@@ -59,6 +59,9 @@ proc conwrite*(msg: string) =
     stdout.flushFile()
 
 proc error*(msg: string) {.noreturn.} =
+  when defined(windows):
+    showCursor()
+
   when defined(debug):
     raise newException(ValueError, msg)
   else:

@@ -1,4 +1,4 @@
-import std/[times, math, strutils, strformat, terminal, osproc]
+import std/[times, math, strutils, strformat, terminal, os, osproc]
 
 import ../log
 
@@ -132,6 +132,8 @@ proc start*(bar: Bar, total: float, title: string) =
   bar.stack.add((title: title, lenTitle: lenTitle, total: total,
       begin: epochTime()))
 
+  when defined(windows):
+    hideCursor()
   try:
     bar.tick(0)
   except:
@@ -143,8 +145,18 @@ proc start*(bar: Bar, total: float, title: string) =
     bar.tick(0)
 
 proc `end`*(bar: Bar) =
+  when defined(windows):
+    showCursor()
   let columns = terminalWidth()
   stdout.write(" ".repeat(max(0, columns - 2)) & "\r")
   stdout.flushFile()
   if bar.stack.len > 0:
     bar.stack.setLen(bar.stack.len - 1)
+
+if isMainModule:
+  let bar = initBar(modern)
+  bar.start(1000.0, "Starting...")
+  for i in countup(0, 1000):
+    bar.tick(i.float64)
+    sleep(33)
+  bar.`end`()
