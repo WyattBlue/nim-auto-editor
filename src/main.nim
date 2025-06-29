@@ -75,9 +75,9 @@ proc parseMargin(val: string): (PackedInt, PackedInt) =
 proc parseTimeRange(val, opt: string): (PackedInt, PackedInt) =
   var vals = val.strip().split(",")
   if vals.len < 2:
-    error &"--{opt}: Too few arguments"
+    error &"--{opt} has too few arguments"
   if vals.len > 2:
-    error &"--{opt}: Too many arguments"
+    error &"--{opt} has too many arguments"
   return (parseTime(vals[0]), parseTime(vals[1]))
 
 proc parseSpeed(val, opt: string): float64 =
@@ -87,7 +87,7 @@ proc parseSpeed(val, opt: string): float64 =
   elif unit == "":
     result = num
   else:
-    error &"--{opt}: unknown unit: {unit}"
+    error &"--{opt} has unknown unit: {unit}"
 
   if result <= 0.0 or result > 99999.0:
     result = 99999.0
@@ -95,9 +95,9 @@ proc parseSpeed(val, opt: string): float64 =
 proc parseSpeedRange(val: string): (float64, PackedInt, PackedInt) =
   var vals = val.strip().split(",")
   if vals.len < 3:
-    error &"--set-speed: Too few arguments"
+    error &"--set-speed has too few arguments"
   if vals.len > 3:
-    error &"--set-speed: Too many arguments"
+    error &"--set-speed has too many arguments"
   return (parseSpeed(vals[0], "set-speed"), parseTime(vals[1]), parseTime(vals[2]))
 
 func handleKey(val: string): string =
