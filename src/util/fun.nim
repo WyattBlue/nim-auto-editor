@@ -17,7 +17,7 @@ proc splitNumStr*(val: string): (float64, string) =
   let (num, unit) = (val[0 ..< index], val[index .. ^1])
   var floatNum: float64
   try:
-    floatNum = parseFloat(num)
+    floatNum = parseFloat(num.replace(" ", ""))
   except:
     error fmt"Invalid number: '{val}'"
   return (floatNum, unit)
