@@ -4,6 +4,7 @@ import std/sequtils
 
 import ../timeline
 import ../log
+import ../util/color
 
 func `%`*(self: v1): JsonNode =
   var jsonChunks = self.chunks.mapIt(%[%it[0], %it[1], %it[2]])
@@ -44,7 +45,7 @@ func `%`*(self: v3): JsonNode =
   return %* {
     "version": "3",
     "timebase": $self.tb.num & "/" & $self.tb.den,
-    "background": self.background,
+    "background": self.background.toString,
     "resolution": [self.res[0], self.res[1]],
     "samplerate": self.sr,
     "layout": self.layout,

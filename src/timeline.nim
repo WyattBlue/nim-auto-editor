@@ -8,6 +8,7 @@ import ffmpeg
 import media
 import log
 import wavutil
+import util/color
 
 type v1* = object
   chunks*: seq[(int64, int64, float64)]
@@ -24,7 +25,7 @@ type Clip* = object
 
 type v3* = object
   tb*: AVRational
-  background*: string
+  background*: RGBColor
   sr*: int64
   layout*: string
   res*: (int64, int64)
@@ -51,7 +52,7 @@ func uniqueSources*(self: v3): HashSet[ptr string] =
     for audio in alayer:
       result.incl(audio.src)
 
-func toNonLinear*(src: ptr string, tb: AvRational, mi: MediaInfo, chunks: seq[(
+func toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo, chunks: seq[(
     int64, int64, float64)]): v3 =
   var clips: seq[Clip] = @[]
   var i: int64 = 0
@@ -93,7 +94,7 @@ func toNonLinear*(src: ptr string, tb: AvRational, mi: MediaInfo, chunks: seq[(
     aspace.add(alayer)
 
   result = v3(v: vspace, a: aspace, chunks: some(chunks))
-  result.background = "#000000"
+  result.background = bg
   result.tb = tb
   result.res = mi.get_res()
   result.sr = 48000

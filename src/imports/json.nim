@@ -4,6 +4,7 @@ import ../log
 import ../timeline
 import ../ffmpeg
 import ../media
+import ../util/color
 
 proc parseClip(node: JsonNode, interner: var StringInterner): Clip =
   result.src = interner.intern(node["src"].getStr())
@@ -27,7 +28,7 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 =
     error("sr/bg bad structure")
 
   result.sr = jsonNode["samplerate"].getInt()
-  result.background = jsonNode["background"].getStr()
+  result.background = parseColor(jsonNode["background"].getStr())
 
   if not jsonNode.hasKey("resolution") or jsonNode["resolution"].kind != JArray:
     error("'resolution' has bad structure")
@@ -78,7 +79,8 @@ proc parseV1*(jsonNode: JsonNode, interner: var StringInterner): v3 =
   if mi.v.len > 0:
     tb = makeSaneTimebase(mi.v[0].avgRate)
 
-  result = toNonLinear(ptrInput, tb, mi, chunks)
+  let bg = RGBColor(red: 0, green: 0, blue: 0)
+  result = toNonLinear(ptrInput, tb, bg, mi, chunks)
 
 proc readJson*(jsonStr: string, interner: var StringInterner): v3 =
   let jsonNode = parseJson(jsonStr)

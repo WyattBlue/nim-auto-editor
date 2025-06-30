@@ -7,6 +7,7 @@ import ../ffmpeg
 import ../timeline
 import ../media
 import ../log
+import ../util/fun
 
 proc genericTrack(lang: string, bitrate: int) =
   if bitrate != 0:

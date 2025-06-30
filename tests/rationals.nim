@@ -3,7 +3,7 @@ import std/os
 import std/tempfiles
 
 import ../src/[av, ffmpeg]
-import ../src/util/fun
+import ../src/util/[fun, color]
 import ../src/edit
 import ../src/wavutil
 import ../src/cmds/info
@@ -39,6 +39,19 @@ test "strings":
   check(AVRational("-2/3") == AVRational(num: -2, den: 3))
   check(AVRational("6/8") == AVRational(num: 3, den: 4))
   check(AVRational("1.5") == AVRational(num: 3, den: 2))
+
+test "color":
+  check(RGBColor(red: 0, green: 0, blue: 0).toString == "#000000")
+  check(RGBColor(red: 255, green: 255, blue: 255).toString == "#ffffff")
+
+  check(parseColor("#000") == RGBColor(red: 0, green: 0, blue: 0))
+  check(parseColor("#000000") == RGBColor(red: 0, green: 0, blue: 0))
+  check(parseColor("#FFF") == RGBColor(red: 255, green: 255, blue: 255))
+  check(parseColor("#fff") == RGBColor(red: 255, green: 255, blue: 255))
+  check(parseColor("#FFFFFF") == RGBColor(red: 255, green: 255, blue: 255))
+
+  check(parseColor("black") == RGBColor(red: 0, green: 0, blue: 0))
+  check(parseColor("darkgreen") == RGBColor(red: 0, green: 100, blue: 0))
 
 test "encoder":
   let (_, encoderCtx) = initEncoder("pcm_s16le")

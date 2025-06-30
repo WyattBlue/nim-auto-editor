@@ -1,6 +1,6 @@
 import std/[strutils, strformat]
 import std/os
-from std/math import round, trunc
+from std/math import round, trunc, gcd
 
 import ../log
 
@@ -35,6 +35,12 @@ proc parseBitrate*(input: string): int =
     return int(val)
 
   error &"Unknown bitrate: {input}"
+
+func aspectRatio*(width, height: int): tuple[w, h: int] =
+  if height == 0:
+    return (0, 0)
+  let c = gcd(width, height)
+  return (width div c, height div c)
 
 proc parseTime*(val: string): PackedInt =
   let tb = 1000.0

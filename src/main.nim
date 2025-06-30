@@ -7,7 +7,7 @@ import about
 import edit
 import log
 import cmds/[info, desc, cache, levels, subdump]
-import util/fun
+import util/[color, fun]
 
 import tinyre
 
@@ -43,6 +43,9 @@ Options:
                                   will apply --video-speed
     --set-speed, --set-speed-for-range [SPEED,START,STOP ...]
                                   Set the SPEED for a given range
+
+  Timeline Options:
+    -b, -bg, --background COLOR   Set the background as a solid RGB color
 
   URL Download Options:
     --yt-dlp-location PATH        Set a custom path to yt-dlp
@@ -232,6 +235,8 @@ judge making cuts.
       expecting = "edit"
     of "--set-speed", "--set-speed-for-range":
       expecting = "set-speed"
+    of "-b", "-bg", "--background":
+      expecting = "background"
     of "--progress", "--add-in", "--cut-out", "--yt-dlp-location", "--download-format", "--output-format", "--yt-dlp-extras":
       expecting = key[2..^1]
     else:
@@ -265,6 +270,8 @@ judge making cuts.
         args.outputFormat = key
       of "yt-dlp-extras":
         args.ytDlpExtras = key
+      of "background":
+        args.background = parseColor(key)
       of "audio-codec":
         args.audioCodec = key
       of "progress":

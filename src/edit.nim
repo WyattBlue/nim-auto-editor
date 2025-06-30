@@ -235,7 +235,7 @@ proc editMedia*(args: mainArgs) =
           speedIndex[i] = getSpeedIndex(speed)
 
       chunks = chunkify(speedIndex, speedHash)
-      tlV3 = toNonLinear(addr args.input, tb, src, chunks)
+      tlV3 = toNonLinear(addr args.input, tb, args.background, src, chunks)
 
   var exportKind, tlName, fcpVersion: string
   if args.`export` == "":

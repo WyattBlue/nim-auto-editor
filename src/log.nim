@@ -3,6 +3,8 @@ import std/terminal
 import std/[strutils, strformat]
 import std/math
 
+import util/color
+
 
 type BarType* = enum
   modern, classic, ascii, machine, none
@@ -39,6 +41,7 @@ type mainArgs* = object
   setSpeed*: seq[(float64, PackedInt, PackedInt)]
 
   # Timeline Options
+  background* = RGBColor(red: 0, green: 0, blue: 0)
 
   # URL download Options
   ytDlpLocation*: string = "yt-dlp"
@@ -98,11 +101,6 @@ proc cleanup*(interner: var StringInterner) =
     dealloc(ptrStr)
   interner.strings.clear()
 
-func aspectRatio*(width, height: int): tuple[w, h: int] =
-  if height == 0:
-    return (0, 0)
-  let c = gcd(width, height)
-  return (width div c, height div c)
 
 type Code* = enum
   webvtt, srt, mov_text, standard, ass, rass
