@@ -1,8 +1,7 @@
-import std/os
-import std/posix_utils
-import std/strformat
-import std/strutils
+import std/[os, osproc, posix_utils]
+import std/[strformat, strutils]
 import std/terminal
+import std/uri
 
 import about
 import edit
@@ -10,6 +9,7 @@ import log
 import cmds/[info, desc, cache, levels, subdump]
 import util/fun
 
+import tinyre
 
 proc ctrlc() {.noconv.} =
   error "Keyboard Interrupt"
@@ -43,6 +43,14 @@ Options:
                                   will apply --video-speed
     --set-speed, --set-speed-for-range [SPEED,START,STOP ...]
                                   Set the SPEED for a given range
+
+  URL Download Options:
+    --yt-dlp-location PATH        Set a custom path to yt-dlp
+    --download-format FORMAT      Set the yt-dlp download format (--format, -f)
+    --output-format TEMPLATE      Set the yt-dlp output file template (
+                                  --output, -o)
+    --yt-dlp-extras CMD           Add extra options for yt-dlp. Must be in
+                                  quotes
 
   Display Options:
     --progress PROGRESS           Set what type of progress bar to use
@@ -104,6 +112,53 @@ func handleKey(val: string): string =
   if val.startsWith("--") and val.len >= 3:
     return val[0 ..< 3] & val[3 .. ^1].replace("_", "-")
   return val
+
+proc downloadVideo(myInput: string, args: mainArgs): string =
+  conwrite("Downloading video...")
+
+  proc getDomain(url: string): string =
+    let parsed = parseUri(url)
+    var hostname = parsed.hostname
+    if hostname.startsWith("www."):
+      hostname = hostname[4..^1]
+    return hostname
+
+  var downloadFormat = args.downloadFormat
+  if downloadFormat == "" and getDomain(myInput) == "youtube.com":
+    downloadFormat = "bestvideo[ext=mp4]+bestaudio[ext=m4a]"
+
+  var outputFormat: string
+  if args.outputFormat == "":
+    outputFormat = replacef(splitext(myInput)[0], re"\W+", "-") & ".%(ext)s"
+  else:
+    outputFormat = args.outputFormat
+
+  var cmd: seq[string] = @[]
+  if downloadFormat != "":
+    cmd.add(@["-f", downloadFormat])
+
+  cmd.add(@["-o", outputFormat, myInput])
+  if args.yt_dlp_extras != "":
+    cmd.add(args.ytDlpExtras.split(" "))
+
+  let ytDlpPath = args.ytDlpLocation
+  var location: string
+  try:
+    location = execProcess(ytDlpPath,
+      args = @["--get-filename", "--no-warnings"] & cmd,
+      options = {poUsePath}).strip()
+  except OSError:
+    error "Program `yt-dlp` must be installed and on PATH."
+
+  if not fileExists(location):
+    let p = startProcess(ytDlpPath, args = cmd, options = {poUsePath, poParentStreams})
+    defer: p.close()
+    discard p.waitForExit()
+
+  if not fileExists(location):
+    error &"Download file wasn't created: {location}"
+
+  return location
 
 proc main() =
   if paramCount() < 1:
@@ -177,7 +232,7 @@ judge making cuts.
       expecting = "edit"
     of "--set-speed", "--set-speed-for-range":
       expecting = "set-speed"
-    of "--progress", "--add-in", "--cut-out":
+    of "--progress", "--add-in", "--cut-out", "--yt-dlp-location", "--download-format", "--output-format", "--yt-dlp-extras":
       expecting = key[2..^1]
     else:
       if key.startsWith("--"):
@@ -202,6 +257,14 @@ judge making cuts.
         args.cutOut.add parseTimeRange(key, expecting)
       of "set-speed":
         args.setSpeed.add parseSpeedRange(key)
+      of "yt-dlp-location":
+        args.ytDlpLocation = key
+      of "download-format":
+        args.downloadFormat = key
+      of "output-format":
+        args.outputFormat = key
+      of "yt-dlp-extras":
+        args.ytDlpExtras = key
       of "audio-codec":
         args.audioCodec = key
       of "progress":
@@ -239,6 +302,16 @@ judge making cuts.
       echo "OS: ", plat.sysname, " ", plat.release, " ", plat.machine
     echo "Auto-Editor: ", version
     quit(0)
+
+  let myInput = args.input
+  if myInput.startswith("http://") or myInput.startswith("https://"):
+    args.input = downloadVideo(myInput, args)
+  elif splitFile(myInput).ext == "":
+    if dirExists(myInput):
+      error(&"Input must be a file or a URL, not a directory.")
+    if myInput.startswith("-"):
+      error(&"Option/Input file doesn't exist: {myInput}")
+    error(&"Input file must have an extension: {myInput}")
 
   editMedia(args)
 

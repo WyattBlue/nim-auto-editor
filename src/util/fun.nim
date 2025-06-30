@@ -1,8 +1,12 @@
 import std/[strutils, strformat]
-
+import std/os
 from std/math import round, trunc
 
 import ../log
+
+func splitext*(val: string): (string, string) =
+  let (dir, name, ext) = splitFile(val)
+  return (dir & "/" & name, ext)
 
 proc splitNumStr*(val: string): (float64, string) =
   var index = 0

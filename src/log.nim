@@ -38,6 +38,14 @@ type mainArgs* = object
   addIn*: seq[(PackedInt, PackedInt)]
   setSpeed*: seq[(float64, PackedInt, PackedInt)]
 
+  # Timeline Options
+
+  # URL download Options
+  ytDlpLocation*: string = "yt-dlp"
+  downloadFormat*: string
+  outputFormat*: string
+  ytDlpExtras*: string
+
   # Display Options
   progress*: BarType = modern
   debug*: bool = false

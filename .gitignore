@@ -6,6 +6,7 @@ build
 ffmpeg_sources
 .vscode
 *.v3
+*https*
 *_ALTERED*
 
 tests/*
