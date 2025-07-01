@@ -1,5 +1,17 @@
+import std/strformat
+
 import ffmpeg
 import log
+
+
+proc initCodec(name: string): ptr AVCodec =
+  result = avcodec_find_encoder_by_name(name.cstring)
+  if result == nil:
+    let desc = avcodec_descriptor_get_by_name(name.cstring)
+    if desc != nil:
+      result = avcodec_find_encoder(desc.id)
+  if result == nil:
+    error "Codec not found: " & name
 
 proc initEnCtx(codec: ptr AVCodec): ptr AVCodecContext =
   let encoderCtx = avcodec_alloc_context3(codec)
@@ -18,14 +30,7 @@ proc initEncoder*(id: AVCodecID): (ptr AVCodec, ptr AVCodecContext) =
   return (codec, initEnCtx(codec))
 
 proc initEncoder*(name: string): (ptr AVCodec, ptr AVCodecContext) =
-  var codec: ptr AVCodec = avcodec_find_encoder_by_name(name.cstring)
-  if codec == nil:
-    let desc = avcodec_descriptor_get_by_name(name.cstring)
-    if desc != nil:
-      codec = avcodec_find_encoder(desc.id)
-
-  if codec == nil:
-    error "Encoder not found: " & name
+  let codec = initCodec(name)
   return (codec, initEnCtx(codec))
 
 proc initDecoder*(codecpar: ptr AVCodecParameters): ptr AVCodecContext =
@@ -148,6 +153,40 @@ proc mediaLength*(container: InputContainer): AVRational =
 
 proc close*(container: InputContainer) =
   avformat_close_input(addr container.formatContext)
+
+
+proc addStream*(format: ptr AVFormatContext, codecName: string, rate: cint = 48000) =
+  let codec = initCodec(codecName)
+
+  # Assert that this format supports the requested codec.
+  if avformat_query_codec(format.oformat[], codec.id, FF_COMPLIANCE_NORMAL) == 0:
+    error &"? format does not support {codecName} codec"
+
+  let stream: ptr AVStream = avformat_new_stream(format, codec)
+  let ctx: ptr AVCodecContext = avcodec_alloc_context3(codec)
+  if ctx == nil:
+    error "Could not allocate encoder context"
+
+  # Now lets set some more sane video defaults
+  if codec.`type` == AVMEDIA_TYPE_VIDEO:
+    # ctx.pix_fmt = AV_PIX_FMT_YUV420P
+    ctx.width = 640
+    ctx.height = 480
+    ctx.bit_rate = 0
+    ctx.bit_rate_tolerance = 128000
+    # stream.avg_frame_rate = ctx.framerate
+    stream.time_base = ctx.time_base
+  # Some sane audio defaults
+  elif codec.`type` == AVMEDIA_TYPE_AUDIO:
+    ctx.sample_fmt = codec.sample_fmts[0]
+    ctx.bit_rate = 0
+    ctx.bit_rate_tolerance = 32000
+    ctx.sample_rate = rate
+    stream.time_base = ctx.time_base
+
+  if avcodec_parameters_from_context(stream.codecpar, ctx) < 0:
+    error "Could not set ctx parameters"
+
 
 proc close*(outputCtx: ptr AVFormatContext) =
   discard av_write_trailer(outputCtx)

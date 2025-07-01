@@ -105,7 +105,7 @@ type
   AVFormatContext* {.importc, header: "<libavformat/avformat.h>".} = object
     av_class*: pointer
     iformat*: pointer
-    oformat*: ptr[AVOutputFormat]
+    oformat*: ptr AVOutputFormat
     priv_data*: pointer
     pb*: pointer
     ctx_flags*: cint
@@ -287,6 +287,14 @@ proc av_get_channel_layout_string*(buf: cstring, buf_size: cint,
     nb_channels: cint, channel_layout: uint64): cstring {.importc,
     header: "<libavutil/channel_layout.h>".}
 proc av_get_pix_fmt_name*(pix_fmt: AVPixelFormat): cstring {.importc, cdecl.}
+
+proc avformat_query_codec*(ofmt: AVOutputFormat, codec_id: AVCodecID,
+  std_compliance: cint): cint {.importc, header: "<libavformat/avformat.h>".}
+
+const FF_COMPLIANCE_STRICT*: cint = 1
+const FF_COMPLIANCE_NORMAL*: cint = 0
+const FF_COMPLIANCE_INOFFICIAL*: cint = -1
+const FF_COMPLIANCE_EXPERIMENTAL*: cint = -2
 
 # https://www.ffmpeg.org/doxygen/7.0/group__lavu__dict.html#gae67f143237b2cb2936c9b147aa6dfde3
 proc av_dict_get*(m: ptr AVDictionary, key: cstring,
