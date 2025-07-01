@@ -105,8 +105,7 @@ proc initResampler(iter: AudioIterator, inputFormat: AVSampleFormat,
     error "Could not set input sample format"
 
   # Set output parameters (target format)
-  var outputLayout = inputLayout # Keep same layout
-  if av_opt_set_chlayout(iter.swrCtx, "out_chlayout", unsafeAddr outputLayout, 0) < 0:
+  if av_opt_set_chlayout(iter.swrCtx, "out_chlayout", unsafeAddr inputLayout, 0) < 0:
     error "Could not set output channel layout"
   if av_opt_set_int(iter.swrCtx, "out_sample_rate", iter.sampleRate, 0) < 0:
     error "Could not set output sample rate"

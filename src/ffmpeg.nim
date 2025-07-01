@@ -554,6 +554,7 @@ proc prettyAudioFrame*(frame: ptr AVFrame): string =
       $frame.nb_samples & ">"
 
 const
+  AV_CODEC_ID_NONE* = AVCodecID(0)
   AV_CODEC_ID_PCM_S16LE* = AVCodecID(65536)
   AVFMT_NOFILE* = 0x0001
   AVIO_FLAG_WRITE* = 2

@@ -3,19 +3,9 @@ import std/strformat
 
 import ../about
 import ../timeline
+import ../[av, ffmpeg, log]
 import audio
 
-# Priority type for frame ordering (unused in simplified version)
-# type
-#   Priority = object
-#     index: int64  # time in timebase
-#     frameType: string  # "audio", "video", "subtitle"
-#     frame: ptr AVFrame
-#     packet: ptr AVPacket
-#     stream: ptr AVStream
-#
-# proc `<`(a, b: Priority): bool =
-#   a.index < b.index
 
 proc makeMedia*(tl: v3, outputPath: string) =
   let tempDir = getTempDir() / &"ae-{version}"

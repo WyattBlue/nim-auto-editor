@@ -458,10 +458,6 @@ proc ndArrayToFile*(audioData: seq[seq[int16]], rate: int, outputPath: string) =
     if avio_open(addr outputCtx.pb, outputPath.cstring, AVIO_FLAG_WRITE) < 0:
       error fmt"Could not open output file '{outputPath}'"
 
-  # Create audio stream BEFORE encoder setup
-  let stream = avformat_new_stream(outputCtx, nil)
-  if stream == nil:
-    error "Could not create audio stream"
 
   let (encoder, encoderCtx) = initEncoder("pcm_s16le")
   defer: avcodec_free_context(addr encoderCtx)
@@ -480,6 +476,9 @@ proc ndArrayToFile*(audioData: seq[seq[int16]], rate: int, outputPath: string) =
     error "Could not open encoder"
 
   # Copy codec parameters to stream
+  let stream = avformat_new_stream(outputCtx, nil)
+  if stream == nil:
+    error "Could not create audio stream"
   discard avcodec_parameters_from_context(stream.codecpar, encoderCtx)
 
   if avformat_write_header(outputCtx, nil) < 0:

@@ -218,32 +218,10 @@ proc muxAudio*(inputPath, outputPath: string, streamIndex: int64) =
     if audioBuffer.fifo != nil:
       av_audio_fifo_free(audioBuffer.fifo)
 
-  # Set up resampler
-  var swrCtx: ptr SwrContext = swr_alloc()
-  if swrCtx == nil:
-    error "Could not allocate resampler context"
-  defer: swr_free(addr swrCtx)
-
-  if av_opt_set_chlayout(swrCtx, "in_chlayout", addr decoderCtx.ch_layout, 0) < 0:
-    error "Could not set input channel layout"
-
-  if av_opt_set_int(swrCtx, "in_sample_rate", decoderCtx.sample_rate, 0) < 0:
-    error "Could not set input sample rate"
-
-  if av_opt_set_sample_fmt(swrCtx, "in_sample_fmt", decoderCtx.sample_fmt, 0) < 0:
-    error "Could not set input sample format"
-
-  if av_opt_set_chlayout(swrCtx, "out_chlayout", addr encoderCtx.ch_layout, 0) < 0:
-    error "Could not set output channel layout"
-
-  if av_opt_set_int(swrCtx, "out_sample_rate", encoderCtx.sample_rate, 0) < 0:
-    error "Could not set output sample rate"
-
-  if av_opt_set_sample_fmt(swrCtx, "out_sample_fmt", encoderCtx.sample_fmt, 0) < 0:
-    error "Could not set output sample format"
-
-  if swr_init(swrCtx) < 0:
+  let swrCtx: ptr SwrContext = allocResampler(decoderCtx).setResampler(encoderCtx)
+  if swrCtx.swr_init() < 0:
     error "Could not initialize resampler"
+  defer: swr_free(addr swrCtx)
 
   let outputStream: ptr AVStream = avformat_new_stream(outputCtx, nil)
   if outputStream == nil:
