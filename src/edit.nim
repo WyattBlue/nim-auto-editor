@@ -218,20 +218,20 @@ proc editMedia*(args: mainArgs) =
       for myRange in args.cutOut:
         let start = toTb(myRange[0], tb.float64)
         let stop = toTb(myRange[1], tb.float64)
-        for i in countup(start, stop-1):
+        for i in start ..< min(stop, speedIndex.len):
           speedIndex[i] = getSpeedIndex(99999.0)
 
       for myRange in args.addIn:
         let start = toTb(myRange[0], tb.float64)
         let stop = toTb(myRange[1], tb.float64)
-        for i in countup(start, stop-1):
+        for i in start ..< min(stop, speedIndex.len):
           speedIndex[i] = 1 # Video speed
 
       for speedRange in args.setSpeed:
         let speed = speedRange[0]
         let start = toTb(speedRange[1], tb.float64)
         let stop = toTb(speedRange[2], tb.float64)
-        for i in countup(start, stop-1):
+        for i in start ..< min(stop, speedIndex.len):
           speedIndex[i] = getSpeedIndex(speed)
 
       chunks = chunkify(speedIndex, speedHash)

@@ -81,6 +81,10 @@ proc parseMargin(val: string): (PackedInt, PackedInt) =
     vals.add vals[0]
   if vals.len != 2:
     error "--margin has too many arguments."
+  if "end" in vals:
+    error "Invalid number: 'end'"
+  if "start" in vals:
+    error "Invalid number: 'start'"
   return (parseTime(vals[0]), parseTime(vals[1]))
 
 proc parseTimeRange(val, opt: string): (PackedInt, PackedInt) =

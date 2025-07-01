@@ -43,8 +43,12 @@ func aspectRatio*(width, height: int): tuple[w, h: int] =
   return (width div c, height div c)
 
 proc parseTime*(val: string): PackedInt =
-  let tb = 1000.0
+  if val == "start":
+    return pack(false, 0)
+  if val == "end":
+    return pack(false, 0x3FFFFFFFFFFFFFFF)
 
+  let tb = 1000.0
   let (num, unit) = splitNumStr(val)
   if unit in ["s", "sec", "secs", "second", "seconds"]:
     return pack(true, round(num * tb).int64)
