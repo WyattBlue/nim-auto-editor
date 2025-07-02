@@ -2,6 +2,7 @@ import std/[os, terminal, browsers]
 import std/[strutils, strformat]
 import std/sequtils
 import std/tables
+import std/random
 from std/math import round
 
 import av
@@ -278,7 +279,39 @@ proc editMedia*(args: mainArgs) =
   if args.output == "-":
     error "Exporting media files to stdout is not supported."
 
-  makeMedia(tlV3, output)
+  proc createAlphanumTempDir(length: int = 8): string =
+    const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+    const prefix = "tmp"
+    var suffix = ""
+    for i in 0..<length:
+      suffix.add(chars[rand(chars.len - 1)])
+
+    let dirName = prefix & suffix
+    let fullPath = getTempDir() / dirName
+    createDir(fullPath)
+    return fullPath
+
+  randomize()
+  var tempDir: string
+  if args.tempDir == "":
+    tempDir = createAlphanumTempDir()
+  else:
+    if fileExists(args.tempDir):
+      error "Temp directory cannot be an already existing file."
+    if dirExists(args.tempDir):
+      discard
+    else:
+      createDir(args.tempDir)
+    tempDir = args.tempDir
+
+  debug &"Temp Directory: {tempDir}"
+  defer:
+    try:
+      removeDir(tempDir)
+    except OSError:
+      discard
+
+  makeMedia(tlV3, tempDir, output)
 
   if not args.noOpen and exportKind == "default":
     openDefaultBrowser(output)

@@ -25,8 +25,8 @@ Commands:
 Options:
   Editing Options:
     -m, --margin LENGTH           Set sections near "loud" as "loud" too if
-                                  section is less than LENGTH away. (default is
-                                  "0.2s")
+                                  section is less than LENGTH away. (default
+                                  is "0.2s")
     --edit METHOD                 Set an expression which determines how to
                                   make auto edits
     -ex, --export EXPORT:ATTRS?   Choose the export mode. (default is
@@ -49,7 +49,8 @@ Options:
 
   URL Download Options:
     --yt-dlp-location PATH        Set a custom path to yt-dlp
-    --download-format FORMAT      Set the yt-dlp download format (--format, -f)
+    --download-format FORMAT      Set the yt-dlp download format (--format,
+                                  -f)
     --output-format TEMPLATE      Set the yt-dlp output file template (
                                   --output, -o)
     --yt-dlp-extras CMD           Add extra options for yt-dlp. Must be in
@@ -69,6 +70,7 @@ Options:
   Miscellaneous:
     --no-open                     Do not open the output file after editing
                                   is done
+    --temp-dir PATH               Set where the temporary directory is located
     -V, --version                 Display version and halt
     -h, --help                    Show info about this program or option
                                   then exit
@@ -208,7 +210,7 @@ judge making cuts.
     of "-q", "--quiet":
       quiet = true
     of "--debug":
-      args.debug = true
+      isDebug = true
     of "--preview", "--stats":
       args.preview = true
     of "--no-open":
@@ -241,7 +243,7 @@ judge making cuts.
       expecting = "set-speed"
     of "-b", "-bg", "--background":
       expecting = "background"
-    of "--progress", "--add-in", "--cut-out", "--yt-dlp-location", "--download-format", "--output-format", "--yt-dlp-extras":
+    of "--temp-dir", "--progress", "--add-in", "--cut-out", "--yt-dlp-location", "--download-format", "--output-format", "--yt-dlp-extras":
       expecting = key[2..^1]
     else:
       if key.startsWith("--"):
@@ -285,6 +287,8 @@ judge making cuts.
           error &"{key} is not a choice for --progress\nchoices are:\n  modern, classic, ascii, machine, none"
       of "margin":
         args.margin = parseMargin(key)
+      of "temp-dir":
+        args.tempDir = key
       expecting = ""
 
   if expecting != "":
@@ -294,7 +298,7 @@ judge making cuts.
     echo version
     quit(0)
 
-  if args.debug:
+  if args.input == "" and isDebug:
     when defined(windows):
       var cpuArchitecture: string
       when defined(amd64):

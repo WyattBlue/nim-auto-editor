@@ -51,7 +51,6 @@ type mainArgs* = object
 
   # Display Options
   progress*: BarType = modern
-  debug*: bool = false
   preview*: bool = false
 
   # Audio Rendering
@@ -59,7 +58,9 @@ type mainArgs* = object
 
   # Misc.
   noOpen*: bool = false
+  tempDir*: string = ""
 
+var isDebug* = false
 var quiet* = false
 
 proc conwrite*(msg: string) =
@@ -79,6 +80,11 @@ proc error*(msg: string) {.noreturn.} =
     conwrite("")
     stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)
     quit(1)
+
+
+proc debug*(msg: string) =
+  if isDebug:
+    stderr.styledWriteLine(fgGreen, "Debug: ", resetStyle, msg)
 
 
 type StringInterner* = object

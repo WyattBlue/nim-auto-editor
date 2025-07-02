@@ -3,7 +3,7 @@ import std/strformat
 import ../timeline
 import ../ffmpeg
 import ../log
-import ../util/fun
+import ../util/[color, fun]
 from std/os import splitFile
 
 #[
@@ -70,7 +70,7 @@ proc shotcut_write_mlt*(output: string, tl: v3) =
 
   let resource_prop = newElement("property")
   resource_prop.attrs = {"name": "resource"}.toXmlAttributes()
-  resource_prop.add(newText($tl.background))
+  resource_prop.add(newText(tl.background.toString))
   producer.add(resource_prop)
 
   let service_prop = newElement("property")

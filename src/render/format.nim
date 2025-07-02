@@ -1,21 +1,11 @@
 import std/os
-import std/strformat
 
-import ../about
 import ../timeline
-import ../[av, ffmpeg, log]
+import ../ffmpeg
 import audio
 
 
-proc makeMedia*(tl: v3, outputPath: string) =
-  let tempDir = getTempDir() / &"ae-{version}"
-  createDir(tempDir)
-  defer:
-    try:
-      removeDir(tempDir)
-    except OSError:
-      discard
-
+proc makeMedia*(tl: v3, tempDir: string, outputPath: string) =
   if tl.a.len > 0:
     let audioPaths = makeNewAudio(tl, tempDir)
     if audioPaths.len > 0:
