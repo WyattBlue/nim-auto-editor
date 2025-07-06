@@ -576,7 +576,7 @@ proc avformat_alloc_output_context2*(ctx: ptr ptr AVFormatContext,
     oformat: pointer, format_name: cstring, filename: cstring): cint {.importc,
     header: "<libavformat/avformat.h>".}
 proc avformat_new_stream*(s: ptr AVFormatContext,
-    c: pointer): ptr AVStream {.importc, header: "<libavformat/avformat.h>".}
+    c: ptr AVCodec): ptr AVStream {.importc, header: "<libavformat/avformat.h>".}
 proc avcodec_find_encoder*(id: AVCodecID): ptr AVCodec {.importc,
     header: "<libavcodec/avcodec.h>".}
 proc avcodec_find_encoder_by_name*(name: cstring): ptr AVCodec {.importc,

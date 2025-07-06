@@ -3,6 +3,8 @@ import std/strformat
 import ffmpeg
 import log
 
+proc `|=`*[T](a: var T, b: T) =
+  a = a or b
 
 proc initCodec(name: string): ptr AVCodec =
   result = avcodec_find_encoder_by_name(name.cstring)
@@ -77,13 +79,12 @@ proc setResampler*(swrCtx: ptr SwrContext, encoderCtx: ptr AVCodecContext): ptr 
 
   return swrCtx
 
-type
-  InputContainer* = ref object
-    formatContext*: ptr AVFormatContext
-    video*: seq[ptr AVStream]
-    audio*: seq[ptr AVStream]
-    subtitle*: seq[ptr AVStream]
-    streams*: seq[ptr AVStream]
+type InputContainer* = object
+  formatContext*: ptr AVFormatContext
+  video*: seq[ptr AVStream]
+  audio*: seq[ptr AVStream]
+  subtitle*: seq[ptr AVStream]
+  streams*: seq[ptr AVStream]
 
 proc open*(filename: string): InputContainer =
   result = InputContainer()
@@ -155,14 +156,90 @@ proc close*(container: InputContainer) =
   avformat_close_input(addr container.formatContext)
 
 
-proc addStream*(format: ptr AVFormatContext, codecName: string, rate: cint = 48000) =
+type OutputContainer* = object
+  file: string
+  formatCtx*: ptr AVFormatContext
+
+
+proc defaultVideoCodec*(container: OutputContainer): string =
+  # Returns the default video codec this container recommends.
+  if container.formatCtx != nil and container.formatCtx.oformat != nil:
+    let codecId = container.formatCtx.oformat.video_codec
+    if codecId != AV_CODEC_ID_NONE:
+      let codecName = avcodec_get_name(codecId)
+      if codecName != nil:
+        return $codecName
+  return ""
+
+proc defaultAudioCodec*(container: OutputContainer): string =
+  # Returns the default audio codec this container recommends.
+  if container.formatCtx != nil and container.formatCtx.oformat != nil:
+    let codecId = container.formatCtx.oformat.audio_codec
+    if codecId != AV_CODEC_ID_NONE:
+      let codecName = avcodec_get_name(codecId)
+      if codecName != nil:
+        return $codecName
+  return ""
+
+proc defaultSubtitleCodec*(container: OutputContainer): string =
+  # Returns the default subtitle codec this container recommends.
+  if container.formatCtx != nil and container.formatCtx.oformat != nil:
+    let codecId = container.formatCtx.oformat.subtitle_codec
+    if codecId != AV_CODEC_ID_NONE:
+      let codecName = avcodec_get_name(codecId)
+      if codecName != nil:
+        return $codecName
+  return ""
+
+proc openWrite*(file: string): OutputContainer =
+  let formatCtx: ptr AVFormatContext = nil
+  discard avformat_alloc_output_context2(addr formatCtx, nil, nil, file.cstring)
+  if formatCtx == nil:
+    error "Could not create output context"
+  OutputContainer(file: file, formatCtx: formatCtx)
+
+
+
+proc addStreamFromTemplate*(self: OutputContainer, streamT: ptr AVStream): (ptr AVCodecContext, ptr AVStream) =
+  let format = self.formatCtx
+
+  let ctxT = initDecoder(streamT.codecpar)
+  let codec: ptr AVCodec = ctxT.codec
+  defer: avcodec_free_context(addr ctxT)
+
+  # Assert that this format supports the requested codec.
+  if avformat_query_codec(format.oformat[], codec.id, FF_COMPLIANCE_NORMAL) == 0:
+    error &"? format does not support ? codec"
+
+  let stream: ptr AVStream = avformat_new_stream(format, codec)
+  let ctx: ptr AVCodecContext = avcodec_alloc_context3(codec)
+
+  # Reset the codec tag assuming we are remuxing.
+  discard avcodec_parameters_to_context(ctx, streamT.codecpar)
+  ctx.codec_tag = 0
+
+  # Some formats want stream headers to be separate
+  if (format.oformat.flags and AVFMT_GLOBALHEADER) != 0:
+    ctx.flags |= AV_CODEC_FLAG_GLOBAL_HEADER
+
+  # Initialize stream codec parameters to populate the codec type. Subsequent changes to
+  # the codec context will be applied just before encoding starts in `start_encoding()`.
+  if avcodec_parameters_from_context(stream.codecpar, ctx) < 0:
+    error "Could not set ctx parameters"
+
+  return (ctx, stream)
+
+proc addStream*(self: OutputContainer, codecName: string, rate: cint = 48000): (ptr AVCodecContext, ptr AVStream) =
   let codec = initCodec(codecName)
+  let format = self.formatCtx
 
   # Assert that this format supports the requested codec.
   if avformat_query_codec(format.oformat[], codec.id, FF_COMPLIANCE_NORMAL) == 0:
     error &"? format does not support {codecName} codec"
 
   let stream: ptr AVStream = avformat_new_stream(format, codec)
+  if stream == nil:
+    error "Could not allocate new stream"
   let ctx: ptr AVCodecContext = avcodec_alloc_context3(codec)
   if ctx == nil:
     error "Could not allocate encoder context"
@@ -184,9 +261,28 @@ proc addStream*(format: ptr AVFormatContext, codecName: string, rate: cint = 480
     ctx.sample_rate = rate
     stream.time_base = ctx.time_base
 
+  # Some formats want stream headers to be separate
+  if (format.oformat.flags and AVFMT_GLOBALHEADER) != 0:
+    ctx.flags |= AV_CODEC_FLAG_GLOBAL_HEADER
+
+  # Initialise stream codec parameters to populate the codec type.
+  #
+  # Subsequent changes to the codec context will be applied just before
+  # encoding starts in `start_encoding()`.
   if avcodec_parameters_from_context(stream.codecpar, ctx) < 0:
     error "Could not set ctx parameters"
 
+  return (ctx, stream)
+
+proc startEncoding*(self: OutputContainer) =
+  let outputCtx = self.formatCtx
+  if (outputCtx.oformat.flags and AVFMT_NOFILE) == 0:
+    var ret = avio_open(addr outputCtx.pb, self.file.cstring, AVIO_FLAG_WRITE)
+    if ret < 0:
+      error fmt"Could not open output file '{self.file}'"
+
+  if avformat_write_header(outputCtx, nil) < 0:
+    error "Error occurred when opening output file"
 
 proc close*(outputCtx: ptr AVFormatContext) =
   discard av_write_trailer(outputCtx)
@@ -194,6 +290,9 @@ proc close*(outputCtx: ptr AVFormatContext) =
   if (outputCtx.oformat.flags and AVFMT_NOFILE) == 0:
     discard avio_closep(addr outputCtx.pb)
   avformat_free_context(outputCtx)
+
+proc close*(self: OutputContainer) =
+  close(self.formatCtx)
 
 func avgRate*(stream: ptr AVStream): AVRational =
   return stream.avg_frame_rate
