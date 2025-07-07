@@ -93,18 +93,29 @@ test "aac-mux":
   let tempDir = createTempDir("tmp", "")
   defer: removeDir(tempDir)
   let outFile = tempDir / "out.aac"
-  muxAudio2("example.mp4", outFile)
+  muxAudio("example.mp4", outFile, 0)
 
   let container = av.open(outFile)
   defer: container.close()
   check(container.audio.len == 1)
   check($container.audio[0].name == "aac")
 
+test "wav-mux":
+  let tempDir = createTempDir("tmp", "")
+  defer: removeDir(tempDir)
+  let outFile = "out.wav"
+  muxAudio("resources/multi-track.mov", outFile, 1)
+
+  let container = av.open(outFile)
+  defer: container.close()
+  check(container.audio.len == 1)
+  check($container.audio[0].name == "pcm_s16le")
+
 test "wav1":
   let tempDir = createTempDir("tmp", "")
   defer: removeDir(tempDir)
   let outFile = tempDir / "out.wav"
-  muxAudio("example.mp4", outFile, 0)
+  transcodeAudio("example.mp4", outFile, 0)
 
   let container = av.open(outFile)
   defer: container.close()
@@ -115,7 +126,7 @@ test "aac":
   let tempDir = createTempDir("tmp", "")
   defer: removeDir(tempDir)
   let outFile = tempDir / "out.aac"
-  muxAudio("example.mp4", outFile, 0)
+  transcodeAudio("example.mp4", outFile, 0)
 
   let container = av.open(outFile)
   defer: container.close()
