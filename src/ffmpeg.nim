@@ -287,8 +287,7 @@ proc av_get_channel_layout_string*(buf: cstring, buf_size: cint,
     nb_channels: cint, channel_layout: uint64): cstring {.importc,
     header: "<libavutil/channel_layout.h>".}
 proc av_get_pix_fmt_name*(pix_fmt: AVPixelFormat): cstring {.importc, cdecl.}
-
-proc avformat_query_codec*(ofmt: AVOutputFormat, codec_id: AVCodecID,
+proc avformat_query_codec*(ofmt: ptr AVOutputFormat, codec_id: AVCodecID,
   std_compliance: cint): cint {.importc, header: "<libavformat/avformat.h>".}
 
 const FF_COMPLIANCE_STRICT*: cint = 1

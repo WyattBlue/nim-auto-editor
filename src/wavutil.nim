@@ -170,16 +170,17 @@ proc processAndEncodeFrame(
 
   return processedAny
 
-# proc muxAudio2*(inputPath, outputPath: string) =
-#   let c = av.open(inputPath)
-#   defer: c.close()
-#   let output = openWrite(outputPath)
-#   defer: output.close()
+proc muxAudio2*(inputPath, outputPath: string) =
+  var c = av.open(inputPath)
+  defer: c.close()
+  var output = openWrite(outputPath)
+  defer: output.close()
 
-#   let outputStream = output.addStreamFromTemplate(c.audio[0])
-#   for packet in c.demux():
-#     packet.stream = outputStream
-#     output.mux(packet)
+  let audioStream = c.audio[0]
+  discard output.addStreamFromTemplate(audioStream)
+  for packet in c.demux(audioStream.index):
+    packet.stream_index = 0
+    output.mux(packet)
 
 
 proc muxAudio*(inputPath, outputPath: string, streamIndex: int64) =

@@ -89,6 +89,17 @@ test "margin":
   mutMargin(levels, 2, 2)
   check(levels == @[true, true, true, true, true])
 
+test "aac-mux":
+  let tempDir = createTempDir("tmp", "")
+  defer: removeDir(tempDir)
+  let outFile = tempDir / "out.aac"
+  muxAudio2("example.mp4", outFile)
+
+  let container = av.open(outFile)
+  defer: container.close()
+  check(container.audio.len == 1)
+  check($container.audio[0].name == "aac")
+
 test "wav1":
   let tempDir = createTempDir("tmp", "")
   defer: removeDir(tempDir)
@@ -99,17 +110,6 @@ test "wav1":
   defer: container.close()
   check(container.audio.len == 1)
   check($container.audio[0].name == "pcm_s16le")
-
-test "mp3":
-  let tempDir = createTempDir("tmp", "")
-  defer: removeDir(tempDir)
-  let outFile = tempDir / "out.mp3"
-  muxAudio("example.mp4", outFile, 0)
-
-  let container = av.open(outFile)
-  defer: container.close()
-  check(container.audio.len == 1)
-  check($container.audio[0].name in ["mp3", "mp3float"])
 
 test "aac":
   let tempDir = createTempDir("tmp", "")
