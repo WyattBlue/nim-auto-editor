@@ -448,16 +448,9 @@ proc processAudioClip*(clip: Clip, data: seq[seq[int16]], sr: int): seq[seq[int1
         result[1][i] = result[0][i]
 
 proc ndArrayToFile*(audioData: seq[seq[int16]], rate: int, outputPath: string) =
-  var outputCtx: ptr AVFormatContext
-  if avformat_alloc_output_context2(addr outputCtx, nil, "wav", outputPath.cstring) < 0:
-    error "Could not create output context"
-  defer:
-    outputCtx.close()
-
-  if (outputCtx.oformat.flags and AVFMT_NOFILE) == 0:
-    if avio_open(addr outputCtx.pb, outputPath.cstring, AVIO_FLAG_WRITE) < 0:
-      error fmt"Could not open output file '{outputPath}'"
-
+  var output = openWrite(outputPath)
+  let outputCtx = output.formatCtx
+  defer: output.close()
 
   let (encoder, encoderCtx) = initEncoder("pcm_s16le")
   defer: avcodec_free_context(addr encoderCtx)
@@ -481,8 +474,7 @@ proc ndArrayToFile*(audioData: seq[seq[int16]], rate: int, outputPath: string) =
     error "Could not create audio stream"
   discard avcodec_parameters_from_context(stream.codecpar, encoderCtx)
 
-  if avformat_write_header(outputCtx, nil) < 0:
-    error "Error occurred when opening output file"
+  output.startEncoding()
 
   # Write all audio data in chunks
   if audioData.len > 0 and audioData[0].len > 0:
