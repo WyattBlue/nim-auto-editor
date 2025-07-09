@@ -107,7 +107,7 @@ test "aac-mux":
 test "wav-mux":
   let tempDir = createTempDir("tmp", "")
   defer: removeDir(tempDir)
-  let outFile = "out.wav"
+  let outFile = tempDir / "out.wav"
   muxAudio("resources/multi-track.mov", outFile, 1)
 
   let container = av.open(outFile)
@@ -126,6 +126,17 @@ test "wav1":
   check(container.audio.len == 1)
   check($container.audio[0].name == "pcm_s16le")
 
+test "mp3":
+  let tempDir = createTempDir("tmp", "")
+  defer: removeDir(tempDir)
+  let outFile = tempDir / "out.mp3"
+  transcodeAudio("example.mp4", outFile, 0)
+
+  let container = av.open(outFile)
+  defer: container.close()
+  check(container.audio.len == 1)
+  check($container.audio[0].name in ["mp3", "mp3float"])
+
 test "aac":
   let tempDir = createTempDir("tmp", "")
   defer: removeDir(tempDir)
@@ -137,6 +148,6 @@ test "aac":
   check(container.audio.len == 1)
   check($container.audio[0].name == "aac")
 
-test "dialouge":
+test "dialogue":
   check("0,0,Default,,0,0,0,,oop".dialogue == "oop")
   check("0,0,Default,,0,0,0,,boop".dialogue == "boop")
