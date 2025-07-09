@@ -266,12 +266,12 @@ proc addStream*(self: var OutputContainer, codecName: string, rate: cint = 48000
 
   # Now lets set some more sane video defaults
   if codec.`type` == AVMEDIA_TYPE_VIDEO:
-    # ctx.pix_fmt = AV_PIX_FMT_YUV420P
+    ctx.pix_fmt = AVPixelFormat(0) # AV_PIX_FMT_YUV420P
     ctx.width = 640
     ctx.height = 480
     ctx.bit_rate = 0
     ctx.bit_rate_tolerance = 128000
-    # stream.avg_frame_rate = ctx.framerate
+    stream.avg_frame_rate = ctx.framerate
     stream.time_base = ctx.time_base
   # Some sane audio defaults
   elif codec.`type` == AVMEDIA_TYPE_AUDIO:

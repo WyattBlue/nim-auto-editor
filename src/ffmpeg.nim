@@ -218,15 +218,13 @@ type
     ch_layout*: AVChannelLayout
     gop_size*: cint
     frame_size*: cint
+    framerate*: AVRational
     pix_fmt*: AVPixelFormat
-    # ... other fields omitted for brevity
     sample_rate*: cint
     sample_fmt*: AVSampleFormat
     sample_aspect_ratio*: AVRational
     thread_type*: cint
     thread_count*: cint
-
-    # ... other fields omitted for brevity
     color_range*: AVColorRange
     color_primaries*: AVColorPrimaries
     color_trc*: AVColorTransferCharacteristic
