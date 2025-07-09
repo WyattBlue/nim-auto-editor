@@ -45,12 +45,14 @@ func makeName(mi: MediaInfo, tb: AVRational): string =
     return "FFVideoFormat720p30"
   if mi.get_res()[1] == 720 and tb == 25:
     return "FFVideoFormat720p25"
+  if mi.get_res() == (3840'i64, 2160'i64) and tb == AVRational(num: 24000, den: 1001):
+    return "FFVideoFormat3840x2160p2398"
   return "FFVideoFormatRateUndefined"
 
 func pathToUri(a: string): string =
   return "file://" & a
 
-proc parseSMPTE(val: string, fps: AVRational): int =
+proc parseSMPTE*(val: string, fps: AVRational): int =
   if val.len == 0:
     return 0
 
@@ -68,11 +70,11 @@ proc parseSMPTE(val: string, fps: AVRational): int =
         60 or frames < 0:
       raise newException(ValueError, &"Invalid SMPTE values: {val}")
 
-    if frames >= fps:
-      raise newException(ValueError, &"Frame count {frames} exceeds fps {fps}")
+    let timecodeFps = int(round(fps.num / fps.den))
+    if frames >= timecodeFps:
+      raise newException(ValueError, &"Frame count {frames} exceeds timecode fps {timecodeFps}")
 
-    var totalFrames = (hours * 3600 + minutes * 60 + seconds) * fps + frames
-    return int(round(totalFrames))
+    return (hours * 3600 + minutes * 60 + seconds) * timecodeFps + frames
   except ValueError as e:
     error(&"Cannot parse SMPTE timecode '{val}': {e.msg}")
 

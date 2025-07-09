@@ -9,6 +9,7 @@ import ../src/wavutil
 import ../src/cmds/info
 import ../src/media
 import ../src/timeline
+import ../src/exports/fcp11
 
 test "struct-sizes":
   check(sizeof(AVRational) == 8)
@@ -19,6 +20,9 @@ test "struct-sizes":
   check(sizeof(VideoStream) == 144)
   check(sizeof(AudioStream) == 72)
   check(sizeof(Clip) == 56)
+
+test "smpte":
+  check(parseSMPTE("13:44:05:21", AVRational(num: 24000, den: 1001)) == 1186701)
 
 test "maths":
   let a = AVRational(num: 3, den: 4)
