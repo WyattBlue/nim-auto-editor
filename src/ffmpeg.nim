@@ -306,6 +306,8 @@ proc av_dict_free*(m: ptr ptr AVDictionary) {.importc,
 proc av_channel_layout_describe*(ch_layout: ptr AVChannelLayout, buf: cstring,
     buf_size: csize_t): cint {.importc, header: "<libavutil/channel_layout.h>".}
 
+proc av_channel_layout_default*(ch_layout: ptr AVChannelLayout, nb_channels: cint) {.importc, header: "<libavutil/channel_layout.h>".}
+
 
 type
   AVPacket* {.importc, header: "<libavcodec/packet.h>", bycopy.} = object
@@ -700,6 +702,7 @@ proc av_buffersink_get_frame*(ctx: ptr AVFilterContext,
 proc av_buffersink_get_frame_flags*(ctx: ptr AVFilterContext,
     frame: ptr AVFrame, flags: cint): cint {.importc,
     header: "<libavfilter/buffersink.h>".}
+
 
 # String utilities for filters
 proc av_strdup*(s: cstring): cstring {.importc, header: "<libavutil/mem.h>".}

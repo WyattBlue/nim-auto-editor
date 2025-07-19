@@ -4,6 +4,7 @@ import std/tables
 import ../log
 import ../timeline
 import ../[av, ffmpeg]
+import ../resampler
 
 type
   AudioFrame* = ref object
@@ -19,7 +20,6 @@ type
     stream*: ptr AVStream
     decoderCtx*: ptr AVCodecContext
     rate*: int
-
 
 proc newGetter*(path: string, stream: int, rate: int): Getter =
   result = new(Getter)
@@ -467,24 +467,108 @@ proc ndArrayToFile*(audioData: seq[seq[int16]], rate: int, outputPath: string) =
       discard av_interleaved_write_frame(outputCtx, packet)
       av_packet_unref(packet)
 
-proc mixAudioFiles*(sr: int, audioPaths: seq[string], outputPath: string) =
-  # This is a simplified mixing function
-  # In a full implementation, you'd properly decode each file and mix the samples
 
-  if audioPaths.len == 0:
-    error "No audio files to mix"
+iterator makeNewAudioFrames*(tl: v3, tempDir: string, targetSampleRate: int, targetChannels: int): (ptr AVFrame, int) =
+  # Generator that yields audio frames directly for use in makeMedia
+  var samples: Table[(string, int32), Getter]
 
-  if audioPaths.len == 1:
-    # Just copy the single file
-    copyFile(audioPaths[0], outputPath)
-    return
+  if tl.a.len == 0 or tl.a[0].len == 0:
+    error "Trying to render empty audio timeline"
 
-  # For now, just copy the first file as a placeholder
-  # In a full implementation, you'd:
-  # 1. Decode all audio files
-  # 2. Mix the samples together
-  # 3. Encode the result
-  copyFile(audioPaths[0], outputPath)
+  # For now, process the first audio layer
+  let layer = tl.a[0] 
+  if layer.len > 0:  # Only process if layer has clips
+    # Create getters for all unique sources
+    for clip in layer:
+      let key = (clip.src[], clip.stream)
+      if key notin samples:
+        samples[key] = newGetter(clip.src[], clip.stream.int, targetSampleRate)
+
+    # Calculate total duration and create audio buffer
+    var totalDuration = 0
+    for clip in layer:
+      totalDuration = max(totalDuration, clip.start + clip.dur)
+
+    let totalSamples = int(totalDuration * targetSampleRate.int64 * tl.tb.den div tl.tb.num)
+    var audioData = @[newSeq[int16](totalSamples), newSeq[int16](totalSamples)]
+
+    # Initialize with silence
+    for ch in 0..<audioData.len:
+      for i in 0..<totalSamples:
+        audioData[ch][i] = 0
+
+    # Process each clip and mix into the output
+    for clip in layer:
+      let key = (clip.src[], clip.stream)
+      if key in samples:
+        let sampStart = int(clip.offset.float64 * clip.speed * targetSampleRate.float64 / tl.tb)
+        let sampEnd = int(float64(clip.offset + clip.dur) * clip.speed * targetSampleRate.float64 / tl.tb)
+
+        let getter = samples[key]
+        let srcData = getter.get(sampStart, sampEnd)
+
+        let startSample = int(clip.start * targetSampleRate.int64 * tl.tb.den div tl.tb.num)
+        let durSamples = int(clip.dur * targetSampleRate.int64 * tl.tb.den div tl.tb.num)
+        let processedData = processAudioClip(clip, srcData, targetSampleRate)
+        
+        if processedData.len > 0:
+          for ch in 0 ..< min(audioData.len, processedData.len):
+            for i in 0 ..< min(durSamples, processedData[ch].len):
+              let outputIndex = startSample + i
+              if outputIndex < audioData[ch].len:
+                let currentSample = audioData[ch][outputIndex].int32
+                let newSample = processedData[ch][i].int32
+                let mixed = currentSample + newSample
+                # Clamp to 16-bit range to prevent overflow distortion
+                audioData[ch][outputIndex] = int16(max(-32768, min(32767, mixed)))
+
+    # Yield audio frames in chunks
+    const frameSize = 1024
+    var samplesYielded = 0
+    var frameIndex = 0
+
+    var resampler = newAudioResampler(AV_SAMPLE_FMT_FLTP, "stereo", tl.sr)
+    
+    while samplesYielded < totalSamples:
+      let currentFrameSize = min(frameSize, totalSamples - samplesYielded)
+      
+      var frame = av_frame_alloc()
+      if frame == nil:
+        error "Could not allocate audio frame"
+      
+      frame.nb_samples = currentFrameSize.cint
+      frame.format = AV_SAMPLE_FMT_S16P.cint  # Planar format
+      frame.ch_layout.nb_channels = targetChannels.cint
+      frame.ch_layout.order = 0
+      if targetChannels == 1:
+        frame.ch_layout.u.mask = 1  # AV_CH_LAYOUT_MONO
+      else:
+        frame.ch_layout.u.mask = 3  # AV_CH_LAYOUT_STEREO
+      frame.sample_rate = targetSampleRate.cint
+      frame.pts = samplesYielded.int64
+      
+      if av_frame_get_buffer(frame, 0) < 0:
+        av_frame_free(addr frame)
+        error "Could not allocate audio frame buffer"
+      
+      # Copy audio data to frame (planar format)
+      for ch in 0..<min(targetChannels, audioData.len):
+        let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
+        for i in 0..<currentFrameSize:
+          let srcIndex = samplesYielded + i
+          if ch < audioData.len and srcIndex < audioData[ch].len:
+            channelData[i] = audioData[ch][srcIndex]
+          else:
+            channelData[i] = 0
+      
+      for newFrame in resampler.resample(frame):
+        yield (newFrame, frameIndex)
+        frameIndex += 1
+      samplesYielded += currentFrameSize
+
+    # Close all getters
+    for getter in samples.values:
+      getter.close()
 
 proc makeNewAudio*(tl: v3, outputDir: string): seq[string] =
   var samples: Table[(string, int32), Getter]
