@@ -14,71 +14,12 @@ type
     ch_layout*: AVChannelLayout
     pts*: int64
 
-  AudioResampler* = ref object
-    swrCtx*: ptr SwrContext
-    outputFormat*: AVSampleFormat
-    outputLayout*: AVChannelLayout
-    outputSampleRate*: int
-
   Getter* = ref object
     container*: InputContainer
     stream*: ptr AVStream
     decoderCtx*: ptr AVCodecContext
     rate*: int
 
-proc newAudioResampler*(format: AVSampleFormat, layout: string,
-  rate: int): AudioResampler =
-  result = new(AudioResampler)
-  result.swrCtx = swr_alloc()
-  result.outputFormat = format
-  result.outputSampleRate = rate
-
-  # Set up output channel layout
-  var outputLayout: AVChannelLayout
-  if layout == "stereo":
-    outputLayout.nb_channels = 2
-    outputLayout.order = 0
-    outputLayout.u.mask = 3 # AV_CH_LAYOUT_STEREO
-  elif layout == "mono":
-    outputLayout.nb_channels = 1
-    outputLayout.order = 0
-    outputLayout.u.mask = 1 # AV_CH_LAYOUT_MONO
-  else:
-    error "Unsupported audio layout: " & layout
-
-  result.outputLayout = outputLayout
-
-proc init*(resampler: AudioResampler, inputLayout: AVChannelLayout,
-    inputFormat: AVSampleFormat, inputRate: int) =
-  discard av_opt_set_chlayout(resampler.swrCtx, "in_chlayout",
-      unsafeAddr inputLayout, 0)
-  discard av_opt_set_sample_fmt(resampler.swrCtx, "in_sample_fmt", inputFormat, 0)
-  discard av_opt_set_int(resampler.swrCtx, "in_sample_rate", inputRate, 0)
-
-  discard av_opt_set_chlayout(resampler.swrCtx, "out_chlayout",
-      unsafeAddr resampler.outputLayout, 0)
-  discard av_opt_set_sample_fmt(resampler.swrCtx, "out_sample_fmt",
-      resampler.outputFormat, 0)
-  discard av_opt_set_int(resampler.swrCtx, "out_sample_rate",
-      resampler.outputSampleRate, 0)
-
-  if swr_init(resampler.swrCtx) < 0:
-    error "Failed to initialize audio resampler"
-
-proc resample*(resampler: AudioResampler, frame: ptr AVFrame): seq[ptr uint8] =
-  var outputData: ptr uint8
-  let outputSamples = swr_convert(resampler.swrCtx, addr outputData, frame.nb_samples,
-                                  cast[ptr ptr uint8](addr frame.data[0]),
-                                      frame.nb_samples)
-  if outputSamples < 0:
-    error "Failed to resample audio"
-
-  # Return the converted audio data
-  result = @[outputData]
-
-proc close*(resampler: AudioResampler) =
-  if resampler.swrCtx != nil:
-    swr_free(addr resampler.swrCtx)
 
 proc newGetter*(path: string, stream: int, rate: int): Getter =
   result = new(Getter)
@@ -390,7 +331,6 @@ proc processAudioClip*(clip: Clip, data: seq[seq[int16]], sr: int): seq[seq[int1
   var totalSamples = 0
   for frame in outputFrames:
     totalSamples += frame.nb_samples.int
-
 
 
   # Initialize result with proper size
