@@ -563,7 +563,6 @@ const
   AV_CODEC_ID_PCM_S16LE* = AVCodecID(65536)
   AVFMT_NOFILE* = 0x0001
   AVIO_FLAG_WRITE* = 2
-  AV_OPT_SEARCH_CHILDREN* = 0x0001
 
 type AVCodecDescriptor* {.importc, header: "<libavcodec/avcodec.h>".} = object
   id*: AVCodecID

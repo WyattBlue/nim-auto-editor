@@ -246,61 +246,50 @@ proc createAudioFilterGraph(clip: Clip, sr: int, channels: int): (ptr AVFilterGr
   if ret < 0:
     error fmt"Cannot create audio buffer sink: {ret}"
 
-  # The buffer sink will output in the same format as input by default
-
-  # Create and link filters manually
-  var currentFilter = bufferSrc
+  var filterChain = ""
   var needsFilters = false
 
   if clip.speed != 1.0:
     needsFilters = true
-    # Clamp speed to atempo filter's valid range [0.5 100.0]
     let clampedSpeed = max(0.5, min(100.0, clip.speed))
-    var atempoFilter: ptr AVFilterContext = nil
-    ret = avfilter_graph_create_filter(addr atempoFilter, avfilter_get_by_name("atempo"),
-                                      "atempo", nil, nil, filterGraph)
-    if ret < 0:
-      error fmt"Cannot create atempo filter: {ret}"
-    
-    ret = av_opt_set(atempoFilter, "tempo", cstring($clampedSpeed), AV_OPT_SEARCH_CHILDREN)
-    if ret < 0:
-      error fmt"Cannot set atempo tempo parameter: {ret}"
-    
-    ret = avfilter_link(currentFilter, 0, atempoFilter, 0)
-    if ret < 0:
-      error fmt"Cannot link atempo filter: {ret}"
-    
-    currentFilter = atempoFilter
+    if filterChain != "":
+      filterChain &= ","
+    filterChain &= fmt"atempo={clampedSpeed}"
 
-  # Handle volume changes
   if clip.volume != 1.0:
     needsFilters = true
-    var volumeFilter: ptr AVFilterContext = nil
-    ret = avfilter_graph_create_filter(addr volumeFilter, avfilter_get_by_name("volume"),
-                                      "volume", nil, nil, filterGraph)
-    if ret < 0:
-      error fmt"Cannot create volume filter: {ret}"
+    if filterChain != "":
+      filterChain &= ","
+    filterChain &= fmt"volume={clip.volume}"
 
-    # Set the volume parameter
-    ret = av_opt_set(volumeFilter, "volume", cstring($clip.volume), AV_OPT_SEARCH_CHILDREN)
-    if ret < 0:
-      error fmt"Cannot set volume parameter: {ret}"
+  if not needsFilters:
+    filterChain = "anull"
 
-    ret = avfilter_link(currentFilter, 0, volumeFilter, 0)
-    if ret < 0:
-      error fmt"Cannot link volume filter: {ret}"
+  var inputs = avfilter_inout_alloc()
+  var outputs = avfilter_inout_alloc()
+  if inputs == nil or outputs == nil:
+    error "Could not allocate filter inputs/outputs"
 
-    currentFilter = volumeFilter
+  outputs.name = av_strdup("in")
+  outputs.filter_ctx = bufferSrc
+  outputs.pad_idx = 0
+  outputs.next = nil
 
-  # Connect final filter to sink
-  ret = avfilter_link(currentFilter, 0, bufferSink, 0)
+  inputs.name = av_strdup("out")
+  inputs.filter_ctx = bufferSink
+  inputs.pad_idx = 0
+  inputs.next = nil
+
+  ret = avfilter_graph_parse_ptr(filterGraph, filterChain.cstring, addr inputs, addr outputs, nil)
   if ret < 0:
-    error fmt"Cannot link to buffer sink: {ret}"
+    error fmt"Could not parse audio filter graph: {ret}"
 
-  # Configure the filter graph
   ret = avfilter_graph_config(filterGraph, nil)
   if ret < 0:
     error fmt"Could not configure audio filter graph: {ret}"
+
+  avfilter_inout_free(addr inputs)
+  avfilter_inout_free(addr outputs)
 
   return (filterGraph, bufferSrc, bufferSink)
 
