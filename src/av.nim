@@ -247,7 +247,7 @@ proc addStreamFromTemplate*(self: var OutputContainer, streamT: ptr AVStream): p
 
   return stream
 
-proc addStream*(self: var OutputContainer, codecName: string, rate: cint = 48000): ptr AVStream =
+proc addStream*(self: var OutputContainer, codecName: string, rate: cint = 48000): (ptr AVStream, ptr AVCodecContext) =
   let codec = initCodec(codecName)
   let format = self.formatCtx
 
@@ -280,6 +280,7 @@ proc addStream*(self: var OutputContainer, codecName: string, rate: cint = 48000
     ctx.bit_rate_tolerance = 32000
     ctx.sample_rate = rate
     stream.time_base = ctx.time_base
+    av_channel_layout_default(addr ctx.ch_layout, 2)
 
   # Some formats want stream headers to be separate
   if (format.oformat.flags and AVFMT_GLOBALHEADER) != 0:
@@ -290,7 +291,7 @@ proc addStream*(self: var OutputContainer, codecName: string, rate: cint = 48000
   if avcodec_parameters_from_context(stream.codecpar, ctx) < 0:
     error "Could not set ctx parameters"
 
-  return stream
+  return (stream, ctx)
 
 proc startEncoding*(self: var OutputContainer) =
   if self.started:
