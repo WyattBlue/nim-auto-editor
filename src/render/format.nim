@@ -7,6 +7,7 @@ import ../timeline
 import ../ffmpeg
 import ../log
 import ../av
+import ../util/bar
 import audio
 
 type Priority = object
@@ -18,7 +19,7 @@ type Priority = object
 
 proc `<`(a, b: Priority): bool = a.index < b.index
 
-proc makeMedia*(tl: v3, tempDir: string, outputPath: string) =
+proc makeMedia*(tl: v3, tempDir: string, outputPath: string, bar: Bar) =
   conwrite("Processing media")
 
   # Check if we have audio to process
@@ -34,8 +35,6 @@ proc makeMedia*(tl: v3, tempDir: string, outputPath: string) =
     of ".ogg": "libvorbis"
     else: "pcm_s16le"  # Default to WAV
 
-  conwrite(&"Using audio codec: {audioCodec}")
-
   var output = openWrite(outputPath)
   defer: output.close()
 
@@ -48,6 +47,11 @@ proc makeMedia*(tl: v3, tempDir: string, outputPath: string) =
   output.startEncoding()
   conwrite("Generating audio from timeline")
 
+  var outPacket = av_packet_alloc()
+  if outPacket == nil:
+    error "Could not allocate output packet"
+  defer: av_packet_free(addr outPacket)
+
   # Process audio directly from timeline using the frame iterator
   for (frame, index) in makeNewAudioFrames(tl, tempDir, tl.sr.int, 2):
     defer: av_frame_free(addr frame)
@@ -56,23 +60,16 @@ proc makeMedia*(tl: v3, tempDir: string, outputPath: string) =
       error "Frame format doesn't match encoder format"
 
     if avcodec_send_frame(encoderCtx, frame) >= 0:
-      var outPacket = av_packet_alloc()
-      if outPacket == nil:
-        error "Could not allocate output packet"
-      defer: av_packet_free(addr outPacket)
-
       while avcodec_receive_packet(encoderCtx, outPacket) >= 0:
         outPacket.stream_index = outputStream.index
         av_packet_rescale_ts(outPacket, encoderCtx.time_base, outputStream.time_base)
         output.mux(outPacket[])
         av_packet_unref(outPacket)
 
-  if avcodec_send_frame(encoderCtx, nil) >= 0:
-    var outPacket = av_packet_alloc()
-    if outPacket == nil:
-      error "Could not allocate flush packet"
-    defer: av_packet_free(addr outPacket)
+  bar.`end`()
 
+  # Flush streams
+  if avcodec_send_frame(encoderCtx, nil) >= 0:
     while avcodec_receive_packet(encoderCtx, outPacket) >= 0:
       outPacket.stream_index = outputStream.index
       av_packet_rescale_ts(outPacket, encoderCtx.time_base, outputStream.time_base)

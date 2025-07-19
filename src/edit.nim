@@ -152,6 +152,8 @@ proc editMedia*(args: mainArgs) =
   if args.progress == BarType.machine and args.output != "-":
     conwrite("Starting")
 
+  let bar = initBar(args.progress)
+
   if args.input == "" and not stdin.isatty():
     let stdinContent = readAll(stdin)
     tlV3 = readJson(stdinContent, interner)
@@ -178,7 +180,6 @@ proc editMedia*(args: mainArgs) =
         pattern) = parseEditString(args.edit)
 
       if editMethod in ["audio", "motion"]:
-        let bar = initBar(args.progress)
         let levels = (if editMethod == "audio":
           audio(bar, container, args.input, tb, stream)
           else:
@@ -311,7 +312,7 @@ proc editMedia*(args: mainArgs) =
     except OSError:
       discard
 
-  makeMedia(tlV3, tempDir, output)
+  makeMedia(tlV3, tempDir, output, bar)
 
   if not args.noOpen and exportKind == "default":
     openDefaultBrowser(output)
