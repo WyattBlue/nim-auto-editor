@@ -1,6 +1,5 @@
 import std/os
 import std/heapqueue
-import std/strformat
 import std/strutils
 
 import ../timeline

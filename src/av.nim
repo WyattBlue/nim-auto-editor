@@ -51,34 +51,6 @@ proc initDecoder*(codecpar: ptr AVCodecParameters): ptr AVCodecContext =
   if avcodec_open2(result, codec, nil) < 0:
     error "Could not open codec"
 
-
-proc allocResampler*(decoderCtx: ptr AVCodecContext): ptr SwrContext =
-  var swrCtx: ptr SwrContext = swr_alloc()
-  if swrCtx == nil:
-    error "Could not allocate resampler context"
-
-  if av_opt_set_chlayout(swrCtx, "in_chlayout", addr decoderCtx.ch_layout, 0) < 0:
-    error "Could not set input channel layout"
-
-  if av_opt_set_int(swrCtx, "in_sample_rate", decoderCtx.sample_rate, 0) < 0:
-    error "Could not set input sample rate"
-
-  if av_opt_set_sample_fmt(swrCtx, "in_sample_fmt", decoderCtx.sample_fmt, 0) < 0:
-    error "Could not set input sample format"
-  return swrCtx
-
-proc setResampler*(swrCtx: ptr SwrContext, encoderCtx: ptr AVCodecContext): ptr SwrContext =
-  if av_opt_set_chlayout(swrCtx, "out_chlayout", addr encoderCtx.ch_layout, 0) < 0:
-    error "Could not set output channel layout"
-
-  if av_opt_set_int(swrCtx, "out_sample_rate", encoderCtx.sample_rate, 0) < 0:
-    error "Could not set output sample rate"
-
-  if av_opt_set_sample_fmt(swrCtx, "out_sample_fmt", encoderCtx.sample_fmt, 0) < 0:
-    error "Could not set output sample format"
-
-  return swrCtx
-
 type InputContainer* = object
   formatContext*: ptr AVFormatContext
   packet*: ptr AVPacket

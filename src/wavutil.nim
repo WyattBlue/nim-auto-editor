@@ -15,12 +15,36 @@ proc initAudioBuffer(sampleFmt: AVSampleFormat, channels: cint,
   if result.fifo == nil:
     error "Could not allocate audio FIFO"
 
+proc allocResampler(decoderCtx: ptr AVCodecContext): ptr SwrContext =
+  var swrCtx: ptr SwrContext = swr_alloc()
+  if swrCtx == nil:
+    error "Could not allocate resampler context"
+
+  if av_opt_set_chlayout(swrCtx, "in_chlayout", addr decoderCtx.ch_layout, 0) < 0:
+    error "Could not set input channel layout"
+
+  if av_opt_set_int(swrCtx, "in_sample_rate", decoderCtx.sample_rate, 0) < 0:
+    error "Could not set input sample rate"
+
+  if av_opt_set_sample_fmt(swrCtx, "in_sample_fmt", decoderCtx.sample_fmt, 0) < 0:
+    error "Could not set input sample format"
+  return swrCtx
+
+proc setResampler(swrCtx: ptr SwrContext, encoderCtx: ptr AVCodecContext): ptr SwrContext =
+  if av_opt_set_chlayout(swrCtx, "out_chlayout", addr encoderCtx.ch_layout, 0) < 0:
+    error "Could not set output channel layout"
+
+  if av_opt_set_int(swrCtx, "out_sample_rate", encoderCtx.sample_rate, 0) < 0:
+    error "Could not set output sample rate"
+
+  if av_opt_set_sample_fmt(swrCtx, "out_sample_fmt", encoderCtx.sample_fmt, 0) < 0:
+    error "Could not set output sample format"
+
+  return swrCtx
+
 proc addSamplesToBuffer(buffer: var AudioBuffer, frame: ptr AVFrame): cint =
   return av_audio_fifo_write(buffer.fifo, cast[ptr pointer](addr frame.data[0]),
       frame.nb_samples)
-
-proc getBufferedSamplesCount(buffer: AudioBuffer): cint =
-  return av_audio_fifo_size(buffer.fifo)
 
 proc readSamplesFromBuffer(buffer: var AudioBuffer,
     outputFrame: ptr AVFrame): bool =
@@ -312,7 +336,7 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int64) =
       break
 
   # Process any remaining buffered samples (pad with silence if needed)
-  let remainingSamples = getBufferedSamplesCount(audioBuffer)
+  let remainingSamples = av_audio_fifo_size(audioBuffer.fifo)
   if remainingSamples > 0:
     let silenceSamples = requiredFrameSize - remainingSamples
     if silenceSamples > 0:
