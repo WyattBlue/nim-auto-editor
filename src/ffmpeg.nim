@@ -435,6 +435,8 @@ proc av_read_frame*(s: ptr AVFormatContext, pkt: ptr AVPacket): cint {.importc, 
 proc av_frame_alloc*(): ptr AVFrame {.importc, header: "<libavutil/frame.h>".}
 proc av_frame_free*(frame: ptr ptr AVFrame) {.importc,
     header: "<libavutil/frame.h>".}
+proc av_frame_ref*(dst: ptr AVFrame, src: ptr AVFrame): cint {.importc,
+    header: "<libavutil/frame.h>".}
 proc av_frame_unref*(frame: ptr AVFrame) {.importc,
     header: "<libavutil/frame.h>".}
 proc av_frame_get_buffer*(frame: ptr AVFrame, align: cint): cint {.importc,
