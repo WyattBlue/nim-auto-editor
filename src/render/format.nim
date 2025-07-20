@@ -1,6 +1,7 @@
 import std/os
 import std/heapqueue
-import std/strutils
+import std/[strformat, strutils]
+from std/math import round
 
 import ../timeline
 import ../ffmpeg
@@ -18,21 +19,22 @@ type Priority = object
 
 proc `<`(a, b: Priority): bool = a.index < b.index
 
-proc makeMedia*(tl: v3, tempDir: string, outputPath: string, bar: Bar) =
+proc makeMedia*(args: mainArgs, tl: v3, tempDir: string, outputPath: string, bar: Bar) =
   conwrite("Processing media")
 
-  # Check if we have audio to process
   if tl.a.len == 0:
     error "No audio tracks found in timeline"
 
-  # Determine output format and codec based on file extension
   let (_, _, ext) = splitFile(outputPath)
-  let audioCodec = case ext.toLowerAscii():
-    of ".mp3": "libmp3lame"
-    of ".wav": "pcm_s16le"
-    of ".m4a", ".mp4": "aac"
-    of ".ogg": "libvorbis"
-    else: "pcm_s16le"  # Default to WAV
+
+  var audioCodec = args.audioCodec
+  if audioCodec == "auto":
+    audioCodec = case ext.toLowerAscii():
+      of ".mp3": "libmp3lame"
+      of ".wav": "pcm_s16le"
+      of ".m4a", ".mp4": "aac"
+      of ".ogg": "libvorbis"
+      else: "pcm_s16le"
 
   var output = openWrite(outputPath)
   defer: output.close()
@@ -51,6 +53,21 @@ proc makeMedia*(tl: v3, tempDir: string, outputPath: string, bar: Bar) =
     error "Could not allocate output packet"
   defer: av_packet_free(addr outPacket)
 
+  let noColor = false
+  var title = fmt"({ext[1 .. ^1]}) "
+  var barIndex = -1.0
+  var encoderTitles: seq[string] = @[]
+  if noColor:
+    encoderTitles.add audioCodec
+  else:
+    encoderTitles.add &"\e[32m{audioCodec}"
+
+  if noColor:
+    title &= encoderTitles.join("+")
+  else:
+    title &= encoderTitles.join("\e[0m+") & "\e[0m"
+  bar.start(tl.`end`.float, title)
+
   # Process audio directly from timeline using the frame iterator
   for (frame, index) in makeNewAudioFrames(tl, tempDir, tl.sr.int, 2):
     defer: av_frame_free(addr frame)
@@ -60,10 +77,18 @@ proc makeMedia*(tl: v3, tempDir: string, outputPath: string, bar: Bar) =
 
     if avcodec_send_frame(encoderCtx, frame) >= 0:
       while avcodec_receive_packet(encoderCtx, outPacket) >= 0:
+        barIndex = -1.0
         outPacket.stream_index = outputStream.index
         av_packet_rescale_ts(outPacket, encoderCtx.time_base, outputStream.time_base)
+
+        var time = frame.time(outputStream.time_base)
+        if time != -1.0:
+          barIndex = round(time * tl.tb)
         output.mux(outPacket[])
         av_packet_unref(outPacket)
+
+        if barIndex != -1.0:
+          bar.tick(barIndex)
 
   bar.`end`()
 

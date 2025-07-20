@@ -312,7 +312,7 @@ proc editMedia*(args: mainArgs) =
     except OSError:
       discard
 
-  makeMedia(tlV3, tempDir, output, bar)
+  makeMedia(args, tlV3, tempDir, output, bar)
 
   if not args.noOpen and exportKind == "default":
     openDefaultBrowser(output)

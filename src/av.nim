@@ -335,6 +335,14 @@ func name*(stream: ptr AVStream): string =
 
   return ""
 
+
+func time*(frame: ptr AVFrame, tb: AVRational): float64 =
+  # `tb` should be AVStream.time_base
+  if frame.pts == AV_NOPTS_VALUE:
+    return -1.0
+  return float(frame.pts) * float(tb.num) / float(tb.den)
+
+
 func dialogue*(assText: string): string =
   let textLen = assText.len
   var

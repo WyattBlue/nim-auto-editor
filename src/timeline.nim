@@ -52,6 +52,18 @@ func uniqueSources*(self: v3): HashSet[ptr string] =
     for audio in alayer:
       result.incl(audio.src)
 
+
+func `end`*(self: v3): int64 =
+  result = 0
+  for vclips in self.v:
+    if vclips.len > 0:
+      let v = vclips[^1]
+      result = max(result, v.start + v.dur)
+  for aclips in self.a:
+    if aclips.len > 0:
+      let a = aclips[^1]
+      result = max(result, a.start + a.dur)
+
 func toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo, chunks: seq[(
     int64, int64, float64)]): v3 =
   var clips: seq[Clip] = @[]
