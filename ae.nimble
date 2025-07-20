@@ -83,12 +83,24 @@ type Package = object
   sourceUrl: string
   location: string
   sha256: string
+  dirName: string
+  buildArguments: seq[string]
 
 let lame = Package(
   name: "lame",
   sourceUrl: "http://deb.debian.org/debian/pool/main/l/lame/lame_3.100.orig.tar.gz",
   location: "lame_3.100.orig.tar.gz",
   sha256: "ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e",
+  dirName: "lame-3.100",
+  buildArguments: @["--disable-frontend", "--disable-decoder", "--disable-gtktest"],
+)
+let twolame = Package(
+  name: "twolame",
+  sourceUrl: "http://deb.debian.org/debian/pool/main/t/twolame/twolame_0.4.0.orig.tar.gz",
+  location: "twolame_0.4.0.orig.tar.gz",
+  dirName: "twolame-0.4.0",
+  sha256: "cc35424f6019a88c6f52570b63e1baf50f62963a3eac52a03a800bb070d7c87d",
+  buildArguments: @["--disable-sndfile"],
 )
 let ffmpeg = Package(
   name: "ffmpeg",
@@ -96,6 +108,7 @@ let ffmpeg = Package(
   location: "ffmpeg-7.1.1.tar.xz",
   sha256: "733984395e0dbbe5c046abda2dc49a5544e7e0e1e2366bba849222ae9e3a03b1",
 )
+let packages = @[lame, twolame]
 
 proc getFileHash(filename: string): string =
   let (existsOutput, existsCode) = gorgeEx("test -f " & filename)
@@ -114,6 +127,16 @@ proc checkHash(package: Package, filename: string) =
     echo &"sha256 hash of {package.name} tarball do not match!\nExpected: {package.sha256}\nGot: {hash}"
     quit(1)
 
+
+proc makeInstall() =
+  when defined(macosx):
+    exec "make -j$(sysctl -n hw.ncpu)"
+  elif defined(linux):
+    exec "make -j$(nproc)"
+  else:
+    exec "make -j4"
+  exec "make install"
+
 proc ffmpegSetup() =
   # Create directories
   mkDir("ffmpeg_sources")
@@ -122,31 +145,20 @@ proc ffmpegSetup() =
   let buildPath = absolutePath("build")
 
   withDir "ffmpeg_sources":
-    if not fileExists(lame.location):
-      exec &"curl -O -L {lame.sourceUrl}"
-      checkHash(lame, "ffmpeg_sources" / lame.location)
+    for package in packages:
+      if not fileExists(package.location):
+        exec &"curl -O -L {package.sourceUrl}"
+        checkHash(package, "ffmpeg_sources" / package.location)
 
-    if not dirExists(lame.name):
-      exec &"tar -xzf {lame.location} && mv lame-3.100 lame"
+      if not dirExists(package.name):
+        exec &"tar -xzf {package.location} && mv {package.dirName} {package.name}"
 
-    # Build LAME
-    withDir "lame":
-      if not fileExists("Makefile"):
-        exec &"""./configure --prefix="{buildPath}" \
-          --disable-shared \
-          --enable-static \
-          --disable-frontend \
-          --disable-decoder \
-          --disable-gtktest"""
+      withDir package.name:
+        if not fileExists("Makefile"):
+          exec &"./configure --prefix=\"{buildPath}\" --disable-shared --enable-static " & package.buildArguments.join(" ")
+        makeInstall()
 
-      when defined(macosx):
-        exec "make -j$(sysctl -n hw.ncpu)"
-      elif defined(linux):
-        exec "make -j$(nproc)"
-      else:
-        exec "make -j4"
-      exec "make install"
-
+    # Build ffmpeg
     if not fileExists(ffmpeg.location):
       exec &"curl -O -L {ffmpeg.sourceUrl}"
       checkHash(ffmpeg, "ffmpeg_sources" / ffmpeg.location)
@@ -161,36 +173,29 @@ proc ffmpegSetupWindows() =
   let buildPath = absolutePath("build")
 
   withDir "ffmpeg_sources":
-    # Download and extract LAME
-    if not fileExists(lame.location):
-      exec &"curl -O -L {lame.sourceUrl}"
-    if not dirExists(lame.name):
-      exec &"tar -xzf {lame.location} && mv lame-3.100 lame"
+    for package in packages:
+      if not fileExists(package.location):
+        exec &"curl -O -L {package.sourceUrl}"
+        checkHash(package, "ffmpeg_sources" / package.location)
 
-    # Build LAME for Windows cross-compilation
-    withDir "lame":
-      if not fileExists("Makefile"):
-        exec &"""./configure --prefix="{buildPath}" \
-          --host=x86_64-w64-mingw32 \
-          --disable-shared \
-          --enable-static \
-          --disable-frontend \
-          --disable-decoder \
-          --disable-gtktest \
-          CC=x86_64-w64-mingw32-gcc \
-          CXX=x86_64-w64-mingw32-g++ \
-          AR=x86_64-w64-mingw32-ar \
-          STRIP=x86_64-w64-mingw32-strip \
-          RANLIB=x86_64-w64-mingw32-ranlib"""
+      if not dirExists(package.name):
+        exec &"tar -xzf {package.location} && mv {package.dirName} {package.name}"
 
-      when defined(linux):
-        exec "make -j$(nproc)"
-      else:
-        exec "make -j4"
-      exec "make install"
+      withDir package.name:
+        if not fileExists("Makefile"):
+          var args = package.buildArguments
+          args &= @[
+            "--host=x86_64-w64-mingw32", "CC=x86_64-w64-mingw32-gcc",
+            "CXX=x86_64-w64-mingw32-g++", "AR=x86_64-w64-mingw32-ar",
+            "STRIP=x86_64-w64-mingw32-strip", "RANLIB=x86_64-w64-mingw32-ranlib"
+          ]
+          exec &"./configure --prefix=\"{buildPath}\" --disable-shared --enable-static " & args.join(" ")
+        makeInstall()
 
     if not fileExists(ffmpeg.location):
       exec &"curl -O -L {ffmpeg.sourceUrl}"
+      checkHash(ffmpeg, "ffmpeg_sources" / ffmpeg.location)
+
     if not dirExists(ffmpeg.name):
       exec &"tar -xJf {ffmpeg.location} && mv ffmpeg-7.1.1 ffmpeg"
 
@@ -208,13 +213,7 @@ task makeff, "Build FFmpeg from source":
       --extra-ldflags="-L{buildPath}/lib" \
       --extra-libs="-lpthread -lm" \""" & "\n" & commonFlags
 
-    when defined(macosx):
-      exec "make -j$(sysctl -n hw.ncpu)"
-    elif defined(linux):
-      exec "make -j$(nproc)"
-    else:
-      exec "make -j4"
-    exec "make install"
+    makeInstall()
 
 task makeffwin, "Build FFmpeg for Windows cross-compilation":
   ffmpegSetupWindows()
@@ -232,12 +231,7 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
       --target-os=mingw32 \
       --cross-prefix=x86_64-w64-mingw32- \
       --enable-cross-compile \""" & "\n" & commonFlags)
-
-    when defined(linux):
-      exec "make -j$(nproc)"
-    else:
-      exec "make -j4"
-    exec "make install"
+    makeInstall()
 
 task windows, "Cross-compile to Windows (requires mingw-w64)":
   echo "Cross-compiling for Windows (64-bit)..."
