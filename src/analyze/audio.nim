@@ -67,8 +67,7 @@ proc cleanup(iter: AudioIterator) =
   if iter.fifo != nil:
     av_audio_fifo_free(iter.fifo)
     iter.fifo = nil
-  if iter.resampler.graph != nil:
-    iter.resampler.cleanup()
+
   if iter.readBuffer != nil:
     av_freep(addr iter.readBuffer)
     iter.readBuffer = nil

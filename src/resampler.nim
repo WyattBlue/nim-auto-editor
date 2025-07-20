@@ -56,7 +56,7 @@ proc newAudioResampler*(format: AVSampleFormat, layout: string = "", rate: int =
   result.abuffer = nil
   result.abuffersink = nil
 
-proc cleanup*(resampler: var AudioResampler) =
+proc `=destroy`*(resampler: var AudioResampler) =
   if resampler.graph != nil:
     avfilter_graph_free(addr resampler.graph)
   if resampler.`template` != nil:
