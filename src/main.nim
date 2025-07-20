@@ -288,7 +288,7 @@ judge making cuts.
       of "margin":
         args.margin = parseMargin(key)
       of "temp-dir":
-        args.tempDir = key
+        tempDir = key
       expecting = ""
 
   if expecting != "":

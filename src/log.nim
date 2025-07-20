@@ -1,3 +1,4 @@
+import std/os
 import std/tables
 import std/terminal
 import std/[strutils, strformat]
@@ -62,6 +63,7 @@ type mainArgs* = object
 
 var isDebug* = false
 var quiet* = false
+var tempDir* = ""
 
 proc conwrite*(msg: string) =
   if not quiet:
@@ -70,21 +72,29 @@ proc conwrite*(msg: string) =
     stdout.write("  " & msg & buffer & "\r")
     stdout.flushFile()
 
+proc debug*(msg: string) =
+  if isDebug:
+    stderr.styledWriteLine(fgGreen, "Debug: ", resetStyle, msg)
+
+proc closeTempDir*() =
+  if tempDir != "":
+    try:
+      removeDir(tempDir)
+      debug "Removed Temp Directory."
+    except OSError:
+      discard
+
 proc error*(msg: string) {.noreturn.} =
   when defined(windows):
     showCursor()
 
+  closeTempDir()
   when defined(debug):
     raise newException(ValueError, msg)
   else:
     conwrite("")
     stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)
     quit(1)
-
-
-proc debug*(msg: string) =
-  if isDebug:
-    stderr.styledWriteLine(fgGreen, "Debug: ", resetStyle, msg)
 
 
 type StringInterner* = object

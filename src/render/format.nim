@@ -19,9 +19,7 @@ type Priority = object
 
 proc `<`(a, b: Priority): bool = a.index < b.index
 
-proc makeMedia*(args: mainArgs, tl: v3, tempDir: string, outputPath: string, bar: Bar) =
-  conwrite("Processing media")
-
+proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
   if tl.a.len == 0:
     error "No audio tracks found in timeline"
 

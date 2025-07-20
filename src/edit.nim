@@ -293,26 +293,19 @@ proc editMedia*(args: mainArgs) =
     return fullPath
 
   randomize()
-  var tempDir: string
-  if args.tempDir == "":
+  if tempDir == "":
     tempDir = createAlphanumTempDir()
   else:
-    if fileExists(args.tempDir):
+    if fileExists(tempDir):
       error "Temp directory cannot be an already existing file."
-    if dirExists(args.tempDir):
+    if dirExists(tempDir):
       discard
     else:
-      createDir(args.tempDir)
-    tempDir = args.tempDir
+      createDir(tempDir)
 
   debug &"Temp Directory: {tempDir}"
-  defer:
-    try:
-      removeDir(tempDir)
-    except OSError:
-      discard
-
-  makeMedia(args, tlV3, tempDir, output, bar)
+  makeMedia(args, tlV3, output, bar)
 
   if not args.noOpen and exportKind == "default":
     openDefaultBrowser(output)
+  closeTempDir()
