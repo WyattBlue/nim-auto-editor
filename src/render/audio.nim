@@ -468,7 +468,7 @@ proc ndArrayToFile*(audioData: seq[seq[int16]], rate: int, outputPath: string) =
       av_packet_unref(packet)
 
 
-iterator makeNewAudioFrames*(tl: v3, tempDir: string, targetSampleRate: int, targetChannels: int): (ptr AVFrame, int) =
+iterator makeNewAudioFrames*(fmt: AVSampleFormat, tl: v3, tempDir: string, targetSampleRate: int, targetChannels: int): (ptr AVFrame, int) =
   # Generator that yields audio frames directly for use in makeMedia
   var samples: Table[(string, int32), Getter]
 
@@ -527,7 +527,7 @@ iterator makeNewAudioFrames*(tl: v3, tempDir: string, targetSampleRate: int, tar
     var samplesYielded = 0
     var frameIndex = 0
 
-    var resampler = newAudioResampler(AV_SAMPLE_FMT_FLTP, "stereo", tl.sr)
+    var resampler = newAudioResampler(fmt, "stereo", tl.sr)
     
     while samplesYielded < totalSamples:
       let currentFrameSize = min(frameSize, totalSamples - samplesYielded)

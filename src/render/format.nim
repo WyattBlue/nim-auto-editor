@@ -41,6 +41,9 @@ proc makeMedia*(args: mainArgs, tl: v3, tempDir: string, outputPath: string, bar
 
   let (outputStream, encoderCtx) = output.addStream(audioCodec, 48000)
   let encoder = encoderCtx.codec
+  if encoder.sample_fmts == nil:
+    error &"{encoder.name}: No known audio formats avail."
+  let audioFormat = encoder.sample_fmts[0]
   if avcodec_open2(encoderCtx, encoder, nil) < 0:
     error "Could not open encoder"
   defer: avcodec_free_context(addr encoderCtx)
@@ -69,7 +72,7 @@ proc makeMedia*(args: mainArgs, tl: v3, tempDir: string, outputPath: string, bar
   bar.start(tl.`end`.float, title)
 
   # Process audio directly from timeline using the frame iterator
-  for (frame, index) in makeNewAudioFrames(tl, tempDir, tl.sr.int, 2):
+  for (frame, index) in makeNewAudioFrames(audioFormat, tl, tempDir, tl.sr.int, 2):
     defer: av_frame_free(addr frame)
 
     if frame.format != encoderCtx.sample_fmt.cint:
