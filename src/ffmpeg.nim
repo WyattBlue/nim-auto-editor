@@ -464,6 +464,16 @@ proc AVERROR*(e: cint): cint {.inline.} = (-e)
 const AVERROR_EOF* = AVERROR(0x10000051)
 let AVERROR_EAGAIN* = AVERROR(EAGAIN)
 
+const AV_ERROR_MAX_STRING_SIZE* = 64
+
+proc av_make_error_string*(errbuf: cstring, errbuf_size: csize_t, errnum: cint): cstring {.importc,
+    header: "<libavutil/error.h>".}
+
+proc av_err2str*(errnum: cint): string =
+  var errbuf = newString(AV_ERROR_MAX_STRING_SIZE)
+  discard av_make_error_string(errbuf.cstring, AV_ERROR_MAX_STRING_SIZE.csize_t, errnum)
+  return errbuf
+
 # Audio FIFO function declarations
 type AVAudioFifo* {.importc, header: "<libavutil/audio_fifo.h>".} = object
 

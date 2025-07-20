@@ -150,7 +150,6 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
         frame.sample_rate != resampler.`template`.sample_rate):
       raise newException(ValueError, "Frame does not match AudioResampler setup")
 
-  # Push frame to filter
   let ret = av_buffersrc_write_frame(resampler.abuffer, frame)
   if ret < 0:
     raise newException(ValueError, fmt"Error pushing frame to filter: {ret}")
@@ -168,13 +167,7 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     let ret = av_buffersink_get_frame(resampler.abuffersink, out_frame)
     if ret < 0:
       av_frame_free(addr out_frame)
-      if ret == AVERROR_EOF or ret == AVERROR_EAGAIN:
-        break
-      else:
-        # Free any frames we've already allocated
-        for f in output:
-          av_frame_free(addr f)
-        raise newException(ValueError, fmt"Error pulling frame from filter: {ret}")
+      break
     
     output.add(out_frame)
 
