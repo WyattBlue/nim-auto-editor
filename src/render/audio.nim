@@ -468,9 +468,12 @@ proc ndArrayToFile*(audioData: seq[seq[int16]], rate: int, outputPath: string) =
       av_packet_unref(packet)
 
 
-iterator makeNewAudioFrames*(fmt: AVSampleFormat, tl: v3, tempDir: string, targetSampleRate: int, targetChannels: int): (ptr AVFrame, int) =
+iterator makeNewAudioFrames*(fmt: AVSampleFormat, tl: v3, tempDir: string, frameSize: int): (ptr AVFrame, int) =
   # Generator that yields audio frames directly for use in makeMedia
   var samples: Table[(string, int32), Getter]
+
+  let targetSampleRate = tl.sr.int
+  let targetChannels = 2
 
   if tl.a.len == 0 or tl.a[0].len == 0:
     error "Trying to render empty audio timeline"
@@ -523,7 +526,6 @@ iterator makeNewAudioFrames*(fmt: AVSampleFormat, tl: v3, tempDir: string, targe
                 audioData[ch][outputIndex] = int16(max(-32768, min(32767, mixed)))
 
     # Yield audio frames in chunks
-    const frameSize = 1024
     var samplesYielded = 0
     var frameIndex = 0
 

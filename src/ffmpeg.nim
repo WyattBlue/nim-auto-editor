@@ -307,7 +307,7 @@ proc av_channel_layout_describe*(ch_layout: ptr AVChannelLayout, buf: cstring,
     buf_size: csize_t): cint {.importc, header: "<libavutil/channel_layout.h>".}
 
 proc av_channel_layout_default*(ch_layout: ptr AVChannelLayout, nb_channels: cint) {.importc, header: "<libavutil/channel_layout.h>".}
-
+proc av_channel_layout_from_string*(channel_layout: ptr AVChannelLayout, char: cstring): cint {.importc, header: "<libavutil/channel_layout.h>".}
 
 type
   AVPacket* {.importc, header: "<libavcodec/packet.h>", bycopy.} = object
