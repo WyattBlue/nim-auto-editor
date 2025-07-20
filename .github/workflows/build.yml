@@ -22,7 +22,7 @@ jobs:
           - os: ubuntu-latest
             arch: x86_64
             binary_name: auto-editor-linux-x86_64
-          - os: macos-14
+          - os: macos-13
             arch: x86_64
             binary_name: auto-editor-macos-x86_64
           - os: macos-latest
@@ -42,9 +42,9 @@ jobs:
           if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
             sudo apt-get update
             sudo apt-get install -y build-essential pkg-config nasm git
-          elif [ "${{ matrix.os }}" = "macos-14" ]; then
+          elif [ "${{ matrix.os }}" = "macos-13" ]; then
             brew install nasm
-            export MACOSX_DEPLOYMENT_TARGET=14.0
+            export MACOSX_DEPLOYMENT_TARGET=13.0
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
             export MACOSX_DEPLOYMENT_TARGET=14.0
           fi
