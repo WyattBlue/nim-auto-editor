@@ -72,6 +72,10 @@ var commonFlags = &"""
 if defined(arm) or defined(arm64):
   commonFlags &= "  --enable-neon \\\n"
 
+if defined(macosx):
+  commonFlags &= "  --enable-videotoolbox \\\n"
+  commonFlags &= "  --enable-audiotoolbox \\\n"
+
 commonFlags &= "--disable-autodetect"
 
 type Package = object

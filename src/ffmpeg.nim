@@ -1,4 +1,6 @@
 {.passC: "-I./build/include".}
+when defined(macosx):
+  {.passL: "-framework VideoToolbox -framework AudioToolbox -framework CoreFoundation -framework CoreMedia -framework CoreVideo".}
 {.passL: "-L./build/lib -lavfilter -lavformat -lavcodec -lswresample -lswscale -lavutil -lmp3lame -lm".}
 
 import std/posix
