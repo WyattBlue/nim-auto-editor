@@ -187,7 +187,8 @@ proc defaultSubtitleCodec*(container: OutputContainer): string =
         return $codecName
   return ""
 
-proc addStreamFromTemplate*(self: var OutputContainer, streamT: ptr AVStream): ptr AVStream =
+proc addStreamFromTemplate*(self: var OutputContainer,
+    streamT: ptr AVStream): ptr AVStream =
   let format = self.formatCtx
 
   let ctxT = initDecoder(streamT.codecpar)
@@ -219,7 +220,8 @@ proc addStreamFromTemplate*(self: var OutputContainer, streamT: ptr AVStream): p
 
   return stream
 
-proc addStream*(self: var OutputContainer, codecName: string, rate: cint = 48000): (ptr AVStream, ptr AVCodecContext) =
+proc addStream*(self: var OutputContainer, codecName: string, rate: cint = 48000): (
+    ptr AVStream, ptr AVCodecContext) =
   let codec = initCodec(codecName)
   let format = self.formatCtx
 

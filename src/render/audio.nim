@@ -164,7 +164,8 @@ proc get*(getter: Getter, start: int, endSample: int): seq[seq[int16]] =
       for i in 0..<result[0].len:
         result[1][i] = result[0][i]
 
-proc createAudioFilterGraph(clip: Clip, sr: int, channels: int): (ptr AVFilterGraph, ptr AVFilterContext, ptr AVFilterContext) =
+proc createAudioFilterGraph(clip: Clip, sr: int, channels: int): (ptr AVFilterGraph,
+    ptr AVFilterContext, ptr AVFilterContext) =
   var filterGraph: ptr AVFilterGraph = avfilter_graph_alloc()
   var bufferSrc: ptr AVFilterContext = nil
   var bufferSink: ptr AVFilterContext = nil
@@ -221,7 +222,8 @@ proc createAudioFilterGraph(clip: Clip, sr: int, channels: int): (ptr AVFilterGr
   inputs.pad_idx = 0
   inputs.next = nil
 
-  ret = avfilter_graph_parse_ptr(filterGraph, filterChain.cstring, addr inputs, addr outputs, nil)
+  ret = avfilter_graph_parse_ptr(filterGraph, filterChain.cstring, addr inputs,
+      addr outputs, nil)
   if ret < 0:
     error fmt"Could not parse audio filter graph: {ret}"
 
@@ -267,7 +269,7 @@ proc processAudioClip*(clip: Clip, data: seq[seq[int16]], sr: int): seq[seq[int1
   else:
     inputFrame.ch_layout.u.mask = 3 # AV_CH_LAYOUT_STEREO
   inputFrame.sample_rate = sr.cint
-  inputFrame.pts = AV_NOPTS_VALUE  # Let the filter handle timing
+  inputFrame.pts = AV_NOPTS_VALUE # Let the filter handle timing
 
   if av_frame_get_buffer(inputFrame, 0) < 0:
     error "Could not allocate input audio frame buffer"
@@ -287,7 +289,7 @@ proc processAudioClip*(clip: Clip, data: seq[seq[int16]], sr: int): seq[seq[int1
         if actualChannels >= 2 and i < data[1].len:
           channelData[i] = data[1][i]
         elif i < data[0].len:
-          channelData[i] = data[0][i]  # Duplicate mono to stereo
+          channelData[i] = data[0][i] # Duplicate mono to stereo
         else:
           channelData[i] = 0
       else:
@@ -468,7 +470,8 @@ proc ndArrayToFile*(audioData: seq[seq[int16]], rate: int, outputPath: string) =
       av_packet_unref(packet)
 
 
-iterator makeNewAudioFrames*(fmt: AVSampleFormat, tl: v3, tempDir: string, frameSize: int): (ptr AVFrame, int) =
+iterator makeNewAudioFrames*(fmt: AVSampleFormat, tl: v3, tempDir: string,
+    frameSize: int): (ptr AVFrame, int) =
   # Generator that yields audio frames directly for use in makeMedia
   var samples: Table[(string, int32), Getter]
 
@@ -479,8 +482,8 @@ iterator makeNewAudioFrames*(fmt: AVSampleFormat, tl: v3, tempDir: string, frame
     error "Trying to render empty audio timeline"
 
   # For now, process the first audio layer
-  let layer = tl.a[0] 
-  if layer.len > 0:  # Only process if layer has clips
+  let layer = tl.a[0]
+  if layer.len > 0: # Only process if layer has clips
     # Create getters for all unique sources
     for clip in layer:
       let key = (clip.src[], clip.stream)
@@ -492,7 +495,8 @@ iterator makeNewAudioFrames*(fmt: AVSampleFormat, tl: v3, tempDir: string, frame
     for clip in layer:
       totalDuration = max(totalDuration, clip.start + clip.dur)
 
-    let totalSamples = int(totalDuration * targetSampleRate.int64 * tl.tb.den div tl.tb.num)
+    let totalSamples = int(totalDuration * targetSampleRate.int64 *
+        tl.tb.den div tl.tb.num)
     var audioData = @[newSeq[int16](totalSamples), newSeq[int16](totalSamples)]
 
     # Initialize with silence
@@ -504,16 +508,20 @@ iterator makeNewAudioFrames*(fmt: AVSampleFormat, tl: v3, tempDir: string, frame
     for clip in layer:
       let key = (clip.src[], clip.stream)
       if key in samples:
-        let sampStart = int(clip.offset.float64 * clip.speed * targetSampleRate.float64 / tl.tb)
-        let sampEnd = int(float64(clip.offset + clip.dur) * clip.speed * targetSampleRate.float64 / tl.tb)
+        let sampStart = int(clip.offset.float64 * clip.speed *
+            targetSampleRate.float64 / tl.tb)
+        let sampEnd = int(float64(clip.offset + clip.dur) * clip.speed *
+            targetSampleRate.float64 / tl.tb)
 
         let getter = samples[key]
         let srcData = getter.get(sampStart, sampEnd)
 
-        let startSample = int(clip.start * targetSampleRate.int64 * tl.tb.den div tl.tb.num)
-        let durSamples = int(clip.dur * targetSampleRate.int64 * tl.tb.den div tl.tb.num)
+        let startSample = int(clip.start * targetSampleRate.int64 *
+            tl.tb.den div tl.tb.num)
+        let durSamples = int(clip.dur * targetSampleRate.int64 *
+            tl.tb.den div tl.tb.num)
         let processedData = processAudioClip(clip, srcData, targetSampleRate)
-        
+
         if processedData.len > 0:
           for ch in 0 ..< min(audioData.len, processedData.len):
             for i in 0 ..< min(durSamples, processedData[ch].len):
@@ -530,29 +538,29 @@ iterator makeNewAudioFrames*(fmt: AVSampleFormat, tl: v3, tempDir: string, frame
     var frameIndex = 0
 
     var resampler = newAudioResampler(fmt, "stereo", tl.sr)
-    
+
     while samplesYielded < totalSamples:
       let currentFrameSize = min(frameSize, totalSamples - samplesYielded)
-      
+
       var frame = av_frame_alloc()
       if frame == nil:
         error "Could not allocate audio frame"
-      
+
       frame.nb_samples = currentFrameSize.cint
-      frame.format = AV_SAMPLE_FMT_S16P.cint  # Planar format
+      frame.format = AV_SAMPLE_FMT_S16P.cint # Planar format
       frame.ch_layout.nb_channels = targetChannels.cint
       frame.ch_layout.order = 0
       if targetChannels == 1:
-        frame.ch_layout.u.mask = 1  # AV_CH_LAYOUT_MONO
+        frame.ch_layout.u.mask = 1 # AV_CH_LAYOUT_MONO
       else:
-        frame.ch_layout.u.mask = 3  # AV_CH_LAYOUT_STEREO
+        frame.ch_layout.u.mask = 3 # AV_CH_LAYOUT_STEREO
       frame.sample_rate = targetSampleRate.cint
       frame.pts = samplesYielded.int64
-      
+
       if av_frame_get_buffer(frame, 0) < 0:
         av_frame_free(addr frame)
         error "Could not allocate audio frame buffer"
-      
+
       # Copy audio data to frame (planar format)
       for ch in 0..<min(targetChannels, audioData.len):
         let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
@@ -562,7 +570,7 @@ iterator makeNewAudioFrames*(fmt: AVSampleFormat, tl: v3, tempDir: string, frame
             channelData[i] = audioData[ch][srcIndex]
           else:
             channelData[i] = 0
-      
+
       for newFrame in resampler.resample(frame):
         yield (newFrame, frameIndex)
         frameIndex += 1

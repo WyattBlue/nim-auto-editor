@@ -67,7 +67,8 @@ converter toAVRational*(s: string): AVRational =
 
   return rational
 
-proc av_parse_color*(rgba_color: ptr uint8, color_string: cstring, slen: cint, log_ctx: pointer): cint {.importc, header: "<libavutil/parseutils.h>".}
+proc av_parse_color*(rgba_color: ptr uint8, color_string: cstring, slen: cint,
+    log_ctx: pointer): cint {.importc, header: "<libavutil/parseutils.h>".}
 
 type
   AVMediaType* = cint
@@ -308,8 +309,10 @@ proc av_dict_free*(m: ptr ptr AVDictionary) {.importc,
 proc av_channel_layout_describe*(ch_layout: ptr AVChannelLayout, buf: cstring,
     buf_size: csize_t): cint {.importc, header: "<libavutil/channel_layout.h>".}
 
-proc av_channel_layout_default*(ch_layout: ptr AVChannelLayout, nb_channels: cint) {.importc, header: "<libavutil/channel_layout.h>".}
-proc av_channel_layout_from_string*(channel_layout: ptr AVChannelLayout, char: cstring): cint {.importc, header: "<libavutil/channel_layout.h>".}
+proc av_channel_layout_default*(ch_layout: ptr AVChannelLayout,
+    nb_channels: cint) {.importc, header: "<libavutil/channel_layout.h>".}
+proc av_channel_layout_from_string*(channel_layout: ptr AVChannelLayout,
+    char: cstring): cint {.importc, header: "<libavutil/channel_layout.h>".}
 
 type
   AVPacket* {.importc, header: "<libavcodec/packet.h>", bycopy.} = object
@@ -468,8 +471,8 @@ let AVERROR_EAGAIN* = AVERROR(EAGAIN)
 
 const AV_ERROR_MAX_STRING_SIZE* = 64
 
-proc av_make_error_string*(errbuf: cstring, errbuf_size: csize_t, errnum: cint): cstring {.importc,
-    header: "<libavutil/error.h>".}
+proc av_make_error_string*(errbuf: cstring, errbuf_size: csize_t,
+    errnum: cint): cstring {.importc, header: "<libavutil/error.h>".}
 
 proc av_err2str*(errnum: cint): string =
   var errbuf = newString(AV_ERROR_MAX_STRING_SIZE)

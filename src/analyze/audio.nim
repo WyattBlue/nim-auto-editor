@@ -49,7 +49,8 @@ proc newAudioIterator(sampleRate: cint, channelLayout: AVChannelLayout,
 
   # Initialize AudioResampler to convert to float format
   let layoutName = if channelLayout.nb_channels == 1: "mono" else: "stereo"
-  result.resampler = newAudioResampler(format=AV_SAMPLE_FMT_FLT, layout=layoutName, rate=sampleRate.int)
+  result.resampler = newAudioResampler(format = AV_SAMPLE_FMT_FLT, layout = layoutName,
+      rate = sampleRate.int)
 
   # Initialize audio FIFO
   result.fifo = av_audio_fifo_alloc(result.targetFormat, result.channelCount, 1024)
@@ -78,7 +79,7 @@ proc writeFrame(iter: AudioIterator, frame: ptr AVFrame) =
   try:
     # Use AudioResampler to process the frame
     let resampledFrames = iter.resampler.resample(frame)
-    
+
     # Write all resampled frames to FIFO
     for resampledFrame in resampledFrames:
       let ret = av_audio_fifo_write(iter.fifo, cast[pointer](addr resampledFrame.data[0]),
@@ -86,10 +87,10 @@ proc writeFrame(iter: AudioIterator, frame: ptr AVFrame) =
       if ret < resampledFrame.nb_samples:
         error "Could not write data to FIFO"
       iter.totalSamplesWritten += resampledFrame.nb_samples
-      
+
       # Free the resampled frame (since AudioResampler allocated it)
       av_frame_free(addr resampledFrame)
-      
+
   except ValueError as e:
     error fmt"Error resampling audio frame: {e.msg}"
 
@@ -135,7 +136,7 @@ proc flushResampler(iter: AudioIterator) =
   # Flush the resampler by passing nil frame
   try:
     let flushedFrames = iter.resampler.resample(nil)
-    
+
     # Write all flushed frames to FIFO
     for flushedFrame in flushedFrames:
       let ret = av_audio_fifo_write(iter.fifo, cast[pointer](addr flushedFrame.data[0]),
@@ -143,10 +144,10 @@ proc flushResampler(iter: AudioIterator) =
       if ret < flushedFrame.nb_samples:
         error "Could not write flushed data to FIFO"
       iter.totalSamplesWritten += flushedFrame.nb_samples
-      
+
       # Free the flushed frame
       av_frame_free(addr flushedFrame)
-      
+
   except ValueError as e:
     error fmt"Error flushing audio resampler: {e.msg}"
 

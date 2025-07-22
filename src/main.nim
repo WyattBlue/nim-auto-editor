@@ -243,7 +243,8 @@ judge making cuts.
       expecting = "set-speed"
     of "-b", "-bg", "--background":
       expecting = "background"
-    of "--temp-dir", "--progress", "--add-in", "--cut-out", "--yt-dlp-location", "--download-format", "--output-format", "--yt-dlp-extras":
+    of "--temp-dir", "--progress", "--add-in", "--cut-out", "--yt-dlp-location",
+        "--download-format", "--output-format", "--yt-dlp-extras":
       expecting = key[2..^1]
     else:
       if key.startsWith("--"):

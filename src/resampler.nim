@@ -15,12 +15,12 @@ type AudioResampler* = object
 proc stringToChannelLayout(layout: string): AVChannelLayout =
   if layout == "mono":
     result.nb_channels = 1
-    result.order = 0  # AV_CHANNEL_ORDER_NATIVE
-    result.u.mask = 1  # AV_CH_LAYOUT_MONO
+    result.order = 0 # AV_CHANNEL_ORDER_NATIVE
+    result.u.mask = 1 # AV_CH_LAYOUT_MONO
   elif layout == "stereo":
-    result.nb_channels = 2  
-    result.order = 0  # AV_CHANNEL_ORDER_NATIVE
-    result.u.mask = 3  # AV_CH_LAYOUT_STEREO
+    result.nb_channels = 2
+    result.order = 0 # AV_CHANNEL_ORDER_NATIVE
+    result.u.mask = 3 # AV_CH_LAYOUT_STEREO
   else:
     result.nb_channels = 0
     result.order = 0
@@ -42,7 +42,8 @@ proc getLayoutName(layout: AVChannelLayout): string =
   else:
     return fmt"{layout.nb_channels}channels"
 
-proc newAudioResampler*(format: AVSampleFormat, layout: string = "", rate: int = 0, frame_size: int = 0): AudioResampler =
+proc newAudioResampler*(format: AVSampleFormat, layout: string = "", rate: int = 0,
+    frame_size: int = 0): AudioResampler =
   result.format = format
   if layout != "":
     result.layout = stringToChannelLayout(layout)
@@ -67,7 +68,7 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
   if resampler.graph == nil and frame == nil:
     return @[]
 
-  # Shortcut for passthrough  
+  # Shortcut for passthrough
   if resampler.is_passthrough:
     return @[frame]
 
@@ -76,7 +77,7 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     resampler.`template` = av_frame_alloc()
     if resampler.`template` == nil:
       raise newException(ValueError, "Could not allocate template frame")
-    
+
     # Copy frame properties to template
     av_frame_unref(resampler.`template`)
     if av_frame_ref(resampler.`template`, frame) < 0:
@@ -86,7 +87,7 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     if resampler.format == AV_SAMPLE_FMT_NONE:
       resampler.format = AVSampleFormat(frame.format)
     if resampler.layout.nb_channels == 0:
-      resampler.layout = frame.ch_layout  
+      resampler.layout = frame.ch_layout
     if resampler.rate == 0:
       resampler.rate = frame.sample_rate
 
@@ -112,11 +113,12 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
 
     let input_layout_name = getLayoutName(frame.ch_layout)
     let input_format_name = getFormatName(AVSampleFormat(frame.format))
-    
+
     let abuffer_args = fmt"sample_rate={frame.sample_rate}:sample_fmt={input_format_name}:channel_layout={input_layout_name}{extra_args}"
 
     var ret = avfilter_graph_create_filter(addr resampler.abuffer, avfilter_get_by_name("abuffer"),
-                                          "in", abuffer_args.cstring, nil, resampler.graph)
+                                          "in", abuffer_args.cstring, nil,
+                                              resampler.graph)
     if ret < 0:
       raise newException(ValueError, fmt"Could not create abuffer: {ret}")
 
@@ -124,10 +126,11 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     let output_layout_name = getLayoutName(resampler.layout)
     let output_format_name = getFormatName(resampler.format)
     let aformat_args = fmt"sample_rates={resampler.rate}:sample_fmts={output_format_name}:channel_layouts={output_layout_name}"
-    
+
     var aformat: ptr AVFilterContext = nil
     ret = avfilter_graph_create_filter(addr aformat, avfilter_get_by_name("aformat"),
-                                      "aformat", aformat_args.cstring, nil, resampler.graph)
+                                      "aformat", aformat_args.cstring, nil,
+                                          resampler.graph)
     if ret < 0:
       raise newException(ValueError, fmt"Could not create aformat: {ret}")
 
@@ -163,12 +166,12 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
       for f in output:
         av_frame_free(addr f)
       raise newException(ValueError, "Could not allocate output frame")
-      
+
     let ret = av_buffersink_get_frame(resampler.abuffersink, out_frame)
     if ret < 0:
       av_frame_free(addr out_frame)
       break
-    
+
     output.add(out_frame)
 
   return output

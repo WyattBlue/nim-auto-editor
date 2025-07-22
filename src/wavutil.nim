@@ -204,7 +204,7 @@ proc muxAudio*(inputPath, outputPath: string, index: int) =
   let audioStream = c.audio[index]
   discard output.addStreamFromTemplate(audioStream)
   for packet in c.demux(audioStream.index):
-    packet.stream_index = 0  # Always 0 for single-stream output
+    packet.stream_index = 0 # Always 0 for single-stream output
     output.mux(packet)
 
 

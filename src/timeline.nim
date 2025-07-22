@@ -64,8 +64,8 @@ func `end`*(self: v3): int64 =
       let a = aclips[^1]
       result = max(result, a.start + a.dur)
 
-func toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo, chunks: seq[(
-    int64, int64, float64)]): v3 =
+func toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
+    chunks: seq[(int64, int64, float64)]): v3 =
   var clips: seq[Clip] = @[]
   var i: int64 = 0
   var start: int64 = 0
