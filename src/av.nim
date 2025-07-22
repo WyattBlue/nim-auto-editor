@@ -338,6 +338,9 @@ func name*(stream: ptr AVStream): string =
   return ""
 
 
+func canonicalName*(codec: ptr AVCodec): string =
+  return $avcodec_get_name(codec.id)
+
 func time*(frame: ptr AVFrame, tb: AVRational): float64 =
   # `tb` should be AVStream.time_base
   if frame.pts == AV_NOPTS_VALUE:

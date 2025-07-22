@@ -58,10 +58,9 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
   var title = fmt"({ext[1 .. ^1]}) "
   var barIndex = -1.0
   var encoderTitles: seq[string] = @[]
-  if noColor:
-    encoderTitles.add audioCodec
-  else:
-    encoderTitles.add &"\e[32m{audioCodec}"
+
+  let name = encoder.canonicalName
+  encoderTitles.add (if noColor: name else: &"\e[32m{name}")
 
   if noColor:
     title &= encoderTitles.join("+")
