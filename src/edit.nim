@@ -217,22 +217,39 @@ proc editMedia*(args: mainArgs) =
         speedHash[speedMap.len - 1] = speed
         return speedMap.len - 1
 
+      var start: int64
+      var stop: int64
       for myRange in args.cutOut:
-        let start = toTb(myRange[0], tb.float64)
-        let stop = toTb(myRange[1], tb.float64)
+        start = toTb(myRange[0], tb.float64)
+        stop = toTb(myRange[1], tb.float64)
+        if start < 0:
+          start = speedIndex.len + start
+        if stop < 0:
+          stop = speedIndex.len + stop
+
         for i in start ..< min(stop, speedIndex.len):
           speedIndex[i] = getSpeedIndex(99999.0)
 
       for myRange in args.addIn:
-        let start = toTb(myRange[0], tb.float64)
-        let stop = toTb(myRange[1], tb.float64)
+        start = toTb(myRange[0], tb.float64)
+        stop = toTb(myRange[1], tb.float64)
+        if start < 0:
+          start = speedIndex.len + start
+        if stop < 0:
+          stop = speedIndex.len + stop
+
         for i in start ..< min(stop, speedIndex.len):
           speedIndex[i] = 1 # Video speed
 
       for speedRange in args.setSpeed:
         let speed = speedRange[0]
-        let start = toTb(speedRange[1], tb.float64)
-        let stop = toTb(speedRange[2], tb.float64)
+        start = toTb(speedRange[1], tb.float64)
+        stop = toTb(speedRange[2], tb.float64)
+        if start < 0:
+          start = speedIndex.len + start
+        if stop < 0:
+          stop = speedIndex.len + stop
+
         for i in start ..< min(stop, speedIndex.len):
           speedIndex[i] = getSpeedIndex(speed)
 
