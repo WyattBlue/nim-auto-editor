@@ -63,7 +63,7 @@ proc parseTime*(val: string): PackedInt =
     error &"'{val}': Time format expects an integer"
   return pack(false, num.int64)
 
-proc toTb*(val: PackedInt, tb: float64): int64 =
+func toTb*(val: PackedInt, tb: float64): int64 =
   if val.getFlag:
     return int64(val.getNumber / 1000 * tb)
   return val.getNumber

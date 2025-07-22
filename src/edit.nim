@@ -98,6 +98,19 @@ proc chunkify(arr: seq[int], smap: Table[int, float64]): seq[(int64, int64, floa
     inc j
   result.add (start, arr.len.int64, smap[arr[j - 1]])
 
+func normalizeRange(span: (PackedInt, PackedInt), tb: float64, arrayLen: int): (int64, int64) =
+  var start = toTb(span[0], tb)
+  var stop = toTb(span[1], tb)
+  if start < 0:
+    start = max(0, arrayLen + start)
+  if stop < 0:
+    stop = max(0, arrayLen + stop)
+  return (start, stop)
+
+proc applyToRange(speedIndex: var seq[int], span: (PackedInt, PackedInt), tb: float64, value: int) =
+  let (start, stop) = normalizeRange(span, tb, speedIndex.len)
+  for i in start ..< min(stop, speedIndex.len):
+    speedIndex[i] = value
 
 proc setOutput(userOut, userExport, path: string): (string, string) =
   var dir, name, ext: string
@@ -217,41 +230,16 @@ proc editMedia*(args: mainArgs) =
         speedHash[speedMap.len - 1] = speed
         return speedMap.len - 1
 
-      var start: int64
-      var stop: int64
-      for myRange in args.cutOut:
-        start = toTb(myRange[0], tb.float64)
-        stop = toTb(myRange[1], tb.float64)
-        if start < 0:
-          start = speedIndex.len + start
-        if stop < 0:
-          stop = speedIndex.len + stop
+      for span in args.cutOut:
+        applyToRange(speedIndex, span, tb.float64, getSpeedIndex(99999.0))
 
-        for i in start ..< min(stop, speedIndex.len):
-          speedIndex[i] = getSpeedIndex(99999.0)
-
-      for myRange in args.addIn:
-        start = toTb(myRange[0], tb.float64)
-        stop = toTb(myRange[1], tb.float64)
-        if start < 0:
-          start = speedIndex.len + start
-        if stop < 0:
-          stop = speedIndex.len + stop
-
-        for i in start ..< min(stop, speedIndex.len):
-          speedIndex[i] = 1 # Video speed
+      for span in args.addIn:
+        applyToRange(speedIndex, span, tb.float64, 1)
 
       for speedRange in args.setSpeed:
         let speed = speedRange[0]
-        start = toTb(speedRange[1], tb.float64)
-        stop = toTb(speedRange[2], tb.float64)
-        if start < 0:
-          start = speedIndex.len + start
-        if stop < 0:
-          stop = speedIndex.len + stop
-
-        for i in start ..< min(stop, speedIndex.len):
-          speedIndex[i] = getSpeedIndex(speed)
+        let span = (speedRange[1], speedRange[2])
+        applyToRange(speedIndex, span, tb.float64, getSpeedIndex(speed))
 
       chunks = chunkify(speedIndex, speedHash)
       tlV3 = toNonLinear(addr args.input, tb, args.background, src, chunks)
