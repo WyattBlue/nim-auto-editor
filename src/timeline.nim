@@ -26,7 +26,7 @@ type Clip* = object
 type v3* = object
   tb*: AVRational
   background*: RGBColor
-  sr*: int64
+  sr*: cint
   layout*: string
   res*: (int64, int64)
   v*: seq[seq[Clip]]

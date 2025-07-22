@@ -220,7 +220,7 @@ proc addStreamFromTemplate*(self: var OutputContainer,
 
   return stream
 
-proc addStream*(self: var OutputContainer, codecName: string, rate: cint = 48000): (
+proc addStream*(self: var OutputContainer, codecName: string, rate: cint): (
     ptr AVStream, ptr AVCodecContext) =
   let codec = initCodec(codecName)
   let format = self.formatCtx

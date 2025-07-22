@@ -45,6 +45,7 @@ Options:
                                   Set the SPEED for a given range
 
   Timeline Options:
+    -ar, --sample-rate NAT        Set timeline sample rate
     -b, -bg, --background COLOR   Set the background as a solid RGB color
 
   URL Download Options:
@@ -116,6 +117,16 @@ proc parseSpeedRange(val: string): (float64, PackedInt, PackedInt) =
   if vals.len > 3:
     error &"--set-speed has too many arguments"
   return (parseSpeed(vals[0], "set-speed"), parseTime(vals[1]), parseTime(vals[2]))
+
+
+proc parseSampleRate(val: string): cint =
+  let (num, unit) = splitNumStr(val)
+  if unit == "kHz" or unit == "KHz":
+    return cint(num * 1000)
+  if unit notin ["", "Hz"]:
+    error &"Unknown unit: '{unit}'"
+  return cint(num)
+
 
 func handleKey(val: string): string =
   if val.startsWith("--") and val.len >= 3:
@@ -243,6 +254,8 @@ judge making cuts.
       expecting = "set-speed"
     of "-b", "-bg", "--background":
       expecting = "background"
+    of "-ar", "--sample-rate":
+      expecting = "sample-rate"
     of "--temp-dir", "--progress", "--add-in", "--cut-out", "--yt-dlp-location",
         "--download-format", "--output-format", "--yt-dlp-extras":
       expecting = key[2..^1]
@@ -279,6 +292,8 @@ judge making cuts.
         args.ytDlpExtras = key
       of "background":
         args.background = parseColor(key)
+      of "sample-rate":
+        args.sampleRate = parseSampleRate(key)
       of "audio-codec":
         args.audioCodec = key
       of "progress":

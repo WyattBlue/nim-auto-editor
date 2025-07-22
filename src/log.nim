@@ -42,6 +42,7 @@ type mainArgs* = object
   setSpeed*: seq[(float64, PackedInt, PackedInt)]
 
   # Timeline Options
+  sampleRate*: cint = -1
   background* = RGBColor(red: 0, green: 0, blue: 0)
 
   # URL download Options

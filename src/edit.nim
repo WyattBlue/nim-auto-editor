@@ -238,6 +238,10 @@ proc editMedia*(args: mainArgs) =
 
       chunks = chunkify(speedIndex, speedHash)
       tlV3 = toNonLinear(addr args.input, tb, args.background, src, chunks)
+      if args.sampleRate != -1:
+        tlV3.sr = args.sampleRate
+      if args.sampleRate < -1:
+        error "Bad sample rate"
 
   var exportKind, tlName, fcpVersion: string
   if args.`export` == "":

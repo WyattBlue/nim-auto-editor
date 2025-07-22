@@ -27,7 +27,7 @@ proc parseV3*(jsonNode: JsonNode, interner: var StringInterner): v3 =
   if not jsonNode.hasKey("samplerate") or not jsonNode.hasKey("background"):
     error("sr/bg bad structure")
 
-  result.sr = jsonNode["samplerate"].getInt()
+  result.sr = jsonNode["samplerate"].getInt().cint
   result.background = parseColor(jsonNode["background"].getStr())
 
   if not jsonNode.hasKey("resolution") or jsonNode["resolution"].kind != JArray:

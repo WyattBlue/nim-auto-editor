@@ -236,7 +236,7 @@ proc createAudioFilterGraph(clip: Clip, sr: int, layout: string): (ptr AVFilterG
 
   return (filterGraph, bufferSrc, bufferSink)
 
-proc processAudioClip*(clip: Clip, data: seq[seq[int16]], sr: int): seq[seq[int16]] =
+proc processAudioClip*(clip: Clip, data: seq[seq[int16]], sr: cint): seq[seq[int16]] =
 
   if clip.speed == 1.0 and clip.volume == 1.0:
     return data
@@ -264,7 +264,7 @@ proc processAudioClip*(clip: Clip, data: seq[seq[int16]], sr: int): seq[seq[int1
   inputFrame.ch_layout.nb_channels = channels.cint
   inputFrame.ch_layout.order = 0
   inputFrame.ch_layout.u.mask = (if channels == 1: AV_CH_LAYOUT_MONO else: AV_CH_LAYOUT_STEREO)
-  inputFrame.sample_rate = sr.cint
+  inputFrame.sample_rate = sr
   inputFrame.pts = AV_NOPTS_VALUE # Let the filter handle timing
 
   if av_frame_get_buffer(inputFrame, 0) < 0:
@@ -378,7 +378,7 @@ proc processAudioClip*(clip: Clip, data: seq[seq[int16]], sr: int): seq[seq[int1
 iterator makeNewAudioFrames*(fmt: AVSampleFormat, tl: v3, tempDir: string,
     frameSize: int): (ptr AVFrame, int) =
 
-  let targetSampleRate = tl.sr.int
+  let targetSampleRate = tl.sr
   var samples: Table[(string, int32), Getter]
 
   if tl.a.len == 0 or tl.a[0].len == 0:
