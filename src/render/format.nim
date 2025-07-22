@@ -70,7 +70,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
   bar.start(tl.`end`.float, title)
 
   # Process audio directly from timeline using the frame iterator
-  let frameSize = encoderCtx.frame_size
+  let frameSize = if encoderCtx.frame_size > 0: encoderCtx.frame_size else: 1024
   for (frame, index) in makeNewAudioFrames(audioFormat, tl, tempDir, frameSize):
     defer: av_frame_free(addr frame)
 

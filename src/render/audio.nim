@@ -1,10 +1,13 @@
-import std/[strformat, os]
+import std/strformat
 import std/tables
 
 import ../log
 import ../timeline
 import ../[av, ffmpeg]
 import ../resampler
+
+const AV_CH_LAYOUT_STEREO = 3
+const AV_CH_LAYOUT_MONO = 1
 
 type
   AudioFrame* = ref object
@@ -164,7 +167,7 @@ proc get*(getter: Getter, start: int, endSample: int): seq[seq[int16]] =
       for i in 0..<result[0].len:
         result[1][i] = result[0][i]
 
-proc createAudioFilterGraph(clip: Clip, sr: int, channels: int): (ptr AVFilterGraph,
+proc createAudioFilterGraph(clip: Clip, sr: int, layout: string): (ptr AVFilterGraph,
     ptr AVFilterContext, ptr AVFilterContext) =
   var filterGraph: ptr AVFilterGraph = avfilter_graph_alloc()
   var bufferSrc: ptr AVFilterContext = nil
@@ -173,10 +176,7 @@ proc createAudioFilterGraph(clip: Clip, sr: int, channels: int): (ptr AVFilterGr
   if filterGraph == nil:
     error "Could not allocate audio filter graph"
 
-  # Create buffer source
-  let channelLayoutStr = if channels == 1: "mono" else: "stereo"
-  let bufferArgs = fmt"sample_rate={sr}:sample_fmt=s16p:channel_layout={channelLayoutStr}:time_base=1/{sr}"
-
+  let bufferArgs = &"sample_rate={sr}:sample_fmt=s16p:channel_layout={layout}:time_base=1/{sr}"
   var ret = avfilter_graph_create_filter(addr bufferSrc, avfilter_get_by_name("abuffer"),
                                         "in", bufferArgs.cstring, nil, filterGraph)
   if ret < 0:
@@ -237,10 +237,9 @@ proc createAudioFilterGraph(clip: Clip, sr: int, channels: int): (ptr AVFilterGr
   return (filterGraph, bufferSrc, bufferSink)
 
 proc processAudioClip*(clip: Clip, data: seq[seq[int16]], sr: int): seq[seq[int16]] =
-  # If both speed and volume are unchanged, return original data
+
   if clip.speed == 1.0 and clip.volume == 1.0:
     return data
-
   if data.len == 0 or data[0].len == 0:
     return data
 
@@ -248,8 +247,8 @@ proc processAudioClip*(clip: Clip, data: seq[seq[int16]], sr: int): seq[seq[int1
   let channels = if actualChannels == 1: 1 else: 2 # Determine if we have mono or stereo
   let samples = data[0].len
 
-  # Create filter graph
-  let (filterGraph, bufferSrc, bufferSink) = createAudioFilterGraph(clip, sr, channels)
+  let layout = (if channels == 1: "mono" else: "stereo")
+  let (filterGraph, bufferSrc, bufferSink) = createAudioFilterGraph(clip, sr, layout)
   defer:
     if filterGraph != nil:
       avfilter_graph_free(addr filterGraph)
@@ -264,10 +263,7 @@ proc processAudioClip*(clip: Clip, data: seq[seq[int16]], sr: int): seq[seq[int1
   inputFrame.format = AV_SAMPLE_FMT_S16P.cint
   inputFrame.ch_layout.nb_channels = channels.cint
   inputFrame.ch_layout.order = 0
-  if channels == 1:
-    inputFrame.ch_layout.u.mask = 1 # AV_CH_LAYOUT_MONO
-  else:
-    inputFrame.ch_layout.u.mask = 3 # AV_CH_LAYOUT_STEREO
+  inputFrame.ch_layout.u.mask = (if channels == 1: AV_CH_LAYOUT_MONO else: AV_CH_LAYOUT_STEREO)
   inputFrame.sample_rate = sr.cint
   inputFrame.pts = AV_NOPTS_VALUE # Let the filter handle timing
 
@@ -378,266 +374,107 @@ proc processAudioClip*(clip: Clip, data: seq[seq[int16]], sr: int): seq[seq[int1
       for i in 0..<result[0].len:
         result[1][i] = result[0][i]
 
-proc ndArrayToFile*(audioData: seq[seq[int16]], rate: int, outputPath: string) =
-  var output = openWrite(outputPath)
-  let outputCtx = output.formatCtx
-  defer: output.close()
-
-  let (encoder, encoderCtx) = initEncoder("pcm_s16le")
-  defer: avcodec_free_context(addr encoderCtx)
-
-  encoderCtx.sample_rate = rate.cint
-  encoderCtx.ch_layout.nb_channels = audioData.len.cint
-  encoderCtx.ch_layout.order = 0
-  if audioData.len == 1:
-    encoderCtx.ch_layout.u.mask = 1 # AV_CH_LAYOUT_MONO
-  else:
-    encoderCtx.ch_layout.u.mask = 3 # AV_CH_LAYOUT_STEREO
-  encoderCtx.sample_fmt = AV_SAMPLE_FMT_S16 # Use interleaved format
-  encoderCtx.time_base = AVRational(num: 1, den: rate.cint)
-
-  if avcodec_open2(encoderCtx, encoder, nil) < 0:
-    error "Could not open encoder"
-
-  # Copy codec parameters to stream
-  let stream = avformat_new_stream(outputCtx, nil)
-  if stream == nil:
-    error "Could not create audio stream"
-  discard avcodec_parameters_from_context(stream.codecpar, encoderCtx)
-
-  output.startEncoding()
-
-  # Write all audio data in chunks
-  if audioData.len > 0 and audioData[0].len > 0:
-    let totalSamples = audioData[0].len
-    let samplesPerFrame = 1024 # Process in chunks of 1024 samples
-    var samplesWritten = 0
-
-    while samplesWritten < totalSamples:
-      let currentFrameSize = min(samplesPerFrame, totalSamples - samplesWritten)
-
-      var frame = av_frame_alloc()
-      if frame == nil:
-        error "Could not allocate audio frame"
-      defer: av_frame_free(addr frame)
-
-      frame.nb_samples = currentFrameSize.cint
-      frame.format = AV_SAMPLE_FMT_S16.cint
-      frame.ch_layout = encoderCtx.ch_layout
-      frame.sample_rate = rate.cint
-
-      if av_frame_get_buffer(frame, 0) < 0:
-        error "Could not allocate audio frame buffer"
-
-      # Fill frame with actual audio data
-      let channelData = cast[ptr UncheckedArray[int16]](frame.data[0])
-      for i in 0..<currentFrameSize:
-        let srcIndex = samplesWritten + i
-        for ch in 0..<min(audioData.len, frame.ch_layout.nb_channels.int):
-          let interleavedIndex = i * frame.ch_layout.nb_channels.int + ch
-          if ch < audioData.len and srcIndex < audioData[ch].len:
-            channelData[interleavedIndex] = audioData[ch][srcIndex]
-          else:
-            channelData[interleavedIndex] = 0
-
-      # Set presentation timestamp
-      frame.pts = samplesWritten.int64
-
-      # Send frame to encoder
-      if avcodec_send_frame(encoderCtx, frame) >= 0:
-        var packet = av_packet_alloc()
-        if packet == nil:
-          error "Could not allocate packet"
-        defer: av_packet_free(addr packet)
-
-        while avcodec_receive_packet(encoderCtx, packet) >= 0:
-          packet.stream_index = stream.index
-          discard av_interleaved_write_frame(outputCtx, packet)
-          av_packet_unref(packet)
-
-      samplesWritten += currentFrameSize
-
-  # Flush encoder
-  if avcodec_send_frame(encoderCtx, nil) >= 0:
-    var packet = av_packet_alloc()
-    if packet == nil:
-      error "Could not allocate packet"
-    defer: av_packet_free(addr packet)
-
-    while avcodec_receive_packet(encoderCtx, packet) >= 0:
-      packet.stream_index = stream.index
-      discard av_interleaved_write_frame(outputCtx, packet)
-      av_packet_unref(packet)
-
 
 iterator makeNewAudioFrames*(fmt: AVSampleFormat, tl: v3, tempDir: string,
     frameSize: int): (ptr AVFrame, int) =
-  # Generator that yields audio frames directly for use in makeMedia
-  var samples: Table[(string, int32), Getter]
 
   let targetSampleRate = tl.sr.int
-  let targetChannels = 2
-
-  if tl.a.len == 0 or tl.a[0].len == 0:
-    error "Trying to render empty audio timeline"
-
-  # For now, process the first audio layer
-  let layer = tl.a[0]
-  if layer.len > 0: # Only process if layer has clips
-    # Create getters for all unique sources
-    for clip in layer:
-      let key = (clip.src[], clip.stream)
-      if key notin samples:
-        samples[key] = newGetter(clip.src[], clip.stream.int, targetSampleRate)
-
-    # Calculate total duration and create audio buffer
-    var totalDuration = 0
-    for clip in layer:
-      totalDuration = max(totalDuration, clip.start + clip.dur)
-
-    let totalSamples = int(totalDuration * targetSampleRate.int64 *
-        tl.tb.den div tl.tb.num)
-    var audioData = @[newSeq[int16](totalSamples), newSeq[int16](totalSamples)]
-
-    # Initialize with silence
-    for ch in 0..<audioData.len:
-      for i in 0..<totalSamples:
-        audioData[ch][i] = 0
-
-    # Process each clip and mix into the output
-    for clip in layer:
-      let key = (clip.src[], clip.stream)
-      if key in samples:
-        let sampStart = int(clip.offset.float64 * clip.speed *
-            targetSampleRate.float64 / tl.tb)
-        let sampEnd = int(float64(clip.offset + clip.dur) * clip.speed *
-            targetSampleRate.float64 / tl.tb)
-
-        let getter = samples[key]
-        let srcData = getter.get(sampStart, sampEnd)
-
-        let startSample = int(clip.start * targetSampleRate.int64 *
-            tl.tb.den div tl.tb.num)
-        let durSamples = int(clip.dur * targetSampleRate.int64 *
-            tl.tb.den div tl.tb.num)
-        let processedData = processAudioClip(clip, srcData, targetSampleRate)
-
-        if processedData.len > 0:
-          for ch in 0 ..< min(audioData.len, processedData.len):
-            for i in 0 ..< min(durSamples, processedData[ch].len):
-              let outputIndex = startSample + i
-              if outputIndex < audioData[ch].len:
-                let currentSample = audioData[ch][outputIndex].int32
-                let newSample = processedData[ch][i].int32
-                let mixed = currentSample + newSample
-                # Clamp to 16-bit range to prevent overflow distortion
-                audioData[ch][outputIndex] = int16(max(-32768, min(32767, mixed)))
-
-    # Yield audio frames in chunks
-    var samplesYielded = 0
-    var frameIndex = 0
-
-    var resampler = newAudioResampler(fmt, "stereo", tl.sr)
-
-    while samplesYielded < totalSamples:
-      let currentFrameSize = min(frameSize, totalSamples - samplesYielded)
-
-      var frame = av_frame_alloc()
-      if frame == nil:
-        error "Could not allocate audio frame"
-
-      frame.nb_samples = currentFrameSize.cint
-      frame.format = AV_SAMPLE_FMT_S16P.cint # Planar format
-      frame.ch_layout.nb_channels = targetChannels.cint
-      frame.ch_layout.order = 0
-      if targetChannels == 1:
-        frame.ch_layout.u.mask = 1 # AV_CH_LAYOUT_MONO
-      else:
-        frame.ch_layout.u.mask = 3 # AV_CH_LAYOUT_STEREO
-      frame.sample_rate = targetSampleRate.cint
-      frame.pts = samplesYielded.int64
-
-      if av_frame_get_buffer(frame, 0) < 0:
-        av_frame_free(addr frame)
-        error "Could not allocate audio frame buffer"
-
-      # Copy audio data to frame (planar format)
-      for ch in 0..<min(targetChannels, audioData.len):
-        let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
-        for i in 0..<currentFrameSize:
-          let srcIndex = samplesYielded + i
-          if ch < audioData.len and srcIndex < audioData[ch].len:
-            channelData[i] = audioData[ch][srcIndex]
-          else:
-            channelData[i] = 0
-
-      for newFrame in resampler.resample(frame):
-        yield (newFrame, frameIndex)
-        frameIndex += 1
-      samplesYielded += currentFrameSize
-
-    # Close all getters
-    for getter in samples.values:
-      getter.close()
-
-proc makeNewAudio*(tl: v3, outputDir: string): seq[string] =
   var samples: Table[(string, int32), Getter]
 
   if tl.a.len == 0 or tl.a[0].len == 0:
     error "Trying to render empty audio timeline"
 
-  for i, layer in tl.a:
-    if layer.len == 0:
-      continue
+  let targetChannels = 2
 
-    conwrite("Creating audio")
+  let layer = tl.a[0]
 
-    for clip in layer:
-      let key = (clip.src[], clip.stream)
-      if key notin samples:
-        samples[key] = newGetter(clip.src[], clip.stream.int, tl.sr.int)
+  for clip in layer:
+    let key = (clip.src[], clip.stream)
+    if key notin samples:
+      samples[key] = newGetter(clip.src[], clip.stream.int, targetSampleRate)
 
-    let outputPath = outputDir / &"new{i}.wav"
-    var totalDuration = 0
-    for clip in layer:
-      totalDuration = max(totalDuration, clip.start + clip.dur)
+  # Calculate total duration and create audio buffer
+  var totalDuration = 0
+  for clip in layer:
+    totalDuration = max(totalDuration, clip.start + clip.dur)
 
-    # Create stereo audio data
-    let totalSamples = int(totalDuration * tl.sr.int64 * tl.tb.den div tl.tb.num)
-    var audioData = @[newSeq[int16](totalSamples), newSeq[int16](totalSamples)]
+  let totalSamples = int(totalDuration * targetSampleRate.int64 *
+      tl.tb.den div tl.tb.num)
+  var audioData = @[newSeq[int16](totalSamples), newSeq[int16](totalSamples)]
 
-    # Initialize with silence
-    for ch in 0..<audioData.len:
-      for i in 0..<totalSamples:
-        audioData[ch][i] = 0
+  # Initialize with silence
+  for ch in 0..<audioData.len:
+    for i in 0..<totalSamples:
+      audioData[ch][i] = 0
 
-    # Process each clip and mix into the output
-    for clip in layer:
-      let key = (clip.src[], clip.stream)
-      if key in samples:
-        let sampStart = int(clip.offset.float64 * clip.speed * tl.sr.float64 / tl.tb)
-        let sampEnd = int(float64(clip.offset + clip.dur) * clip.speed * tl.sr.float64 / tl.tb)
+  # Process each clip and mix into the output
+  for clip in layer:
+    let key = (clip.src[], clip.stream)
+    if key in samples:
+      let sampStart = int(clip.offset.float64 * clip.speed *
+          targetSampleRate.float64 / tl.tb)
+      let sampEnd = int(float64(clip.offset + clip.dur) * clip.speed *
+          targetSampleRate.float64 / tl.tb)
 
-        let getter = samples[key]
-        let srcData = getter.get(sampStart, sampEnd)
+      let getter = samples[key]
+      let srcData = getter.get(sampStart, sampEnd)
 
-        let startSample = int(clip.start * tl.sr.int64 * tl.tb.den div tl.tb.num)
-        let durSamples = int(clip.dur * tl.sr.int64 * tl.tb.den div tl.tb.num)
-        let processedData = processAudioClip(clip, srcData, tl.sr.int)
-        if processedData.len > 0:
-          for ch in 0 ..< min(audioData.len, processedData.len):
-            for i in 0 ..< min(durSamples, processedData[ch].len):
-              let outputIndex = startSample + i
-              if outputIndex < audioData[ch].len:
-                let currentSample = audioData[ch][outputIndex].int32
-                let newSample = processedData[ch][i].int32
-                let mixed = currentSample + newSample
-                # Clamp to 16-bit range to prevent overflow distortion
-                audioData[ch][outputIndex] = int16(max(-32768, min(32767, mixed)))
+      let startSample = int(clip.start * targetSampleRate.int64 *
+          tl.tb.den div tl.tb.num)
+      let durSamples = int(clip.dur * targetSampleRate.int64 *
+          tl.tb.den div tl.tb.num)
+      let processedData = processAudioClip(clip, srcData, targetSampleRate)
 
-    # Write the processed audio to file
-    result.add(outputPath)
-    ndArrayToFile(audioData, tl.sr.int, outputPath)
+      if processedData.len > 0:
+        for ch in 0 ..< min(audioData.len, processedData.len):
+          for i in 0 ..< min(durSamples, processedData[ch].len):
+            let outputIndex = startSample + i
+            if outputIndex < audioData[ch].len:
+              let currentSample = audioData[ch][outputIndex].int32
+              let newSample = processedData[ch][i].int32
+              let mixed = currentSample + newSample
+              # Clamp to 16-bit range to prevent overflow distortion
+              audioData[ch][outputIndex] = int16(max(-32768, min(32767, mixed)))
+
+  # Yield audio frames in chunks
+  var samplesYielded = 0
+  var frameIndex = 0
+
+  var resampler = newAudioResampler(fmt, "stereo", tl.sr)
+
+  while samplesYielded < totalSamples:
+    let currentFrameSize = min(frameSize, totalSamples - samplesYielded)
+
+    var frame = av_frame_alloc()
+    if frame == nil:
+      error "Could not allocate audio frame"
+
+    frame.nb_samples = currentFrameSize.cint
+    frame.format = AV_SAMPLE_FMT_S16P.cint # Planar format
+    frame.ch_layout.nb_channels = targetChannels.cint
+    frame.ch_layout.order = 0
+    frame.ch_layout.u.mask = 3 # AV_CH_LAYOUT_STEREO
+    frame.sample_rate = targetSampleRate.cint
+    frame.pts = samplesYielded.int64
+
+    if av_frame_get_buffer(frame, 0) < 0:
+      av_frame_free(addr frame)
+      error "Could not allocate audio frame buffer"
+
+    # Copy audio data to frame (planar format)
+    for ch in 0..<min(targetChannels, audioData.len):
+      let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
+      for i in 0..<currentFrameSize:
+        let srcIndex = samplesYielded + i
+        if ch < audioData.len and srcIndex < audioData[ch].len:
+          channelData[i] = audioData[ch][srcIndex]
+        else:
+          channelData[i] = 0
+
+    for newFrame in resampler.resample(frame):
+      yield (newFrame, frameIndex)
+      frameIndex += 1
+    samplesYielded += currentFrameSize
 
   # Close all getters
   for getter in samples.values:
