@@ -1,7 +1,7 @@
 {.passC: "-I./build/include".}
 when defined(macosx):
   {.passL: "-framework VideoToolbox -framework AudioToolbox -framework CoreFoundation -framework CoreMedia -framework CoreVideo".}
-{.passL: "-L./build/lib -lavfilter -lavformat -lavcodec -lswresample -lswscale -lavutil -lmp3lame -lm".}
+{.passL: "-L./build/lib -lavfilter -lavformat -lavcodec -lswresample -lswscale -lavutil -lmp3lame -lx264 -lm".}
 
 import std/posix
 
@@ -79,6 +79,12 @@ type
   AVColorSpace* = cint
   AVPixelFormat* = distinct cint
 
+const AV_PIX_FMT_NONE* = AVPixelFormat(-1)
+const AV_PIX_FMT_YUV420P* = AVPixelFormat(0)
+const AV_PIX_FMT_YUYV422* = AVPixelFormat(1)
+const AV_PIX_FMT_RGB24* = AVPixelFormat(2)
+
+type
   AVDictionary* {.importc, header: "<libavutil/dict.h>".} = object
   AVDictionaryEntry* {.importc, header: "<libavutil/dict.h>".} = object
     key*: cstring
@@ -233,6 +239,7 @@ type
     color_trc*: AVColorTransferCharacteristic
     colorspace*: AVColorSpace
     chroma_sample_location*: cint
+    max_b_frames*: cint
     # ... other fields omitted for brevity
 
 const

@@ -6,7 +6,7 @@ import std/uri
 import about
 import edit
 import log
-import cmds/[info, desc, cache, levels, subdump]
+import cmds/[info, desc, cache, levels, subdump, exp]
 import util/[color, fun]
 
 import tinyre
@@ -205,6 +205,9 @@ judge making cuts.
     quit(0)
   elif paramStr(1) == "subdump":
     subdump.main(commandLineParams()[1..^1])
+    quit(0)
+  elif paramStr(1) == "exp":
+    exp.main(commandLineParams()[1..^1])
     quit(0)
 
   var args = mainArgs()

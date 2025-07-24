@@ -220,7 +220,7 @@ proc addStreamFromTemplate*(self: var OutputContainer,
 
   return stream
 
-proc addStream*(self: var OutputContainer, codecName: string, rate: cint): (
+proc addStream*(self: var OutputContainer, codecName: string, rate: cint, width: cint = 640, height: cint = 480): (
     ptr AVStream, ptr AVCodecContext) =
   let codec = initCodec(codecName)
   let format = self.formatCtx
@@ -240,11 +240,13 @@ proc addStream*(self: var OutputContainer, codecName: string, rate: cint): (
 
   # Now lets set some more sane video defaults
   if codec.`type` == AVMEDIA_TYPE_VIDEO:
-    ctx.pix_fmt = AVPixelFormat(0) # AV_PIX_FMT_YUV420P
-    ctx.width = 640
-    ctx.height = 480
-    ctx.bit_rate = 0
+    ctx.pix_fmt = AV_PIX_FMT_YUV420P
+    ctx.width = width
+    ctx.height = height
+    ctx.bit_rate = 1000000  # 1 Mbps default bitrate
     ctx.bit_rate_tolerance = 128000
+    ctx.framerate = AVRational(num: rate, den: 1)
+    ctx.time_base = AVRational(num: 1, den: rate)
     stream.avg_frame_rate = ctx.framerate
     stream.time_base = ctx.time_base
   # Some sane audio defaults
@@ -302,9 +304,9 @@ proc mux*(self: var OutputContainer, packet: var AVPacket) =
   # Make another reference to the packet, as `av_interleaved_write_frame()`
   # takes ownership of the reference.
   if av_packet_ref(self.packet, addr packet) < 0:
-    error ""
+    error "Failed to reference packet"
   if av_interleaved_write_frame(self.formatCtx, self.packet) < 0:
-    error ""
+    error "Failed to write packet"
 
 
 proc close*(outputCtx: ptr AVFormatContext) =

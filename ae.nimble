@@ -63,6 +63,7 @@ var commonFlags = &"""
   --disable-filters \
   --enable-filter=scale,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume \
   --enable-libmp3lame \
+  --enable-libx264 \
   --disable-encoder={encodersDisabled} \
   --disable-decoder={decodersDisabled} \
   --disable-demuxer={demuxersDisabled} \
@@ -102,13 +103,22 @@ let twolame = Package(
   sha256: "cc35424f6019a88c6f52570b63e1baf50f62963a3eac52a03a800bb070d7c87d",
   buildArguments: @["--disable-sndfile"],
 )
+let x264 = Package(
+  name: "x264",
+  sourceUrl: "https://code.videolan.org/videolan/x264/-/archive/32c3b801191522961102d4bea292cdb61068d0dd/x264-32c3b801191522961102d4bea292cdb61068d0dd.tar.bz2",
+  location: "x264-32c3b801191522961102d4bea292cdb61068d0dd.tar.bz2",
+  dirName: "x264-32c3b801191522961102d4bea292cdb61068d0dd",
+  sha256: "d7748f350127cea138ad97479c385c9a35a6f8527bc6ef7a52236777cf30b839",
+  buildArguments: "--disable-cli --disable-lsmash --disable-swscale --disable-ffms --enable-strip".split(" "),
+)
 let ffmpeg = Package(
   name: "ffmpeg",
   sourceUrl: "https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz",
   location: "ffmpeg-7.1.1.tar.xz",
+  dirName: "ffmpeg-7.1.1",
   sha256: "733984395e0dbbe5c046abda2dc49a5544e7e0e1e2366bba849222ae9e3a03b1",
 )
-let packages = @[lame, twolame]
+let packages = @[lame, twolame, x264]
 
 proc getFileHash(filename: string): string =
   let (existsOutput, existsCode) = gorgeEx("test -f " & filename)
@@ -145,26 +155,34 @@ proc ffmpegSetup() =
   let buildPath = absolutePath("build")
 
   withDir "ffmpeg_sources":
-    for package in packages:
+    for package in @[ffmpeg] & packages:
       if not fileExists(package.location):
         exec &"curl -O -L {package.sourceUrl}"
         checkHash(package, "ffmpeg_sources" / package.location)
 
-      if not dirExists(package.name):
-        exec &"tar -xzf {package.location} && mv {package.dirName} {package.name}"
+      var cmd: string = ""
+      if package.name == "ffmpeg" and not dirExists(package.name):
+        cmd =  &"tar -xJf {ffmpeg.location} && mv ffmpeg-7.1.1 ffmpeg"
+      elif not dirExists(package.name):
+        cmd = &"tar -xzf {package.location} && mv {package.dirName} {package.name}"
+
+      if cmd != "":
+        exec cmd
+        let patchFile = &"../patches/{package.name}.patch"
+        if fileExists(patchFile):
+          cmd = &"patch -d {package.name} -i {absolutePath(patchFile)} -p1"
+          echo "Applying patch: ", cmd
+          exec cmd
+
+      if package.name == "ffmpeg": # build later
+        continue
 
       withDir package.name:
-        if not fileExists("Makefile"):
-          exec &"./configure --prefix=\"{buildPath}\" --disable-shared --enable-static " & package.buildArguments.join(" ")
+        if not fileExists("Makefile") or package.name == "x264":
+          let cmd = &"./configure --prefix=\"{buildPath}\" --disable-shared --enable-static " & package.buildArguments.join(" ")
+          echo "RUN: ", cmd
+          exec cmd
         makeInstall()
-
-    # Build ffmpeg
-    if not fileExists(ffmpeg.location):
-      exec &"curl -O -L {ffmpeg.sourceUrl}"
-      checkHash(ffmpeg, "ffmpeg_sources" / ffmpeg.location)
-
-    if not dirExists(ffmpeg.name):
-      exec &"tar -xJf {ffmpeg.location} && mv ffmpeg-7.1.1 ffmpeg"
 
 proc ffmpegSetupWindows() =
   mkDir("ffmpeg_sources")
@@ -208,10 +226,10 @@ task makeff, "Build FFmpeg from source":
   # Configure and build FFmpeg
   withDir "ffmpeg_sources/ffmpeg":
     exec &"""./configure --prefix="{buildPath}" \
-      --pkg-config-flags="--static" \
-      --extra-cflags="-I{buildPath}/include" \
-      --extra-ldflags="-L{buildPath}/lib" \
-      --extra-libs="-lpthread -lm" \""" & "\n" & commonFlags
+  --pkg-config-flags="--static" \
+  --extra-cflags="-I{buildPath}/include" \
+  --extra-ldflags="-L{buildPath}/lib" \
+  --extra-libs="-lpthread -lm" \""" & "\n" & commonFlags
 
     makeInstall()
 
