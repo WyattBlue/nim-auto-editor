@@ -2,7 +2,6 @@ import ../ffmpeg
 import ../av
 import ../log
 import ../util/color
-import std/math
 
 
 proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =

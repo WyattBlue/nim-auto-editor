@@ -56,7 +56,6 @@ var commonFlags = &"""
   --disable-programs \
   --disable-doc \
   --disable-network \
-  --disable-bsfs \
   --disable-indevs \
   --disable-outdevs \
   --disable-xlib \
@@ -147,7 +146,7 @@ proc makeInstall() =
     exec "make -j4"
   exec "make install"
 
-proc ffmpegSetup() =
+proc ffmpegSetup(crossWindows: bool) =
   # Create directories
   mkDir("ffmpeg_sources")
   mkDir("build")
@@ -160,17 +159,15 @@ proc ffmpegSetup() =
         exec &"curl -O -L {package.sourceUrl}"
         checkHash(package, "ffmpeg_sources" / package.location)
 
-      var cmd: string = ""
-      if package.name == "ffmpeg" and not dirExists(package.name):
-        cmd =  &"tar -xJf {ffmpeg.location} && mv ffmpeg-7.1.1 ffmpeg"
-      elif not dirExists(package.name):
-        cmd = &"tar -xzf {package.location} && mv {package.dirName} {package.name}"
+      var tarArgs = "xf"
+      if package.location.endsWith("bz2"):
+        tarArgs = "xjf"
 
-      if cmd != "":
-        exec cmd
+      if not dirExists(package.name):
+        exec &"tar {tarArgs} {package.location} && mv {package.dirName} {package.name}"
         let patchFile = &"../patches/{package.name}.patch"
         if fileExists(patchFile):
-          cmd = &"patch -d {package.name} -i {absolutePath(patchFile)} -p1"
+          let cmd = &"patch -d {package.name} -i {absolutePath(patchFile)} -p1"
           echo "Applying patch: ", cmd
           exec cmd
 
@@ -179,68 +176,41 @@ proc ffmpegSetup() =
 
       withDir package.name:
         if not fileExists("Makefile") or package.name == "x264":
-          let cmd = &"./configure --prefix=\"{buildPath}\" --disable-shared --enable-static " & package.buildArguments.join(" ")
+          var args = package.buildArguments
+          var envPrefix = ""
+          if crossWindows:
+            args.add("--host=x86_64-w64-mingw32")
+            envPrefix = "CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib "
+          let cmd = &"{envPrefix}./configure --prefix=\"{buildPath}\" --disable-shared --enable-static " & args.join(" ")
           echo "RUN: ", cmd
           exec cmd
         makeInstall()
 
-proc ffmpegSetupWindows() =
-  mkDir("ffmpeg_sources")
-  mkDir("build")
-
-  let buildPath = absolutePath("build")
-
-  withDir "ffmpeg_sources":
-    for package in packages:
-      if not fileExists(package.location):
-        exec &"curl -O -L {package.sourceUrl}"
-        checkHash(package, "ffmpeg_sources" / package.location)
-
-      if not dirExists(package.name):
-        exec &"tar -xzf {package.location} && mv {package.dirName} {package.name}"
-
-      withDir package.name:
-        if not fileExists("Makefile"):
-          var args = package.buildArguments
-          args &= @[
-            "--host=x86_64-w64-mingw32", "CC=x86_64-w64-mingw32-gcc",
-            "CXX=x86_64-w64-mingw32-g++", "AR=x86_64-w64-mingw32-ar",
-            "STRIP=x86_64-w64-mingw32-strip", "RANLIB=x86_64-w64-mingw32-ranlib"
-          ]
-          exec &"./configure --prefix=\"{buildPath}\" --disable-shared --enable-static " & args.join(" ")
-        makeInstall()
-
-    if not fileExists(ffmpeg.location):
-      exec &"curl -O -L {ffmpeg.sourceUrl}"
-      checkHash(ffmpeg, "ffmpeg_sources" / ffmpeg.location)
-
-    if not dirExists(ffmpeg.name):
-      exec &"tar -xJf {ffmpeg.location} && mv ffmpeg-7.1.1 ffmpeg"
 
 task makeff, "Build FFmpeg from source":
-  ffmpegSetup()
-
-  # Get absolute path for build
   let buildPath = absolutePath("build")
+  putEnv("PKG_CONFIG_PATH", buildPath / "lib/pkgconfig")
+
+  ffmpegSetup(crossWindows=false)
 
   # Configure and build FFmpeg
   withDir "ffmpeg_sources/ffmpeg":
     exec &"""./configure --prefix="{buildPath}" \
-  --pkg-config-flags="--static" \
-  --extra-cflags="-I{buildPath}/include" \
-  --extra-ldflags="-L{buildPath}/lib" \
-  --extra-libs="-lpthread -lm" \""" & "\n" & commonFlags
-
+      --pkg-config-flags="--static" \
+      --extra-cflags="-I{buildPath}/include" \
+      --extra-ldflags="-L{buildPath}/lib" \
+      --extra-libs="-lpthread -lm" \""" & "\n" & commonFlags
     makeInstall()
 
 task makeffwin, "Build FFmpeg for Windows cross-compilation":
-  ffmpegSetupWindows()
-
   let buildPath = absolutePath("build")
+  putEnv("PKG_CONFIG_PATH", buildPath / "lib/pkgconfig")
+
+  ffmpegSetup(crossWindows=true)
 
   # Configure and build FFmpeg with MinGW
   withDir "ffmpeg_sources/ffmpeg":
-    exec (&"""./configure --prefix="{buildPath}" \
+    exec (&"""CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib ./configure --prefix="{buildPath}" \
       --pkg-config-flags="--static" \
       --extra-cflags="-I{buildPath}/include" \
       --extra-ldflags="-L{buildPath}/lib" \
