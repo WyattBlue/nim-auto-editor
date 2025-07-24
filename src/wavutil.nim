@@ -158,37 +158,23 @@ proc processAndEncodeFrame(
   if av_frame_get_buffer(encoderFrame, 0) < 0:
     return false
 
-  var processedAny = false
+  var outPacket = av_packet_alloc()
+  if outPacket == nil:
+    error "Can't alloc packet"
+  defer: av_packet_free(addr outPacket)
 
-  # Process all complete frames available in buffer
+  var processedAny = false
   while readSamplesFromBuffer(audioBuffer, encoderFrame):
     encoderFrame.pts = currentPts
     currentPts += audioBuffer.frameSize
 
-    # Encode frame
-    ret = avcodec_send_frame(encoderCtx, encoderFrame)
-    if ret < 0 and ret != AVERROR_EAGAIN:
-      error &"Error sending frame to encoder: {ret}"
-
-    # Receive and write encoded packets
-    while true:
-      var outPacket = av_packet_alloc()
-      ret = avcodec_receive_packet(encoderCtx, outPacket)
-      if ret == AVERROR_EAGAIN or ret == AVERROR_EOF:
-        av_packet_free(addr outPacket)
-        break
-      elif ret < 0:
-        av_packet_free(addr outPacket)
-        break
-
+    for outPacket in encoderCtx.encode(encoderFrame, outPacket):
       outPacket.stream_index = outputStream.index
-      av_packet_rescale_ts(outPacket, encoderCtx.time_base,
-          outputStream.time_base)
-
+      av_packet_rescale_ts(outPacket, encoderCtx.time_base, outputStream.time_base)
       ret = av_interleaved_write_frame(outputCtx, outPacket)
-      av_packet_free(addr outPacket)
       if ret < 0:
-        echo &"Warning: Error muxing packet: {ret}"
+        error &"Error writing packet: {ret}"
+      av_packet_unref(outPacket)
 
     processedAny = true
 
@@ -359,20 +345,8 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int64) =
         av_frame_free(addr silenceFrame)
 
   # Flush encoder
-  ret = avcodec_send_frame(encoderCtx, nil)
-  if ret >= 0:
-    while true:
-      var outPacket = av_packet_alloc()
-      ret = avcodec_receive_packet(encoderCtx, outPacket)
-      if ret == AVERROR_EOF or ret == AVERROR_EAGAIN:
-        av_packet_free(addr outPacket)
-        break
-      elif ret < 0:
-        av_packet_free(addr outPacket)
-        break
-
-      outPacket.stream_index = outputStream.index
-      av_packet_rescale_ts(outPacket, encoderCtx.time_base,
-          outputStream.time_base)
-      discard av_interleaved_write_frame(outputCtx, outPacket)
-      av_packet_free(addr outPacket)
+  for packet in encoderCtx.encode(nil, packet):
+    packet.stream_index = outputStream.index
+    av_packet_rescale_ts(packet, encoderCtx.time_base, outputStream.time_base)
+    discard av_interleaved_write_frame(outputCtx, packet)
+    av_packet_unref(packet)

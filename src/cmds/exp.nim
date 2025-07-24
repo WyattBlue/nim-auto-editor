@@ -9,7 +9,6 @@ proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =
   if frame == nil:
     return nil
 
-  # Use YUV420P format for better H.264 compatibility
   frame.format = AV_PIX_FMT_YUV420P.cint
   frame.width = width
   frame.height = height
@@ -95,31 +94,14 @@ proc main*(args: seq[string]) =
   for frameNum in 0 ..< 120:
     frame.pts = frameNum.int64
 
-    if avcodec_send_frame(encoderCtx, frame) < 0:
-      error "Error sending frame to encoder"
-
-    # Receive encoded packets
-    while true:
-      let receiveRet = avcodec_receive_packet(encoderCtx, packet)
-      if receiveRet == AVERROR_EAGAIN or receiveRet == AVERROR_EOF:
-        break
-      elif receiveRet < 0:
-        error "Error receiving packet from encoder"
-
+    for packet in encoderCtx.encode(frame, packet):
       packet.stream_index = stream.index
       av_packet_rescale_ts(packet, encoderCtx.time_base, stream.time_base)
       output.mux(packet[])
       av_packet_unref(packet)
 
   # Flush encoder
-  discard avcodec_send_frame(encoderCtx, nil)
-  while true:
-    let receiveRet = avcodec_receive_packet(encoderCtx, packet)
-    if receiveRet == AVERROR_EAGAIN or receiveRet == AVERROR_EOF:
-      break
-    elif receiveRet < 0:
-      break
-
+  for packet in encoderCtx.encode(nil, packet):
     packet.stream_index = stream.index
     av_packet_rescale_ts(packet, encoderCtx.time_base, stream.time_base)
     output.mux(packet[])

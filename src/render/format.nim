@@ -56,7 +56,6 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
 
   let noColor = false
   var title = fmt"({ext[1 .. ^1]}) "
-  var barIndex = -1.0
   var encoderTitles: seq[string] = @[]
 
   let name = encoder.canonicalName
@@ -76,27 +75,21 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
     if frame.format != encoderCtx.sample_fmt.cint:
       error "Frame format doesn't match encoder format"
 
-    if avcodec_send_frame(encoderCtx, frame) >= 0:
-      while avcodec_receive_packet(encoderCtx, outPacket) >= 0:
-        barIndex = -1.0
-        outPacket.stream_index = outputStream.index
-        av_packet_rescale_ts(outPacket, encoderCtx.time_base, outputStream.time_base)
+    for outPacket in encoderCtx.encode(frame, outPacket):
+      outPacket.stream_index = outputStream.index
+      av_packet_rescale_ts(outPacket, encoderCtx.time_base, outputStream.time_base)
 
-        var time = frame.time(outputStream.time_base)
-        if time != -1.0:
-          barIndex = round(time * tl.tb)
-        output.mux(outPacket[])
-        av_packet_unref(outPacket)
-
-        if barIndex != -1.0:
-          bar.tick(barIndex)
+      let time = frame.time(outputStream.time_base)
+      if time != -1.0:
+        bar.tick(round(time * tl.tb))
+      output.mux(outPacket[])
+      av_packet_unref(outPacket)
 
   bar.`end`()
 
   # Flush streams
-  if avcodec_send_frame(encoderCtx, nil) >= 0:
-    while avcodec_receive_packet(encoderCtx, outPacket) >= 0:
-      outPacket.stream_index = outputStream.index
-      av_packet_rescale_ts(outPacket, encoderCtx.time_base, outputStream.time_base)
-      output.mux(outPacket[])
-      av_packet_unref(outPacket)
+  for outPacket in encoderCtx.encode(nil, outPacket):
+    outPacket.stream_index = outputStream.index
+    av_packet_rescale_ts(outPacket, encoderCtx.time_base, outputStream.time_base)
+    output.mux(outPacket[])
+    av_packet_unref(outPacket)

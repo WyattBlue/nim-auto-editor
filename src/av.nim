@@ -309,6 +309,23 @@ proc mux*(self: var OutputContainer, packet: var AVPacket) =
   if av_interleaved_write_frame(self.formatCtx, self.packet) < 0:
     error "Failed to write packet"
 
+iterator encode*(encoderCtx: ptr AVCodecContext, frame: ptr AVFrame, packet: ptr AVPacket): ptr AVPacket =
+  let isFlush: bool = frame == nil
+
+  if avcodec_send_frame(encoderCtx, frame) < 0:
+    error "Error sending frame to encoder"
+
+  while true:
+    let receiveRet = avcodec_receive_packet(encoderCtx, packet)
+    if receiveRet == AVERROR_EAGAIN or receiveRet == AVERROR_EOF:
+      break
+    elif receiveRet < 0:
+      if isFlush:
+        break
+      else:
+        error "Error receiving packet from encoder"
+
+    yield packet # Nim requres iterator yield values
 
 proc close*(outputCtx: ptr AVFormatContext) =
   discard av_write_trailer(outputCtx)
