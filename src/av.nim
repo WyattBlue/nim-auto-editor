@@ -243,7 +243,7 @@ proc addStream*(self: var OutputContainer, codecName: string, rate: cint, width:
     ctx.pix_fmt = AV_PIX_FMT_YUV420P
     ctx.width = width
     ctx.height = height
-    ctx.bit_rate = 1000000  # 1 Mbps default bitrate
+    ctx.bit_rate = 0
     ctx.bit_rate_tolerance = 128000
     ctx.framerate = AVRational(num: rate, den: 1)
     ctx.time_base = AVRational(num: 1, den: rate)
@@ -262,7 +262,7 @@ proc addStream*(self: var OutputContainer, codecName: string, rate: cint, width:
   if (format.oformat.flags and AVFMT_GLOBALHEADER) != 0:
     ctx.flags |= AV_CODEC_FLAG_GLOBAL_HEADER
 
-  # Initialise stream codec parameters to populate the codec type. Subsequent changes to
+  # Initialize stream codec parameters to populate the codec type. Subsequent changes to
   # the codec context will be applied just before encoding starts in `startEncoding()`.
   if avcodec_parameters_from_context(stream.codecpar, ctx) < 0:
     error "Could not set ctx parameters"
@@ -275,10 +275,11 @@ proc startEncoding*(self: var OutputContainer) =
 
   self.started = true
   let outputCtx = self.formatCtx
+
+  # Open the output file, if needed.
   if (outputCtx.oformat.flags and AVFMT_NOFILE) == 0:
-    var ret = avio_open(addr outputCtx.pb, self.file.cstring, AVIO_FLAG_WRITE)
-    if ret < 0:
-      error fmt"Could not open output file '{self.file}'"
+    if avio_open(addr outputCtx.pb, self.file.cstring, AVIO_FLAG_WRITE) < 0:
+      error &"Could not open output file '{self.file}'"
 
   if avformat_write_header(outputCtx, nil) < 0:
     error "Error occurred when opening output file"

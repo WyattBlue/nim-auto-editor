@@ -65,72 +65,25 @@ proc main*(args: seq[string]) =
 
   av_log_set_level(AV_LOG_QUIET)
 
-  let color = RGBColor(red: 0, green: 100, blue: 255)
+  let color = parseColor("skyblue")
   let frame = makeSolid(1920, 1080, color)
   if frame == nil:
     error "Frame is nil"
   defer: av_frame_free(addr frame)
 
-  # Create output container
-  var formatCtx: ptr AVFormatContext = nil
-  discard avformat_alloc_output_context2(addr formatCtx, nil, nil, args[0].cstring)
-  if formatCtx == nil:
-    error "Could not create output context"
-  defer: avformat_free_context(formatCtx)
+  var output = openWrite(args[0])
+  defer: output.close()
 
-  # Find H.264 encoder
-  let codec = avcodec_find_encoder_by_name("libx264")
-  if codec == nil:
-    error "H.264 encoder not found"
+  let (stream, encoderCtx) = output.addStream("libx264", 24, width=1920, height=1080)
+  let codec = encoderCtx.codec
 
-  # Create video stream
-  let stream = avformat_new_stream(formatCtx, codec)
-  if stream == nil:
-    error "Could not create video stream"
-  
-  # Create encoder context
-  let encoderCtx = avcodec_alloc_context3(codec)
-  if encoderCtx == nil:
-    error "Could not allocate encoder context"
-  defer: avcodec_free_context(addr encoderCtx)
-
-  # Set encoder parameters
-  encoderCtx.width = 1920
-  encoderCtx.height = 1080
-  encoderCtx.time_base = AVRational(num: 1, den: 24)
-  encoderCtx.framerate = AVRational(num: 24, den: 1)
-  encoderCtx.pix_fmt = AV_PIX_FMT_YUV420P
-  encoderCtx.bit_rate = 0
-
-  # Set global header flag if needed
-  if (formatCtx.oformat.flags and AVFMT_GLOBALHEADER) != 0:
-    encoderCtx.flags |= AV_CODEC_FLAG_GLOBAL_HEADER
-
-  # Set stream parameters
-  stream.time_base = encoderCtx.time_base
-
-  # Set encoder options for H.264
-  var opt: ptr AVDictionary = nil
-  discard av_dict_set(addr opt, "preset", "ultrafast", 0)
-  discard av_dict_set(addr opt, "profile", "baseline", 0)
-  defer: av_dict_free(addr opt)
-
-  # Open encoder
-  if avcodec_open2(encoderCtx, codec, addr opt) < 0:
+  # Open encoder and copy encoder parameters to stream
+  if avcodec_open2(encoderCtx, codec, nil) < 0:
     error "Could not open encoder"
-
-  # Copy encoder parameters to stream
   if avcodec_parameters_from_context(stream.codecpar, encoderCtx) < 0:
     error "Could not copy encoder parameters to stream"
 
-  # Open output file
-  if (formatCtx.oformat.flags and AVFMT_NOFILE) == 0:
-    if avio_open(addr formatCtx.pb, args[0].cstring, AVIO_FLAG_WRITE) < 0:
-      error "Could not open output file"
-
-  # Write header
-  if avformat_write_header(formatCtx, nil) < 0:
-    error "Error writing header"
+  output.startEncoding()
 
   # Allocate packet
   let packet = av_packet_alloc()
@@ -155,11 +108,7 @@ proc main*(args: seq[string]) =
 
       packet.stream_index = stream.index
       av_packet_rescale_ts(packet, encoderCtx.time_base, stream.time_base)
-      
-      # Write packet
-      if av_interleaved_write_frame(formatCtx, packet) < 0:
-        error "Error writing packet"
-        
+      output.mux(packet[])
       av_packet_unref(packet)
 
   # Flush encoder
@@ -173,15 +122,5 @@ proc main*(args: seq[string]) =
 
     packet.stream_index = stream.index
     av_packet_rescale_ts(packet, encoderCtx.time_base, stream.time_base)
-    
-    if av_interleaved_write_frame(formatCtx, packet) < 0:
-      error "Error writing packet"
-      
+    output.mux(packet[])
     av_packet_unref(packet)
-
-  # Write trailer
-  discard av_write_trailer(formatCtx)
-
-  # Close output file
-  if (formatCtx.oformat.flags and AVFMT_NOFILE) == 0:
-    discard avio_closep(addr formatCtx.pb)

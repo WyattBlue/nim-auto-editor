@@ -37,7 +37,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
   var output = openWrite(outputPath)
   defer: output.close()
 
-  let (outputStream, encoderCtx) = output.addStream(audioCodec, tl.sr.cint)
+  let (outputStream, encoderCtx) = output.addStream(audioCodec, tl.sr)
   let encoder = encoderCtx.codec
   if encoder.sample_fmts == nil:
     error &"{encoder.name}: No known audio formats avail."
