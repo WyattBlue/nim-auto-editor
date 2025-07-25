@@ -20,220 +20,151 @@ type Priority = object
 
 proc `<`(a, b: Priority): bool = a.index < b.index
 
+proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
+  if tl.a.len == 0:
+    error "No audio tracks found in timeline"
 
-proc makeMedia*(args: mainArgs, tl: v3, ctr: Container, outputPath: string, bar: Bar) =
+  let (_, _, ext) = splitFile(outputPath)
+
+  var audioCodec = args.audioCodec
+  if audioCodec == "auto":
+    audioCodec = case ext.toLowerAscii():
+      of ".mp3": "libmp3lame"
+      of ".wav": "pcm_s16le"
+      of ".m4a", ".mp4": "aac"
+      of ".ogg": "libvorbis"
+      else: "pcm_s16le"
+
   var output = openWrite(outputPath)
   defer: output.close()
 
-  # Setup video
-  var videoEncoderCtx: ptr AVCodecContext = nil
-  var videoOutputStream: ptr AVStream = nil
-  var videoFramesIterator: iterator(): (ptr AVFrame, int) = nil # Changed to match Python
-  var videoInputCodec: ptr AVCodec = nil
-
-  if ctr.default_vid notIn {"none", "png"} and tl.v.len > 0:
-    var vEncCtx, vOutStream: ptr AVCodecContext
-    var vCodec: ptr AVCodec # To hold the actual codec
-
-    # render_av in Python yields (output_stream, video_frame_generator)
-    # The Nim makeNewVideoFrames needs to provide the encoder context, stream, and codec.
-    # The first yielded item from makeNewVideoFrames is assumed to set up the encoder/stream.
-    for (frame, index, encCtx, outStream, codec) in makeNewVideoFrames(output, tl, args):
-      videoEncoderCtx = encCtx
-      videoOutputStream = outStream
-      videoInputCodec = codec # Store the codec
-      videoFramesIterator = makeNewVideoFrames(output, tl, args) # Re-initialize for subsequent calls
-      heappush(frameQueue, Priority(
-        index: index.float64,
-        frameType: "video",
-        frame: frame,
-        encoderCtx: videoEncoderCtx,
-        outputStream: videoOutputStream
-      ))
-      break # Only take the first frame to set up the stream/encoder
-    # After the first iteration, we should have videoEncoderCtx and videoOutputStream set
-
-  # Setup audio
-  var audioEncoder: ptr AVCodec
-  var audioEncoderCtx: ptr AVCodecContext
-  var audioStreams: seq[ptr AVStream] = @[]
-  var audioGenFrames: seq[iterator(): (ptr AVFrame, int)] = @[]
-
-  try:
-    audioEncoder = avcodec_find_encoder_by_name(args.audio_codec)
-    if audioEncoder == nil:
-      error(&"Could not find audio encoder: {args.audio_codec}")
-  except:
-    error(&"Error finding audio encoder: {args.audio_codec}")
-
+  # Setup audio encoder
+  let (audioOutputStream, audioEncoderCtx) = output.addStream(audioCodec, tl.sr)
+  debug &"Audio stream created with index: {audioOutputStream.index}"
+  let audioEncoder = audioEncoderCtx.codec
   if audioEncoder.sample_fmts == nil:
-    error(fmt"{args.audio_codec}: No known audio formats avail.")
-  let audioFmt = audioEncoder.sample_fmts[0]
+    error &"{audioEncoder.name}: No known audio formats avail."
+  let audioFormat = audioEncoder.sample_fmts[0]
+  if avcodec_open2(audioEncoderCtx, audioEncoder, nil) < 0:
+    error "Could not open audio encoder"
+  defer: avcodec_free_context(addr audioEncoderCtx)
 
-  if ctr.default_aud == "none":
-    while tl.a.len > 0:
-      tl.a.pop() # Clear audio tracks
-  elif tl.a.len > 1 and ctr.max_audios == 1:
-    # warning("Dropping extra audio streams (container only allows one)")
-    while tl.a.len > 1:
-      tl.a.pop()
+  # Setup video stream if needed
+  var videoOutputStream: ptr AVStream = nil
+  var videoEncoderCtx: ptr AVCodecContext = nil
+  var hasVideo = false
+  
+  if args.videoCodec != "none" and tl.v.len > 0:
+    debug &"Setting up video with codec: {args.videoCodec}"
+    hasVideo = true
+  defer:
+    if videoEncoderCtx != nil:
+      avcodec_free_context(addr videoEncoderCtx)
 
-  if tl.a.len > 0:
-    # Assuming makeNewAudio returns (seq[AVStream], seq[iterators])
-    (audioStreams, audioGenFrames) = makeNewAudio(output, audioFmt, tl, args, log)
-    # Get the encoder context from the first audio stream (assuming they all use the same encoder)
-    if audioStreams.len > 0:
-      audioEncoderCtx = avcodec_alloc_context3(audioEncoder)
-      if audioEncoderCtx == nil:
-        error("Could not allocate audio encoder context.")
-      avcodec_parameters_to_context(audioEncoderCtx, audioStreams[0].codecpar)
-      if avcodec_open2(audioEncoderCtx, audioEncoder, nil) < 0:
-        error("Could not open audio encoder.")
-      defer: avcodec_free_context(addr audioEncoderCtx)
-  else:
-    audioStreams = @[]
-    audioGenFrames = @[iterator(): (ptr AVFrame, int) = yield (nil, 0)] # Empty iterator
+  var outPacket = av_packet_alloc()
+  if outPacket == nil:
+    error "Could not allocate output packet"
+  defer: av_packet_free(addr outPacket)
+
+  output.startEncoding()
+  conwrite("Generating media from timeline")
 
   let noColor = false
+  var title = fmt"({ext[1 .. ^1]}) "
   var encoderTitles: seq[string] = @[]
 
-  if videoOutputStream != nil:
-    let name = videoInputCodec.canonicalName # Use the actual codec name
-    encoderTitles.add(if noColor: name else: fmt"\e[95m{name}")
-  if audioStreams.len > 0:
-    let name = audioEncoder.canonicalName
-    encoderTitles.add(if noColor: name else: fmt"\e[96m{name}")
+  let audioName = audioEncoder.canonicalName
+  encoderTitles.add (if noColor: audioName else: &"\e[32m{audioName}")
+  
+  # Add video name to titles if video was set up
+  if videoEncoderCtx != nil:
+    let videoName = avcodec_get_name(videoOutputStream.codecpar.codec_id)
+    if videoName != nil:
+      encoderTitles.add (if noColor: $videoName else: &"\e[95m{$videoName}")
 
-  var title = fmt"({splitFile(outputPath).ext[1 .. ^1]}) "
   if noColor:
     title &= encoderTitles.join("+")
   else:
     title &= encoderTitles.join("\e[0m+") & "\e[0m"
   bar.start(tl.`end`.float, title)
 
-  const MAX_AUDIO_AHEAD = 30.0 # In timebase, how far audio can be ahead of video.
-  const MAX_SUB_AHEAD = 30.0
-
-  # Priority queue for ordered frames by time_base.
+  # Priority queue for ordered frames by timestamp
   var frameQueue = initHeapQueue[Priority]()
-  var latestAudioIndex = -Inf.float64
-  var earliestVideoIndex: float64 = -1.0 # Use -1.0 or similar to indicate not yet set
+  
+  const MAX_AUDIO_AHEAD = 30
+  var latestAudioIndex = -1000000.0
+  var earliestVideoIndex: int = 0
+  
+  # Populate audio frames first
+  let frameSize = if audioEncoderCtx.frame_size > 0: audioEncoderCtx.frame_size else: 1024
+  for (audioFrame, audioIndex) in makeNewAudioFrames(audioFormat, tl, tempDir, frameSize):
+    debug &"audio  index={audioIndex}"
+    let clonedAudioFrame = av_frame_clone(audioFrame)
+    if clonedAudioFrame == nil:
+      error "Failed to clone audio frame"
 
-  # Populate initial frames (only video, audio and subtitles will be added dynamically)
-  # This part is different from the original Nim code, as frames are now added in the loop
-  # based on synchronization logic.
+    frameQueue.push(Priority(
+      index: audioIndex.float64,
+      frameType: "audio",
+      frame: clonedAudioFrame,
+      encoderCtx: audioEncoderCtx,
+      outputStream: audioOutputStream
+    ))
 
-  while true:
-    var shouldGetAudio = false
+  # Populate video frames if we have video
+  if hasVideo:
+    for (videoFrame, videoIndex, vEncoderCtx, vOutputStream) in makeNewVideoFrames(output, tl, args):
+      if videoEncoderCtx == nil:
+        # First video frame - setup encoder context and stream
+        videoEncoderCtx = vEncoderCtx
+        videoOutputStream = vOutputStream
+        debug &"Video stream setup with index: {videoOutputStream.index}"
+      
+      debug &"video  index={videoIndex}"
+      let clonedVideoFrame = av_frame_clone(videoFrame)
+      if clonedVideoFrame == nil:
+        error "Failed to clone video frame"
+      
+      frameQueue.push(Priority(
+        index: videoIndex.float64,
+        frameType: "video",
+        frame: clonedVideoFrame,
+        encoderCtx: videoEncoderCtx,
+        outputStream: videoOutputStream
+      ))
 
-    if earliestVideoIndex < 0: # If video hasn't started or no video stream
-      shouldGetAudio = true
-    else:
-      # Update latest_audio_index and latest_sub_index from existing frames in queue
-      # This is slightly less efficient than Python's heap, as Nim's heapqueue doesn't expose
-      # direct iteration, so we recompute from current queue
-      var currentLatestAudioIndex = -Inf.float64
-      for item in frameQueue:
-        if item.frameType == "audio":
-          currentLatestAudioIndex = max(currentLatestAudioIndex, item.index)
-      latestAudioIndex = currentLatestAudioIndex
-      shouldGetAudio = latestAudioIndex <= earliestVideoIndex + MAX_AUDIO_AHEAD
+  # Process frames from queue in timestamp order
+  debug &"Processing {frameQueue.len} frames from priority queue"
+  while frameQueue.len > 0:
+    let currentFrame = frameQueue.pop()
+    debug &"Processing {currentFrame.frameType} frame at index {currentFrame.index}"
+    
+    # Encode and mux the frame
+    for packet in currentFrame.encoderCtx.encode(currentFrame.frame, outPacket):
+      packet.stream_index = currentFrame.outputStream.index
+      av_packet_rescale_ts(packet, currentFrame.encoderCtx.time_base, currentFrame.outputStream.time_base)
 
-    var videoFrame: ptr AVFrame = nil
-    var videoIndex = 0
-    if videoFramesIterator != nil:
-      # Try to get a video frame
-      (videoFrame, videoIndex) = videoFramesIterator()
-      if videoFrame != nil:
-        earliestVideoIndex = videoIndex.float64
-        heappush(frameQueue, Priority(
-          index: videoIndex.float64,
-          frameType: "video",
-          frame: videoFrame,
-          encoderCtx: videoEncoderCtx,
-          outputStream: videoOutputStream
-        ))
+      let time = currentFrame.frame.time(currentFrame.outputStream.time_base)
+      if time != -1.0:
+        bar.tick(round(time * tl.tb))
+      output.mux(packet[])
+      av_packet_unref(packet)
 
-    var audioFrames: seq[ptr AVFrame] = newSeq[ptr AVFrame](audioGenFrames.len)
-    if shouldGetAudio:
-      for i, gen in audioGenFrames:
-        var audIndex: int
-        (audioFrames[i], audIndex) = gen() # Get audio frame from each generator
+    # Free the frame
+    av_frame_free(addr currentFrame.frame)
 
-    # Break if no more frames to process
-    if videoFrame == nil and all(f == nil for f in audioFrames) and all(f == nil for f in subFrames):
-      break
+  bar.`end`()
 
-    if shouldGetAudio:
-      for i, aframe in audioFrames:
-        if aframe == nil:
-          continue
-        # Assuming `pts` is a field in AVFrame and `time_base` is available
-        # Need to convert audioFrame.pts to a common timebase (tl.tb) for comparison
-        let pts = aframe.pts.float64 * (tl.tb.numerator.float64 / tl.tb.denominator.float64) /
-                  (audioStreams[i].time_base.num.float64 / audioStreams[i].time_base.den.float64)
-        heappush(frameQueue, Priority(
-          index: pts,
-          frameType: "audio",
-          frame: aframe,
-          encoderCtx: audioEncoderCtx, # All audio streams use the same encoder ctx in Python
-          outputStream: audioStreams[i]
-        ))
-
-    # Process frames from queue
-    while frameQueue.len > 0:
-      let item = frameQueue[0]
-      if videoFrame != nil and item.index > earliestVideoIndex.float64:
-        break # Don't process frames ahead of the latest video frame
-
-      discard frameQueue.pop() # Remove from heap
-
-      # Encode and mux the frame
-      # This part needs careful handling of `AVCodecContext.encode` and `output.mux`
-      # based on your `av.nim` bindings.
-      # The Python `item.stream.encode(item.frame)` handles the encoding logic.
-      # In Nim, you'll need to call `avcodec_send_frame` and `avcodec_receive_packet`.
-
-      if item.frameType == "video":
-        if videoEncoderCtx == nil: # Should not happen if video stream was setup
-          error("Video encoder context is nil when trying to encode video frame.")
-        for packet in videoEncoderCtx.encode(item.frame, output.getOutPacket()):
-          packet.stream_index = item.outputStream.index
-          av_packet_rescale_ts(packet, videoEncoderCtx.time_base, item.outputStream.time_base)
-          output.mux(packet[])
-          av_packet_unref(packet)
-      elif item.frameType == "audio":
-        if audioEncoderCtx == nil: # Should not happen if audio stream was setup
-          error("Audio encoder context is nil when trying to encode audio frame.")
-        for packet in audioEncoderCtx.encode(item.frame, output.getOutPacket()):
-          packet.stream_index = item.outputStream.index
-          av_packet_rescale_ts(packet, audioEncoderCtx.time_base, item.outputStream.time_base)
-          output.mux(packet[])
-          av_packet_unref(packet)
-
-      # Update bar progress
-      if item.frame.time != -1.0: # Check if time is valid
-        bar.tick(round(item.frame.time(item.outputStream.time_base) * tl.tb.float64))
-
-      # Free the frame after processing
-      av_frame_free(addr item.frame)
-
-
-  # Flush streams
-  var outPacket = output.getOutPacket() # Get a packet for flushing
+  # Flush encoders
+  for packet in audioEncoderCtx.encode(nil, outPacket):
+    packet.stream_index = audioOutputStream.index
+    av_packet_rescale_ts(packet, audioEncoderCtx.time_base, audioOutputStream.time_base)
+    output.mux(packet[])
+    av_packet_unref(packet)
 
   if videoEncoderCtx != nil:
-    for packet in videoEncoderCtx.encode(nil, outPacket): # Encode with nil frame to flush
+    for packet in videoEncoderCtx.encode(nil, outPacket):
       packet.stream_index = videoOutputStream.index
       av_packet_rescale_ts(packet, videoEncoderCtx.time_base, videoOutputStream.time_base)
       output.mux(packet[])
       av_packet_unref(packet)
-
-  if audioEncoderCtx != nil:
-    for packet in audioEncoderCtx.encode(nil, outPacket): # Encode with nil frame to flush
-      packet.stream_index = audioStreams[0].index # Assuming first audio stream
-      av_packet_rescale_ts(packet, audioEncoderCtx.time_base, audioStreams[0].time_base)
-      output.mux(packet[])
-      av_packet_unref(packet)
-
-  bar.`end`()

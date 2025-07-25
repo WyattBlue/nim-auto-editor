@@ -464,6 +464,8 @@ proc av_frame_is_writable*(frame: ptr AVFrame): cint {.importc,
     header: "<libavutil/frame.h>".}
 proc av_frame_make_writable*(frame: ptr AVFrame): cint {.importc,
     header: "<libavutil/frame.h>".}
+proc av_frame_clone*(src: ptr AVFrame): ptr AVFrame {.importc,
+    header: "<libavutil/frame.h>".}
 
 # Codec
 proc avcodec_find_decoder*(codec_id: AVCodecID): ptr AVCodec {.importc,
