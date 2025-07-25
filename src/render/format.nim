@@ -57,28 +57,29 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
   # Process audio directly from timeline using the frame iterator
   #let frameSize = if encoderCtx.frame_size > 0: encoderCtx.frame_size else: 1024
 
-  var lastEncoderCtx: ptr AVCodecContext
+  var lastVidEncCtx: ptr AVCodecContext
   var lastOutputStream: ptr AVStream
-  for (frame, index, encoderCtx, outputStream) in makeNewVideoFrames(output, tl, args):
-    for outPacket in encoderCtx.encode(frame, outPacket):
-      outPacket.stream_index = outputStream.index
-      av_packet_rescale_ts(outPacket, encoderCtx.time_base, outputStream.time_base)
 
-      let time = frame.time(AVRational(num: 1, den: 30_000))
+  for (frame, index, vEncCtx, outputStream) in makeNewVideoFrames(output, tl, args):
+    for outPacket in vEncCtx.encode(frame, outPacket):
+      outPacket.stream_index = outputStream.index
+      av_packet_rescale_ts(outPacket, vEncCtx.time_base, outputStream.time_base)
+
+      let time = frame.time(1 / tl.tb)
       if time != -1.0:
         bar.tick(round(time * tl.tb))
       output.mux(outPacket[])
       av_packet_unref(outPacket)
 
-    lastEncoderCtx = encoderCtx
+    lastVidEncCtx = vEncCtx
     lastOutputStream = outputStream
 
   bar.`end`()
 
   # Flush streams
-  for outPacket in lastEncoderCtx.encode(nil, outPacket):
+  for outPacket in lastVidEncCtx.encode(nil, outPacket):
     outPacket.stream_index = lastOutputStream.index
-    av_packet_rescale_ts(outPacket, lastEncoderCtx.time_base, lastOutputStream.time_base)
+    av_packet_rescale_ts(outPacket, lastVidEncCtx.time_base, lastOutputStream.time_base)
     output.mux(outPacket[])
     av_packet_unref(outPacket)
 

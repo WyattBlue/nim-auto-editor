@@ -79,6 +79,7 @@ proc conwrite*(msg: string) =
 
 proc debug*(msg: string) =
   if isDebug:
+    conwrite("")
     stderr.styledWriteLine(fgGreen, "Debug: ", resetStyle, msg)
 
 proc closeTempDir*() =

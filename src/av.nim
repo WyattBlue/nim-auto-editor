@@ -153,7 +153,7 @@ iterator decode*(container: var InputContainer, index: cint, codecCtx: ptr AVCod
 
         yield frame
 
-proc seek*(container: var InputContainer, offset: int64, backward: bool = true, stream: ptr AVStream = nil) =
+proc seek*(container: InputContainer, offset: int64, backward: bool = true, stream: ptr AVStream = nil) =
   var flags: cint = 0
   var ret: cint
 
@@ -164,7 +164,7 @@ proc seek*(container: var InputContainer, offset: int64, backward: bool = true, 
   ret = av_seek_frame(container.formatContext, stream_index, offset, flags)
   if ret < 0:
     error "Error seeking frame"
-
+  # Callers need to call `avcodec_flush_buffers()` after.
 
 proc close*(container: InputContainer) =
   if container.packet != nil:
@@ -257,7 +257,7 @@ proc addStreamFromTemplate*(self: var OutputContainer,
 
   return stream
 
-proc addStream*(self: var OutputContainer, codecName: string, rate: cint, width: cint = 640, height: cint = 480): (
+proc addStream*(self: var OutputContainer, codecName: string, rate: AVRational, width: cint = 640, height: cint = 480): (
     ptr AVStream, ptr AVCodecContext) =
   let codec = initCodec(codecName)
   let format = self.formatCtx
@@ -282,8 +282,8 @@ proc addStream*(self: var OutputContainer, codecName: string, rate: cint, width:
     ctx.height = height
     ctx.bit_rate = 0
     ctx.bit_rate_tolerance = 128000
-    ctx.framerate = AVRational(num: rate, den: 1)
-    ctx.time_base = AVRational(num: 1, den: rate)
+    ctx.framerate = rate
+    ctx.time_base = av_inv_q(rate)
     stream.avg_frame_rate = ctx.framerate
     stream.time_base = ctx.time_base
   # Some sane audio defaults
@@ -291,7 +291,7 @@ proc addStream*(self: var OutputContainer, codecName: string, rate: cint, width:
     ctx.sample_fmt = codec.sample_fmts[0]
     ctx.bit_rate = 0
     ctx.bit_rate_tolerance = 32000
-    ctx.sample_rate = rate
+    ctx.sample_rate = rate.num div rate.den
     stream.time_base = ctx.time_base
     av_channel_layout_default(addr ctx.ch_layout, 2)
 
@@ -344,9 +344,9 @@ proc mux*(self: var OutputContainer, packet: var AVPacket) =
   if av_packet_ref(self.packet, addr packet) < 0:
     error "Failed to reference packet"
 
-  var ret = av_interleaved_write_frame(self.formatCtx, self.packet)
-  if ret < 0:
-    echo &"Failed to write packet: {ret}"
+  discard av_interleaved_write_frame(self.formatCtx, self.packet)
+  # if ret < 0:
+  #   echo &"Failed to write packet: {ret}"
 
 iterator encode*(encoderCtx: ptr AVCodecContext, frame: ptr AVFrame, packet: ptr AVPacket): ptr AVPacket =
   let isFlush: bool = frame == nil
