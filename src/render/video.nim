@@ -73,7 +73,7 @@ proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =
 
   return frame
 
-iterator makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs): (ptr AVFrame, int) =
+iterator makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs): (ptr AVFrame, int, ptr AVCodecContext, ptr AVStream, ptr AVCodec) =
 
   var cns = initTable[ptr string, InputContainer]()
   var decoders = initTable[ptr string, ptr AVCodecContext]()
@@ -107,6 +107,7 @@ iterator makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs
       #     scale_graph.add("buffersink"),
       # )
 
+  debug &"Creating video stream with codec: {args.videoCodec}"
   var (outputStream, encoderCtx) = output.addStream(args.videoCodec, rate = 5,
     width = targetWidth, height = targetHeight)
   let codec = encoderCtx.codec
@@ -123,19 +124,12 @@ iterator makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs
     error "Could not open encoder"
   if avcodec_parameters_from_context(outputStream.codecpar, encoderCtx) < 0:
     error "Could not copy encoder parameters to stream"
-  defer: avcodec_free_context(addr encoderCtx)
-
-  # Allocate packet for encoding
-  var outPacket = av_packet_alloc()
-  if outPacket == nil:
-    error "Could not allocate output packet"
-  defer: av_packet_free(addr outPacket)
 
   for src, cn in cns:
     if len(cn.video) > 0:
       if args.noSeek:
         seekCost[src] = int(high(uint32) - 1)
-        tous[src] = 0
+        tous[src] = 1000 #toInt(av_inv_q(encoderCtx.time_base) / targetFps)
       else:
         # Keyframes are usually spread out every 5 seconds or less.
         seekCost[src] = toInt(targetFps * AVRational(5))
@@ -207,23 +201,7 @@ iterator makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs
 
     frame.pts = index.int64
     frame.time_base = encoderCtx.time_base
-
-    # Encode the frame and write packets
-    for packet in encoderCtx.encode(frame, outPacket):
-      packet.stream_index = outputStream.index
-      av_packet_rescale_ts(packet, encoderCtx.time_base, outputStream.time_base)
-      output.mux(packet[])
-      av_packet_unref(packet)
-
-    # Yield a dummy value to maintain iterator interface (not used)
-    yield (nil, index)
-
-  # Flush encoder
-  for packet in encoderCtx.encode(nil, outPacket):
-    packet.stream_index = outputStream.index
-    av_packet_rescale_ts(packet, encoderCtx.time_base, outputStream.time_base)
-    output.mux(packet[])
-    av_packet_unref(packet)
+    yield (frame, index, encoderCtx, outputStream, codec)
 
   debug(&"Total frames saved seeking: {framesSaved}")
 
