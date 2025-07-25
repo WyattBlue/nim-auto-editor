@@ -73,7 +73,7 @@ proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =
 
   return frame
 
-iterator makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs): (ptr AVFrame, int, ptr AVCodecContext, ptr AVStream, ptr AVCodec) =
+iterator makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs): (ptr AVFrame, int, ptr AVCodecContext, ptr AVStream) {.closure.} =
 
   var cns = initTable[ptr string, InputContainer]()
   var decoders = initTable[ptr string, ptr AVCodecContext]()
@@ -201,7 +201,7 @@ iterator makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs
 
     frame.pts = index.int64
     frame.time_base = encoderCtx.time_base
-    yield (frame, index, encoderCtx, outputStream, codec)
+    yield (frame, index, encoderCtx, outputStream)
 
   debug(&"Total frames saved seeking: {framesSaved}")
 
