@@ -1,0 +1,179 @@
+import std/[sets, tables]
+import std/options
+import std/strformat
+from std/math import round
+
+import ../log
+import ../av
+import ../ffmpeg
+import ../timeline
+import ../util/color
+
+# Helps with timing, may be extended.
+type VideoFrame = object
+  index: int
+  src: ptr string
+
+func toInt(r: AVRational): int =
+  (r.num div r.den).int
+
+proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =
+  let frame: ptr AVFrame = av_frame_alloc()
+  if frame == nil:
+    return nil
+
+  frame.format = AV_PIX_FMT_YUV420P.cint
+  frame.width = width
+  frame.height = height
+
+  if av_frame_get_buffer(frame, 32) < 0:
+    error "Bad buffer"
+
+  if av_frame_make_writable(frame) < 0:
+    error "Can't make frame writable"
+
+  # Fill Y plane (luma)
+  let yData: ptr uint8 = frame.data[0]
+  let yLinesize: cint = frame.linesize[0]
+  # Convert RGB to Y (luma): Y = 0.299*R + 0.587*G + 0.114*B
+  let yValue = uint8(0.299 * color.red.float + 0.587 * color.green.float + 0.114 *
+      color.blue.float)
+
+  for y in 0 ..< height:
+    let row: ptr uint8 = cast[ptr uint8](cast[int](yData) + y.int * yLinesize.int)
+    let rowArray = cast[ptr UncheckedArray[uint8]](row)
+    for x in 0 ..< width:
+      rowArray[x] = yValue
+
+  # Fill U plane (chroma)
+  let uData: ptr uint8 = frame.data[1]
+  let uLinesize: cint = frame.linesize[1]
+  # Convert RGB to U: U = -0.169*R - 0.331*G + 0.5*B + 128
+  let uValue = uint8(max(0.0, min(255.0, -0.169 * color.red.float - 0.331 *
+      color.green.float + 0.5 * color.blue.float + 128)))
+
+  for y in 0 ..< (height div 2):
+    let row: ptr uint8 = cast[ptr uint8](cast[int](uData) + y.int * uLinesize.int)
+    let rowArray = cast[ptr UncheckedArray[uint8]](row)
+    for x in 0 ..< (width div 2):
+      rowArray[x] = uValue
+
+  # Fill V plane (chroma)
+  let vData: ptr uint8 = frame.data[2]
+  let vLinesize: cint = frame.linesize[2]
+  # Convert RGB to V: V = 0.5*R - 0.419*G - 0.081*B + 128
+  let vValue = uint8(max(0.0, min(255.0, 0.5 * color.red.float - 0.419 *
+      color.green.float - 0.081 * color.blue.float + 128)))
+
+  for y in 0 ..< (height div 2):
+    let row: ptr uint8 = cast[ptr uint8](cast[int](vData) + y.int * vLinesize.int)
+    let rowArray = cast[ptr UncheckedArray[uint8]](row)
+    for x in 0 ..< (width div 2):
+      rowArray[x] = vValue
+
+  return frame
+
+iterator renderAv*(output: var OutputContainer, tl: v3, args: mainArgs): (int, ptr AVFrame) =
+
+  var cns = initTable[ptr string, InputContainer]()
+  var seekCost = initTable[ptr string, int]()
+  var tous = initTable[ptr string, int]()
+
+  var pix_fmt = AV_PIX_FMT_YUV420P # Reasonable default
+  let targetFps = tl.tb # Always constant
+
+  var firstSrc: ptr string = nil
+  for src in tl.uniqueSources:
+    if firstSrc == nil:
+      firstSrc = src
+
+    if src notin cns:
+      cns[src] = av.open(src[])
+
+  var targetWidth: cint = cint(tl.res[0])
+  var targetHeight: cint = cint(tl.res[1])
+
+  if args.scale != 1.0:
+    targetWidth = max(cint(round(tl.res[0].float64 * args.scale)), 2)
+    targetHeight = max(cint(round(tl.res[1].float64 * args.scale)), 2)
+      # scale_graph = av.filter.Graph()
+      # scale_graph.link_nodes(
+      #     scale_graph.add(
+      #         "buffer", video_size="1x1", time_base="1/1", pix_fmt=pix_fmt
+      #     ),
+      #     scale_graph.add("scale", f"{target_width}:{target_height}"),
+      #     scale_graph.add("buffersink"),
+      # )
+
+  var (outputStream, encoderCtx) = output.addStream(args.videoCodec, rate = 5,
+    width = targetWidth, height = targetHeight)
+
+  outputStream.time_base = av_inv_q(targetFps)
+
+  encoderCtx.framerate = targetFps
+  encoderCtx.time_base = av_inv_q(targetFps)
+  encoderCtx.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE # "Auto"
+
+  for src, cn in cns:
+    if len(cn.video) > 0:
+      if args.noSeek:
+        seekCost[src] = int(high(uint32) - 1)
+        tous[src] = 0
+      else:
+        # Keyframes are usually spread out every 5 seconds or less.
+        seekCost[src] = toInt(targetFps * AVRational(5))
+        tous[src] = toInt(av_inv_q(encoderCtx.time_base) / targetFps)
+
+      if src == firstSrc and encoderCtx.pix_fmt != AV_PIX_FMT_NONE:
+        pix_fmt = encoderCtx.pix_fmt
+
+  # debug(&"Tous: {tous}")
+  debug(&"Clips: {tl.v}")
+
+  let codec = encoderCtx.codec
+  var need_valid_fmt = true
+  if codec.pix_fmts[0].cint != 0:
+    var i = 0
+    while codec.pix_fmts[i].cint != -1:
+      if pix_fmt == codec.pix_fmts[i]:
+        need_valid_fmt = false
+      i += 1
+
+  if need_valid_fmt:
+    if codec.canonicalName == "gif":
+      pix_fmt = AV_PIX_FMT_RGB8
+    elif codec.canonicalName == "prores":
+      pix_fmt = AV_PIX_FMT_YUV422P10LE
+    else:
+      pix_fmt = AV_PIX_FMT_YUV420P
+
+  # First few frames can have an abnormal keyframe count, so never seek there.
+  var seek = 10
+  var seekFrame = -1
+  var framesSaved = 0
+
+  var nullFrame = makeSolid(targetWidth, targetHeight, args.background)
+  var frameIndex = -1
+  var frame: ptr AVFrame
+
+  var objList: seq[VideoFrame]
+  for index in 0 ..< tl.`end`:
+    objList = @[]
+
+    for layer in tl.v:
+      for obj in layer:
+        if index >= obj.start and index < (obj.start + obj.dur):
+          let i = int(round(float(obj.offset + index - obj.start) * obj.speed))
+          objList.add VideoFrame(index: i, src: obj.src)
+
+    if tl.chunks.isSome:
+      # When there can be valid gaps in the timeline.
+      frame = nullFrame
+    # else, use the last frame
+
+    for obj in objList:
+      var myStream: ptr AVStream = cns[obj.src].video[0]
+
+
+  debug(&"Total frames saved seeking: {framesSaved}")
+

@@ -58,9 +58,13 @@ type mainArgs* = object
   # Audio Rendering
   audioCodec*: string = "auto"
 
+  # Video Rendering
+  videoCodec*: string = "auto"
+  noSeek*: bool = false
+  scale*: float = 1.0
+
   # Misc.
   noOpen*: bool = false
-  tempDir*: string = ""
 
 var isDebug* = false
 var quiet* = false

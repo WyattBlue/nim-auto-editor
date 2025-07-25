@@ -142,9 +142,10 @@ proc close*(container: InputContainer) =
 
 type OutputContainer* = object
   file: string
+  streams: seq[ptr AVStream] = @[]
+  video*: seq[ptr AVStream] = @[]
   formatCtx*: ptr AVFormatContext
   packet: ptr AVPacket
-  streams: seq[ptr AVStream] = @[]
   started: bool = false
 
 proc openWrite*(file: string): OutputContainer =
@@ -152,6 +153,10 @@ proc openWrite*(file: string): OutputContainer =
   discard avformat_alloc_output_context2(addr formatCtx, nil, nil, file.cstring)
   if formatCtx == nil:
     error "Could not create output context"
+
+  for i in 0 ..< formatCtx.nb_streams.int:
+    if formatCtx.streams[i].codecpar.codec_type == AVMEDIA_TYPE_VIDEO:
+      result.video.add formatCtx.streams[i]
 
   result.file = file
   result.formatCtx = formatCtx

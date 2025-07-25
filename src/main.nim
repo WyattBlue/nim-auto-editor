@@ -68,6 +68,19 @@ Options:
     -c:a, -acodec, --audio-codec ENCODER
                                   Set audio codec for output media
 
+  Video Rendering:
+    -c:v, -vcodec, --video-codec ENCODER
+                                  Set video codec for output media
+    -b:v, --video-bitrate BITRATE
+                                  Set the number of bits per second for video
+    -profile:v, -vprofile PROFILE
+                                  Set the video profile. For h264: high, main,
+                                  or baseline
+    --scale NUM                   Scale the output video's resolution by NUM
+                                  factor
+    --no-seek                     Disable file seeking when rendering video.
+                                  Helpful for debugging desync issues
+
   Miscellaneous:
     --no-open                     Do not open the output file after editing
                                   is done
@@ -98,7 +111,7 @@ proc parseTimeRange(val, opt: string): (PackedInt, PackedInt) =
     error &"--{opt} has too many arguments"
   return (parseTime(vals[0]), parseTime(vals[1]))
 
-proc parseSpeed(val, opt: string): float64 =
+proc parseNum(val, opt: string): float64 =
   let (num, unit) = splitNumStr(val)
   if unit == "%":
     result = num / 100.0
@@ -107,6 +120,8 @@ proc parseSpeed(val, opt: string): float64 =
   else:
     error &"--{opt} has unknown unit: {unit}"
 
+proc parseSpeed(val, opt: string): float64 =
+  result = parseNum(val, opt)
   if result <= 0.0 or result > 99999.0:
     result = 99999.0
 
@@ -229,6 +244,8 @@ judge making cuts.
       args.preview = true
     of "--no-open":
       args.noOpen = true
+    of "--no-seek":
+      args.noSeek = true
     of "-dn", "-sn":
       discard
     of "-ex", "--export":
@@ -260,7 +277,7 @@ judge making cuts.
     of "-ar", "--sample-rate":
       expecting = "sample-rate"
     of "--temp-dir", "--progress", "--add-in", "--cut-out", "--yt-dlp-location",
-        "--download-format", "--output-format", "--yt-dlp-extras":
+        "--download-format", "--output-format", "--yt-dlp-extras", "--scale":
       expecting = key[2..^1]
     else:
       if key.startsWith("--"):
@@ -293,6 +310,8 @@ judge making cuts.
         args.outputFormat = key
       of "yt-dlp-extras":
         args.ytDlpExtras = key
+      of "scale":
+        args.scale = parseNum(key, expecting)
       of "background":
         args.background = parseColor(key)
       of "sample-rate":
