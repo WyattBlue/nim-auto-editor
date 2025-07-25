@@ -64,7 +64,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
       outPacket.stream_index = outputStream.index
       av_packet_rescale_ts(outPacket, encoderCtx.time_base, outputStream.time_base)
 
-      let time = frame.time(outputStream.time_base)
+      let time = frame.time(AVRational(num: 1, den: 30_000))
       if time != -1.0:
         bar.tick(round(time * tl.tb))
       output.mux(outPacket[])
