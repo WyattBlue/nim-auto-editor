@@ -183,7 +183,7 @@ proc editMedia*(args: mainArgs) =
       defer: container.close()
       var tb = AVRational(30)
       if container.video.len > 0:
-        tb = makeSaneTimebase(container.video[0].avgRate)
+        tb = makeSaneTimebase(container.video[0].avg_frame_rate)
 
       var hasLoud: seq[bool]
       var chunks: seq[(int64, int64, float64)] = @[]

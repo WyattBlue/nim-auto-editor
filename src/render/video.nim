@@ -73,9 +73,10 @@ proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =
 
   return frame
 
-iterator renderAv*(output: var OutputContainer, tl: v3, args: mainArgs): (int, ptr AVFrame) =
+iterator renderAv*(output: var OutputContainer, tl: v3, args: mainArgs): (ptr AVFrame, int) =
 
   var cns = initTable[ptr string, InputContainer]()
+  var decoders = initTable[ptr string, ptr AVCodecContext]()
   var seekCost = initTable[ptr string, int]()
   var tous = initTable[ptr string, int]()
 
@@ -89,6 +90,7 @@ iterator renderAv*(output: var OutputContainer, tl: v3, args: mainArgs): (int, p
 
     if src notin cns:
       cns[src] = av.open(src[])
+      decoders[src] = initDecoder(cns[src].video[0].codecpar)
 
   var targetWidth: cint = cint(tl.res[0])
   var targetHeight: cint = cint(tl.res[1])
@@ -107,12 +109,20 @@ iterator renderAv*(output: var OutputContainer, tl: v3, args: mainArgs): (int, p
 
   var (outputStream, encoderCtx) = output.addStream(args.videoCodec, rate = 5,
     width = targetWidth, height = targetHeight)
+  let codec = encoderCtx.codec
 
   outputStream.time_base = av_inv_q(targetFps)
 
   encoderCtx.framerate = targetFps
   encoderCtx.time_base = av_inv_q(targetFps)
   encoderCtx.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE # "Auto"
+
+
+  # Open encoder and copy encoder parameters to stream
+  if avcodec_open2(encoderCtx, codec, nil) < 0:
+    error "Could not open encoder"
+  if avcodec_parameters_from_context(outputStream.codecpar, encoderCtx) < 0:
+    error "Could not copy encoder parameters to stream"
 
   for src, cn in cns:
     if len(cn.video) > 0:
@@ -130,7 +140,6 @@ iterator renderAv*(output: var OutputContainer, tl: v3, args: mainArgs): (int, p
   # debug(&"Tous: {tous}")
   debug(&"Clips: {tl.v}")
 
-  let codec = encoderCtx.codec
   var need_valid_fmt = true
   if codec.pix_fmts[0].cint != 0:
     var i = 0
@@ -174,6 +183,20 @@ iterator renderAv*(output: var OutputContainer, tl: v3, args: mainArgs): (int, p
     for obj in objList:
       var myStream: ptr AVStream = cns[obj.src].video[0]
 
+      if frameIndex > obj.index:
+        debug(&"Seek: {frameIndex} -> 0")
+        error "Wrong position"
+        # cns[obj.src].seek(0)
+
+      while frameIndex < obj.index:
+        let decoder: ptr AVCodecContext = decoders[obj.src]
+        for _ in cns[obj.src].decode(0.cint, decoder, frame):
+          frameIndex = int(round(frame.time(outputStream.time_base) * tl.tb))
+          break
+
+    frame.pts = AV_NOPTS_VALUE
+    frame.time_base = AVRational(0)
+    yield (frame, index)
 
   debug(&"Total frames saved seeking: {framesSaved}")
 

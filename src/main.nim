@@ -268,6 +268,8 @@ judge making cuts.
       expecting = "video-speed"
     of "-c:a", "-acodec", "--audio-codec":
       expecting = "audio-codec"
+    of "-c:v", "-vcodec", "--video-codec":
+      expecting = "video-codec"
     of "--edit", "--edit-based-on":
       expecting = "edit"
     of "--set-speed", "--set-speed-for-range":
@@ -318,6 +320,8 @@ judge making cuts.
         args.sampleRate = parseSampleRate(key)
       of "audio-codec":
         args.audioCodec = key
+      of "video-codec":
+        args.videoCodec = key
       of "progress":
         try:
           args.progress = parseEnum[BarType](key)

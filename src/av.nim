@@ -134,6 +134,26 @@ proc mediaLength*(container: InputContainer): AVRational =
 
   error "No audio or video stream found"
 
+iterator decode*(container: var InputContainer, index: cint, codecCtx: ptr AVCodecContext, frame: ptr AVFrame): ptr AVFrame =
+  var ret: cint
+  var packet = container.packet
+  while av_read_frame(container.formatContext, packet) >= 0:
+    defer: av_packet_unref(packet)
+
+    if packet.stream_index == index:
+      if avcodec_send_packet(codecCtx, packet) < 0:
+        error "sending packet to decoder"
+
+      while true:
+        ret = avcodec_receive_frame(codecCtx, frame)
+        if ret == AVERROR_EAGAIN or ret == AVERROR_EOF:
+          break
+        elif ret < 0:
+          error &"Error receiving frame from decoder: {ret}"
+
+        yield frame
+
+
 proc close*(container: InputContainer) =
   if container.packet != nil:
     av_packet_free(addr container.packet)
@@ -317,8 +337,10 @@ proc mux*(self: var OutputContainer, packet: var AVPacket) =
 iterator encode*(encoderCtx: ptr AVCodecContext, frame: ptr AVFrame, packet: ptr AVPacket): ptr AVPacket =
   let isFlush: bool = frame == nil
 
-  if avcodec_send_frame(encoderCtx, frame) < 0:
-    error "Error sending frame to encoder"
+  var ret = avcodec_send_frame(encoderCtx, frame)
+  if ret < 0:
+    echo prettyVideoFrame(frame)
+    error &"Error sending frame to encoder: {ret}"
 
   while true:
     let receiveRet = avcodec_receive_packet(encoderCtx, packet)
@@ -344,8 +366,6 @@ proc close*(self: OutputContainer) =
     av_packet_free(addr self.packet)
   close(self.formatCtx)
 
-func avgRate*(stream: ptr AVStream): AVRational =
-  return stream.avg_frame_rate
 
 func name*(stream: ptr AVStream): string =
   if stream == nil or stream.codecpar == nil:

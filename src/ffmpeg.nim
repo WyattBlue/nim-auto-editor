@@ -4,6 +4,7 @@ when defined(macosx):
 {.passL: "-L./build/lib -lavfilter -lavformat -lavcodec -lswresample -lswscale -lavutil -lmp3lame -lx264 -lm".}
 
 import std/posix
+import std/strformat
 
 type AVRational* {.importc, header: "<libavutil/rational.h>", bycopy.} = object
   num*: cint
@@ -587,6 +588,17 @@ proc prettyAudioFrame*(frame: ptr AVFrame): string =
 
   return "<AVFrame format=" & getAudioFormatName(frame.format) & " samples=" &
       $frame.nb_samples & ">"
+
+proc prettyVideoFrame*(frame: ptr AVFrame): string =
+  proc getPixelFormatName(format: cint): string =
+    let name = av_get_pix_fmt_name(AVPixelFormat(format))
+    if name != nil:
+      $name
+    else:
+      "Unknown(" & $format & ")"
+
+  return fmt"<AVFrame format={getPixelFormatName(frame.format)} width={frame.width} height={frame.height} base={frame.time_base}>"
+
 
 const
   AV_CODEC_ID_NONE* = AVCodecID(0)
