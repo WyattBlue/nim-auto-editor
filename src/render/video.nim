@@ -73,7 +73,7 @@ proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =
 
   return frame
 
-iterator renderAv*(output: var OutputContainer, tl: v3, args: mainArgs): (ptr AVFrame, int) =
+iterator makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs): (ptr AVFrame, int) =
 
   var cns = initTable[ptr string, InputContainer]()
   var decoders = initTable[ptr string, ptr AVCodecContext]()
@@ -123,6 +123,13 @@ iterator renderAv*(output: var OutputContainer, tl: v3, args: mainArgs): (ptr AV
     error "Could not open encoder"
   if avcodec_parameters_from_context(outputStream.codecpar, encoderCtx) < 0:
     error "Could not copy encoder parameters to stream"
+  defer: avcodec_free_context(addr encoderCtx)
+
+  # Allocate packet for encoding
+  var outPacket = av_packet_alloc()
+  if outPacket == nil:
+    error "Could not allocate output packet"
+  defer: av_packet_free(addr outPacket)
 
   for src, cn in cns:
     if len(cn.video) > 0:
@@ -132,7 +139,7 @@ iterator renderAv*(output: var OutputContainer, tl: v3, args: mainArgs): (ptr AV
       else:
         # Keyframes are usually spread out every 5 seconds or less.
         seekCost[src] = toInt(targetFps * AVRational(5))
-        tous[src] = toInt(av_inv_q(encoderCtx.time_base) / targetFps)
+        tous[src] = 1000 #toInt(av_inv_q(encoderCtx.time_base) / targetFps)
 
       if src == firstSrc and encoderCtx.pix_fmt != AV_PIX_FMT_NONE:
         pix_fmt = encoderCtx.pix_fmt
@@ -173,6 +180,7 @@ iterator renderAv*(output: var OutputContainer, tl: v3, args: mainArgs): (ptr AV
       for obj in layer:
         if index >= obj.start and index < (obj.start + obj.dur):
           let i = int(round(float(obj.offset + index - obj.start) * obj.speed))
+          echo i
           objList.add VideoFrame(index: i, src: obj.src)
 
     if tl.chunks.isSome:
@@ -191,12 +199,31 @@ iterator renderAv*(output: var OutputContainer, tl: v3, args: mainArgs): (ptr AV
       while frameIndex < obj.index:
         let decoder: ptr AVCodecContext = decoders[obj.src]
         for _ in cns[obj.src].decode(0.cint, decoder, frame):
-          frameIndex = int(round(frame.time(outputStream.time_base) * tl.tb))
+          frameIndex = int(round(frame.time(AVRational(num: 1, den: 30000)) * tl.tb))
           break
 
-    frame.pts = AV_NOPTS_VALUE
-    frame.time_base = AVRational(0)
-    yield (frame, index)
+        #if frame.key_frame:
+        debug(&"frame index={frameIndex} pts={frame.pts}")
+
+    frame.pts = index.int64
+    frame.time_base = encoderCtx.time_base
+
+    # Encode the frame and write packets
+    for packet in encoderCtx.encode(frame, outPacket):
+      packet.stream_index = outputStream.index
+      av_packet_rescale_ts(packet, encoderCtx.time_base, outputStream.time_base)
+      output.mux(packet[])
+      av_packet_unref(packet)
+
+    # Yield a dummy value to maintain iterator interface (not used)
+    yield (nil, index)
+
+  # Flush encoder
+  for packet in encoderCtx.encode(nil, outPacket):
+    packet.stream_index = outputStream.index
+    av_packet_rescale_ts(packet, encoderCtx.time_base, outputStream.time_base)
+    output.mux(packet[])
+    av_packet_unref(packet)
 
   debug(&"Total frames saved seeking: {framesSaved}")
 

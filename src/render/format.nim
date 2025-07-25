@@ -86,22 +86,13 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
       output.mux(outPacket[])
       av_packet_unref(outPacket)
 
-  for (frame, index) in renderAv(output, tl, args):
-    defer: av_frame_free(addr frame)
-
-    for outPacket in encoderCtx.encode(frame, outPacket):
-      outPacket.stream_index = outputStream.index
-      av_packet_rescale_ts(outPacket, encoderCtx.time_base, outputStream.time_base)
-
-      let time = frame.time(outputStream.time_base)
-      if time != -1.0:
-        bar.tick(round(time * tl.tb))
-      output.mux(outPacket[])
-      av_packet_unref(outPacket)
+  # Process video frames (encoding is handled internally by makeNewVideoFrames)
+  for (_, index) in makeNewVideoFrames(output, tl, args):
+    bar.tick(index.float)
 
   bar.`end`()
 
-  # Flush streams
+  # Flush audio stream
   for outPacket in encoderCtx.encode(nil, outPacket):
     outPacket.stream_index = outputStream.index
     av_packet_rescale_ts(outPacket, encoderCtx.time_base, outputStream.time_base)
