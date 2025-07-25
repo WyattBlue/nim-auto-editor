@@ -153,6 +153,18 @@ iterator decode*(container: var InputContainer, index: cint, codecCtx: ptr AVCod
 
         yield frame
 
+proc seek*(container: var InputContainer, offset: int64, backward: bool = true, stream: ptr AVStream = nil) =
+  var flags: cint = 0
+  var ret: cint
+
+  if backward:
+    flags |= AVSEEK_FLAG_BACKWARD
+
+  var stream_index: cint = (if stream == nil: -1 else: stream.index)
+  ret = av_seek_frame(container.formatContext, stream_index, offset, flags)
+  if ret < 0:
+    error "Error seeking frame"
+
 
 proc close*(container: InputContainer) =
   if container.packet != nil:
@@ -331,8 +343,10 @@ proc mux*(self: var OutputContainer, packet: var AVPacket) =
   # takes ownership of the reference.
   if av_packet_ref(self.packet, addr packet) < 0:
     error "Failed to reference packet"
-  if av_interleaved_write_frame(self.formatCtx, self.packet) < 0:
-    error "Failed to write packet"
+
+  var ret = av_interleaved_write_frame(self.formatCtx, self.packet)
+  if ret < 0:
+    echo &"Failed to write packet: {ret}"
 
 iterator encode*(encoderCtx: ptr AVCodecContext, frame: ptr AVFrame, packet: ptr AVPacket): ptr AVPacket =
   let isFlush: bool = frame == nil
