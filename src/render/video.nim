@@ -73,8 +73,8 @@ proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =
 
   return frame
 
-iterator makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs): (ptr AVFrame, int, ptr AVCodecContext, ptr AVStream) =
-  # This iterator follows the Python pattern: first yield sets up the stream and encoder
+proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
+    (ptr AVCodecContext, ptr AVStream, iterator(): (ptr AVFrame, int)) =
 
   var cns = initTable[ptr string, InputContainer]()
   var decoders = initTable[ptr string, ptr AVCodecContext]()
@@ -101,8 +101,8 @@ iterator makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs
     targetHeight = max(cint(round(tl.res[1].float64 * args.scale)), 2)
 
   debug &"Creating video stream with codec: {args.videoCodec}"
-  var (outputStream, encoderCtx) = output.addStream(args.videoCodec, rate = targetFps,
-    width = targetWidth, height = targetHeight)
+  var (outputStream, encoderCtx) = output.addStream(args.videoCodec,
+      rate = targetFps, width = targetWidth, height = targetHeight)
   let codec = encoderCtx.codec
 
   encoderCtx.framerate = targetFps
@@ -153,57 +153,60 @@ iterator makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs
   var nullFrame = makeSolid(targetWidth, targetHeight, args.background)
   var frameIndex = -1
   var frame: ptr AVFrame = nullFrame
+  var objList: seq[VideoFrame] = @[]
 
-  # Process each frame in timeline order like Python version
-  for index in 0 ..< tl.`end`:
-    var objList: seq[VideoFrame] = @[]
+  return (encoderCtx, outputStream, iterator(): (ptr AVFrame, int) =
+    # Process each frame in timeline order like Python version
+    for index in 0 ..< tl.`end`:
+      objList = @[]
 
-    for layer in tl.v:
-      for obj in layer:
-        if index >= obj.start and index < (obj.start + obj.dur):
-          let i = int(round(float(obj.offset + index - obj.start) * obj.speed))
-          objList.add VideoFrame(index: i, src: obj.src)
+      for layer in tl.v:
+        for obj in layer:
+          if index >= obj.start and index < (obj.start + obj.dur):
+            let i = int(round(float(obj.offset + index - obj.start) * obj.speed))
+            objList.add VideoFrame(index: i, src: obj.src)
 
-    if tl.chunks.isSome:
-      # When there can be valid gaps in the timeline.
-      frame = nullFrame
-    # else, use the last frame
+      if tl.chunks.isSome:
+        # When there can be valid gaps in the timeline.
+        frame = nullFrame
+      # else, use the last frame
 
-    for obj in objList:
-      var myStream: ptr AVStream = cns[obj.src].video[0]
-      if frameIndex > obj.index:
-        debug(&"Seek: {frameIndex} -> 0")
-        cns[obj.src].seek(0)
-        avcodec_flush_buffers(decoders[obj.src])
-
-      while frameIndex < obj.index:
-        # Check if skipping ahead is worth it.
-        if obj.index - frameIndex > seekCost[obj.src] and frameIndex > seekThreshold:
-          seekThreshold = frameIndex + (seekCost[obj.src] div 2)
-          seekFrame = some(frameIndex)
-          debug &"Seek: {frameIndex} -> {obj.index}"
-          cns[obj.src].seek(obj.index * tous[obj.src], stream=myStream)
+      for obj in objList:
+        var myStream: ptr AVStream = cns[obj.src].video[0]
+        if frameIndex > obj.index:
+          debug(&"Seek: {frameIndex} -> 0")
+          cns[obj.src].seek(0)
           avcodec_flush_buffers(decoders[obj.src])
 
-        let decoder: ptr AVCodecContext = decoders[obj.src]
-        var foundFrame = false
-        for decodedFrame in cns[obj.src].decode(0.cint, decoder, frame):
-          frame = decodedFrame
-          frameIndex = int(round(decodedFrame.time(AVRational(num: 1, den: 30_000)) * tl.tb.float))
-          foundFrame = true
-          break
+        while frameIndex < obj.index:
+          # Check if skipping ahead is worth it.
+          if obj.index - frameIndex > seekCost[obj.src] and frameIndex > seekThreshold:
+            seekThreshold = frameIndex + (seekCost[obj.src] div 2)
+            seekFrame = some(frameIndex)
+            debug &"Seek: {frameIndex} -> {obj.index}"
+            cns[obj.src].seek(obj.index * tous[obj.src], stream = myStream)
+            avcodec_flush_buffers(decoders[obj.src])
 
-        if not foundFrame:
-          frame = nullFrame
-          break
+          let decoder: ptr AVCodecContext = decoders[obj.src]
+          var foundFrame = false
+          for decodedFrame in cns[obj.src].decode(0.cint, decoder, frame):
+            frame = decodedFrame
+            frameIndex = int(round(decodedFrame.time(AVRational(num: 1,
+                den: 30_000)) * tl.tb.float))
+            foundFrame = true
+            break
 
-        if seekFrame.isSome:
-          debug &"Skipped {frameIndex - seekFrame.get} frame indexes"
-          framesSaved += frameIndex - seekFrame.get
-          seekFrame = none(int)
+          if not foundFrame:
+            frame = nullFrame
+            break
 
-    frame.pts = index.int64
-    frame.time_base = av_inv_q(tl.tb)
-    yield (frame, index, encoderCtx, outputStream)
+          if seekFrame.isSome:
+            debug &"Skipped {frameIndex - seekFrame.get} frame indexes"
+            framesSaved += frameIndex - seekFrame.get
+            seekFrame = none(int)
 
-  debug(&"Total frames saved seeking: {framesSaved}")
+      frame.pts = index.int64
+      frame.time_base = av_inv_q(tl.tb)
+      yield (frame, index)
+
+    debug(&"Total frames saved seeking: {framesSaved}"))

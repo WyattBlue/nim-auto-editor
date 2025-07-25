@@ -375,8 +375,7 @@ proc processAudioClip*(clip: Clip, data: seq[seq[int16]], sr: cint): seq[seq[int
         result[1][i] = result[0][i]
 
 
-iterator makeNewAudioFrames*(fmt: AVSampleFormat, tl: v3, tempDir: string,
-    frameSize: int): (ptr AVFrame, int) {.closure.} =
+proc makeNewAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int): iterator(): (ptr AVFrame, int) =
 
   let targetSampleRate = tl.sr
   var samples: Table[(string, int32), Getter]
@@ -439,43 +438,44 @@ iterator makeNewAudioFrames*(fmt: AVSampleFormat, tl: v3, tempDir: string,
   # Yield audio frames in chunks
   var samplesYielded = 0
   var frameIndex = 0
-
   var resampler = newAudioResampler(fmt, "stereo", tl.sr)
 
-  while samplesYielded < totalSamples:
-    let currentFrameSize = min(frameSize, totalSamples - samplesYielded)
+  # defer:
+  #   # Close all getters
+  #   for getter in samples.values:
+  #     getter.close()
 
-    var frame = av_frame_alloc()
-    if frame == nil:
-      error "Could not allocate audio frame"
+  return iterator(): (ptr AVFrame, int) =
+    while samplesYielded < totalSamples:
+      let currentFrameSize = min(frameSize, totalSamples - samplesYielded)
 
-    frame.nb_samples = currentFrameSize.cint
-    frame.format = AV_SAMPLE_FMT_S16P.cint # Planar format
-    frame.ch_layout.nb_channels = targetChannels.cint
-    frame.ch_layout.order = 0
-    frame.ch_layout.u.mask = 3 # AV_CH_LAYOUT_STEREO
-    frame.sample_rate = targetSampleRate.cint
-    frame.pts = samplesYielded.int64
+      var frame = av_frame_alloc()
+      if frame == nil:
+        error "Could not allocate audio frame"
 
-    if av_frame_get_buffer(frame, 0) < 0:
-      av_frame_free(addr frame)
-      error "Could not allocate audio frame buffer"
+      frame.nb_samples = currentFrameSize.cint
+      frame.format = AV_SAMPLE_FMT_S16P.cint # Planar format
+      frame.ch_layout.nb_channels = targetChannels.cint
+      frame.ch_layout.order = 0
+      frame.ch_layout.u.mask = 3 # AV_CH_LAYOUT_STEREO
+      frame.sample_rate = targetSampleRate.cint
+      frame.pts = samplesYielded.int64
 
-    # Copy audio data to frame (planar format)
-    for ch in 0..<min(targetChannels, audioData.len):
-      let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
-      for i in 0..<currentFrameSize:
-        let srcIndex = samplesYielded + i
-        if ch < audioData.len and srcIndex < audioData[ch].len:
-          channelData[i] = audioData[ch][srcIndex]
-        else:
-          channelData[i] = 0
+      if av_frame_get_buffer(frame, 0) < 0:
+        av_frame_free(addr frame)
+        error "Could not allocate audio frame buffer"
 
-    for newFrame in resampler.resample(frame):
-      yield (newFrame, frameIndex)
-      frameIndex += 1
-    samplesYielded += currentFrameSize
+      # Copy audio data to frame (planar format)
+      for ch in 0 ..< min(targetChannels, audioData.len):
+        let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
+        for i in 0..<currentFrameSize:
+          let srcIndex = samplesYielded + i
+          if ch < audioData.len and srcIndex < audioData[ch].len:
+            channelData[i] = audioData[ch][srcIndex]
+          else:
+            channelData[i] = 0
 
-  # Close all getters
-  for getter in samples.values:
-    getter.close()
+      for newFrame in resampler.resample(frame):
+        yield (newFrame, frameIndex)
+        frameIndex += 1
+      samplesYielded += currentFrameSize

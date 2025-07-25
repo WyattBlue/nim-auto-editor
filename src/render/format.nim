@@ -9,6 +9,7 @@ import ../log
 import ../av
 import ../util/bar
 import video
+import audio
 
 type Priority = object
   index: float64
@@ -54,16 +55,19 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
     title &= encoderTitles.join("\e[0m+") & "\e[0m"
   bar.start(tl.`end`.float, title)
 
-  # Process audio directly from timeline using the frame iterator
-  #let frameSize = if encoderCtx.frame_size > 0: encoderCtx.frame_size else: 1024
+  let (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(output, tl, args)
 
-  var lastVidEncCtx: ptr AVCodecContext
-  var lastOutputStream: ptr AVStream
+  # let frameSize = if encoderCtx.frame_size > 0: encoderCtx.frame_size else: 1024
+  # let audioFrameIter = makeNewAudioFrames(tl, frameSize)
 
-  for (frame, index, vEncCtx, outputStream) in makeNewVideoFrames(output, tl, args):
+  while true:
+    let (frame, index) = videoFrameIter()
+    if finished(videoFrameIter):
+      break
+
     for outPacket in vEncCtx.encode(frame, outPacket):
-      outPacket.stream_index = outputStream.index
-      av_packet_rescale_ts(outPacket, vEncCtx.time_base, outputStream.time_base)
+      outPacket.stream_index = vOutStream.index
+      av_packet_rescale_ts(outPacket, vEncCtx.time_base, vOutStream.time_base)
 
       let time = frame.time(1 / tl.tb)
       if time != -1.0:
@@ -71,15 +75,12 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
       output.mux(outPacket[])
       av_packet_unref(outPacket)
 
-    lastVidEncCtx = vEncCtx
-    lastOutputStream = outputStream
-
   bar.`end`()
 
   # Flush streams
-  for outPacket in lastVidEncCtx.encode(nil, outPacket):
-    outPacket.stream_index = lastOutputStream.index
-    av_packet_rescale_ts(outPacket, lastVidEncCtx.time_base, lastOutputStream.time_base)
+  for outPacket in vEncCtx.encode(nil, outPacket):
+    outPacket.stream_index = vOutStream.index
+    av_packet_rescale_ts(outPacket, vEncCtx.time_base, vOutStream.time_base)
     output.mux(outPacket[])
     av_packet_unref(outPacket)
 
