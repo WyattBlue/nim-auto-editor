@@ -4,7 +4,6 @@ when defined(macosx):
 {.passL: "-L./build/lib -lavfilter -lavformat -lavcodec -lswresample -lswscale -lavutil -lmp3lame -lx264 -lm".}
 
 import std/posix
-import std/strformat
 
 type AVRational* {.importc, header: "<libavutil/rational.h>", bycopy.} = object
   num*: cint
@@ -579,34 +578,6 @@ proc avcodec_decode_subtitle2*(avctx: ptr AVCodecContext, sub: ptr AVSubtitle,
 proc avsubtitle_free*(sub: ptr AVSubtitle) {.importc, header: "<libavcodec/avcodec.h>".}
 proc av_get_sample_fmt_name*(sample_fmt: cint): cstring {.importc,
     header: "<libavutil/samplefmt.h>".}
-
-proc prettyAudioFrame*(frame: ptr AVFrame): string =
-  proc getAudioFormatName(format: cint): string =
-    let name = av_get_sample_fmt_name(format)
-    if name != nil:
-      $name
-    else:
-      "Unknown(" & $format & ")"
-
-  return "<AVFrame format=" & getAudioFormatName(frame.format) & " samples=" &
-      $frame.nb_samples & ">"
-
-proc prettyVideoFrame*(frame: ptr AVFrame): string =
-  proc getPixelFormatName(format: cint): string =
-    let name = av_get_pix_fmt_name(AVPixelFormat(format))
-    if name != nil:
-      $name
-    else:
-      "Unknown(" & $format & ")"
-
-  return fmt"<AVFrame format={getPixelFormatName(frame.format)} width={frame.width} height={frame.height} base={frame.time_base}>"
-
-proc prettyFrame*(frame: ptr AVFrame): string =
-  if frame == nil:
-    return ""
-  if frame.width > 2:
-    return prettyVideoFrame(frame)
-  return prettyAudioFrame(frame)
 
 const
   AV_CODEC_ID_NONE* = AVCodecID(0)

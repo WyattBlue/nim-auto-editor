@@ -206,8 +206,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
           var foundFrame = false
           for decodedFrame in cns[obj.src].decode(0.cint, decoder, frame):
             frame = decodedFrame
-            frameIndex = int(round(decodedFrame.time(AVRational(num: 1,
-                den: 30_000)) * tl.tb.float))
+            frameIndex = int(round(decodedFrame.time(myStream.time_base) * tl.tb.float))
             foundFrame = true
             break
 

@@ -14,13 +14,11 @@ import audio
 
 type Priority = object
   index: float64
-  frameType: AVMediaType
   frame: ptr AVFrame
   stream: ptr AVStream
 
 proc initPriority(index: float64, frame: ptr AVFrame, stream: ptr AVStream): Priority =
   result.index = index
-  result.frameType = (if frame.width > 2: AVMEDIA_TYPE_VIDEO else: AVMEDIA_TYPE_AUDIO)
   result.frame = frame
   result.stream = stream
 
@@ -95,7 +93,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
       shouldGetAudio = true
     else:
       for item in frameQueue:
-        if item.frameType == AVMEDIA_TYPE_AUDIO:
+        if item.stream.codecpar.codec_type == AVMEDIA_TYPE_AUDIO:
           latestAudioIndex = max(latestAudioIndex, item.index.float64)
       shouldGetAudio = (latestAudioIndex <= float(earliestVideoIndex.get() + MAX_AUDIO_AHEAD))
 
@@ -126,10 +124,9 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
     while frameQueue.len > 0 and frameQueue[0].index <= float64(index):
       let item = frameQueue.pop()
       let frame = item.frame
-      let frameType = item.frameType
-
+      let outputStream = item.stream
+      let frameType = outputStream.codecpar.codec_type
       let encCtx = (if frameType == AVMEDIA_TYPE_VIDEO: vEncCtx else: aEncCtx)
-      let outputStream = (if frameType == AVMEDIA_TYPE_VIDEO: vOutStream else: aOutStream)
 
       for outPacket in encCtx.encode(frame, outPacket):
         outPacket.stream_index = outputStream.index
