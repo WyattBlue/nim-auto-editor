@@ -101,17 +101,18 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
       videoFrame = nil
     else:
       (videoFrame, index) = videoFrameIter()
-
-    if videoFrame != nil:
-      earliestVideoIndex = some(index)
-      frameQueue.push(initPriority(float(index), videoFrame, vOutStream))
+      if videoFrame != nil:
+        earliestVideoIndex = some(index)
+        frameQueue.push(initPriority(float(index), videoFrame, vOutStream))
 
     if finished(audioFrameIter):
       audioFrame = nil
     elif shouldGetAudio:
       (audioFrame, _) = audioFrameIter()
       if audioFrame != nil:
-        index = int(round(audioFrame.time(aOutStream.time_base) * tl.tb))
+        let audioIndex = int(round(audioFrame.time(aOutStream.time_base) * tl.tb))
+        # Update index to the maximum of video and audio indices to ensure progress
+        index = max(index, audioIndex)
 
     # Break if no more frames
     if audioFrame == nil and videoFrame == nil:
@@ -119,7 +120,8 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
 
     if shouldGetAudio:
       if audioFrame != nil:
-        frameQueue.push(initPriority(float(index), audioFrame, aOutStream))
+        let audioIndex = int(round(audioFrame.time(aOutStream.time_base) * tl.tb))
+        frameQueue.push(initPriority(float(audioIndex), audioFrame, aOutStream))
 
     while frameQueue.len > 0 and frameQueue[0].index <= float64(index):
       let item = frameQueue.pop()
