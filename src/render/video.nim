@@ -108,6 +108,21 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
   encoderCtx.framerate = targetFps
   encoderCtx.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
 
+  let src = cns[firstSrc]
+  let color_range = src.video[0].codecpar.color_range
+  let colorspace = src.video[0].codecpar.color_space
+  let color_prim = src.video[0].codecpar.color_primaries
+  let color_trc = src.video[0].codecpar.color_trc
+
+  if color_range in [1, 2]:
+      encoderCtx.color_range = color_range
+  if colorspace in [0, 1] or (colorspace >= 3 and colorspace < 16):
+      encoderCtx.colorspace = colorspace
+  if color_prim == 1 or (color_prim >= 4 and color_prim < 17):
+      encoderCtx.color_primaries = color_prim
+  if color_trc == 1 or (color_trc >= 4 and color_trc < 22):
+      encoderCtx.color_trc = color_trc
+
   # Open encoder and copy encoder parameters to stream
   if avcodec_open2(encoderCtx, codec, nil) < 0:
     error "Could not open encoder"
