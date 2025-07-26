@@ -56,25 +56,28 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
     error "Could not allocate output packet"
   defer: av_packet_free(addr outPacket)
 
+  let (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(output, tl, args)
+
+  let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
+  let audioFrameIter = makeNewAudioFrames(encoder.sample_fmts[0], tl, frameSize)
+  output.startEncoding()
+
   let noColor = false
   var title = fmt"({ext[1 .. ^1]}) "
   var encoderTitles: seq[string] = @[]
 
-  let name = "h264" #encoder.canonicalName
-  encoderTitles.add (if noColor: name else: &"\e[32m{name}")
+  if vEncCtx != nil:
+    let name = vEncCtx.codec.canonicalName
+    encoderTitles.add (if noColor: name else: &"\e[95m{name}")
+  if aEncCtx != nil:
+    let name = aEncCtx.codec.canonicalName
+    encoderTitles.add (if noColor: name else: &"\e[96m{name}")
 
   if noColor:
     title &= encoderTitles.join("+")
   else:
     title &= encoderTitles.join("\e[0m+") & "\e[0m"
   bar.start(tl.`end`.float, title)
-
-  let (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(output, tl, args)
-
-  output.startEncoding()
-
-  let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
-  let audioFrameIter = makeNewAudioFrames(encoder.sample_fmts[0], tl, frameSize)
 
   var shouldGetAudio = false
   const MAX_AUDIO_AHEAD = 30  # In timebase, how far audio can be ahead of video.
