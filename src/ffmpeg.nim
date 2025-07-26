@@ -601,6 +601,12 @@ proc prettyVideoFrame*(frame: ptr AVFrame): string =
 
   return fmt"<AVFrame format={getPixelFormatName(frame.format)} width={frame.width} height={frame.height} base={frame.time_base}>"
 
+proc prettyFrame*(frame: ptr AVFrame): string =
+  if frame == nil:
+    return ""
+  if frame.width > 2:
+    return prettyVideoFrame(frame)
+  return prettyAudioFrame(frame)
 
 const
   AV_CODEC_ID_NONE* = AVCodecID(0)

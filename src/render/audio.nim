@@ -376,7 +376,6 @@ proc processAudioClip*(clip: Clip, data: seq[seq[int16]], sr: cint): seq[seq[int
 
 
 proc makeNewAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int): iterator(): (ptr AVFrame, int) =
-
   let targetSampleRate = tl.sr
   var samples: Table[(string, int32), Getter]
 
