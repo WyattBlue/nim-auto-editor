@@ -1,6 +1,7 @@
 import std/[os, terminal, browsers]
 import std/[strutils, strformat]
 import std/sequtils
+import std/sets
 import std/tables
 import std/random
 from std/math import round
@@ -154,7 +155,73 @@ proc setOutput(userOut, userExport, path: string): (string, string) =
 
   return (&"{root}{ext}", outExport)
 
-proc editMedia*(args: mainArgs) =
+type Rules = object
+  allowImage: bool
+  vcodecs: HashSet[string]
+  acodecs: HashSet[string]
+  scodecs: HashSet[string]
+  defaultVid: string
+  defaultAud: string
+  defaultSub: string
+  maxVideos: int = -1
+  maxAudios: int = -1
+  maxSubtitles: int = -1
+
+proc initRules(ext: string): Rules =
+  let dummy = cstring(&".{ext}")
+  let format = av_guess_format(nil, dummy, nil)
+  if format == nil:
+    echo $dummy
+    error "Why no formats?"
+
+  result.defaultVid = format.defaultVideoCodec()
+  result.defaultAud = format.defaultAudioCodec()
+  result.defaultSub = format.defaultSubtitleCodec()
+  result.allowImage = ext in ["mp4", "mkv"]
+
+  for codec in format.supportedCodecs:
+    if codec.`type` == AVMEDIA_TYPE_VIDEO:
+      result.vcodecs.incl $codec.name
+    elif codec.`type` == AVMEDIA_TYPE_AUDIO:
+      result.acodecs.incl $codec.name
+    elif codec.`type` == AVMEDIA_TYPE_SUBTITLE:
+      result.scodecs.incl $codec.name
+
+proc setAudioCodec(codec: var string, ext: string, src: MediaInfo, rule: Rules): string =
+  if codec == "auto":
+    if src.a.len == 0:
+      codec = "aac"
+    else:
+      codec = src.a[0].codec
+      # if Codec(codec, "w").audio_formats is None:
+      #     codec = "aac"
+    if codec notin rule.acodecs and rule.defaultAud != "none":
+      codec = rule.defaultAud
+
+  return codec
+
+proc setVideoCodec(codec: var string, ext: string, src: MediaInfo, rule: Rules): string =
+  if codec == "auto":
+    codec = (if src.v.len == 0: "h264" else: src.v[0].codec)
+    if codec notin rule.vcodecs and rule.defaultVid != "none":
+      return rule.default_vid
+    return codec
+
+  # if codec notin rule.vcodecs:
+  #   if ctr.vcodecs is not None and codec not in ctr.vcodecs:
+  #       try:
+  #           cobj = Codec(codec, "w")
+  #       except av.codec.codec.UnknownCodecError:
+  #           log.error(f"Unknown encoder: {codec}")
+  #       # Normalize encoder names
+  #       if cobj.id not in (Codec(x, "w").id for x in ctr.vcodecs):
+  #           log.error(
+  #               f"'{codec}' video encoder is not supported in the '{out_ext}' container"
+  #           )
+
+  return codec
+
+proc editMedia*(args: var mainArgs) =
   av_log_set_level(AV_LOG_QUIET)
 
   var tlV3: v3
@@ -286,8 +353,14 @@ proc editMedia*(args: mainArgs) =
   else:
     error &"Unknown export format: {exportKind}"
 
-  if args.output == "-":
+  if output == "-":
     error "Exporting media files to stdout is not supported."
+
+  let (_, _, outExt) = splitFile(output)
+  let rule = initRules(outExt.toLowerAscii)
+  let src = initMediaInfo(args.input)
+  args.videoCodec = setVideoCodec(args.videoCodec, outExt, src, rule)
+  args.audioCodec = setAudioCodec(args.audioCodec, outExt, src, rule)
 
   proc createAlphanumTempDir(length: int = 8): string =
     const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
@@ -301,8 +374,8 @@ proc editMedia*(args: mainArgs) =
     createDir(fullPath)
     return fullPath
 
-  randomize()
   if tempDir == "":
+    randomize()
     tempDir = createAlphanumTempDir()
   else:
     if fileExists(tempDir):

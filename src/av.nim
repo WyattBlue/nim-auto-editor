@@ -12,8 +12,6 @@ proc initCodec(name: string): ptr AVCodec =
     let desc = avcodec_descriptor_get_by_name(name.cstring)
     if desc != nil:
       result = avcodec_find_encoder(desc.id)
-  if result == nil:
-    error "Codec not found: " & name
 
 proc initEnCtx(codec: ptr AVCodec): ptr AVCodecContext =
   let encoderCtx = avcodec_alloc_context3(codec)
@@ -33,6 +31,8 @@ proc initEncoder*(id: AVCodecID): (ptr AVCodec, ptr AVCodecContext) =
 
 proc initEncoder*(name: string): (ptr AVCodec, ptr AVCodecContext) =
   let codec = initCodec(name)
+  if codec == nil:
+    error "Codec not found: " & name
   return (codec, initEnCtx(codec))
 
 proc initDecoder*(codecpar: ptr AVCodecParameters): ptr AVCodecContext =
@@ -194,35 +194,40 @@ proc openWrite*(file: string): OutputContainer =
   result.formatCtx = formatCtx
   result.packet = av_packet_alloc()
 
-proc defaultVideoCodec*(container: OutputContainer): string =
-  # Returns the default video codec this container recommends.
-  if container.formatCtx != nil and container.formatCtx.oformat != nil:
-    let codecId = container.formatCtx.oformat.video_codec
-    if codecId != AV_CODEC_ID_NONE:
-      let codecName = avcodec_get_name(codecId)
-      if codecName != nil:
-        return $codecName
-  return ""
+proc defaultVideoCodec*(self: ptr AVOutputFormat): string =
+  let codecId = self.video_codec
+  if codecId != AV_CODEC_ID_NONE:
+    let codecName = avcodec_get_name(codecId)
+    if codecName != nil:
+      return $codecName
+  return "none"
 
-proc defaultAudioCodec*(container: OutputContainer): string =
-  # Returns the default audio codec this container recommends.
-  if container.formatCtx != nil and container.formatCtx.oformat != nil:
-    let codecId = container.formatCtx.oformat.audio_codec
-    if codecId != AV_CODEC_ID_NONE:
-      let codecName = avcodec_get_name(codecId)
-      if codecName != nil:
-        return $codecName
-  return ""
+proc defaultAudioCodec*(self: ptr AVOutputFormat): string =
+  let codecId = self.audio_codec
+  if codecId != AV_CODEC_ID_NONE:
+    let codecName = avcodec_get_name(codecId)
+    if codecName != nil:
+      return $codecName
+  return "none"
 
-proc defaultSubtitleCodec*(container: OutputContainer): string =
-  # Returns the default subtitle codec this container recommends.
-  if container.formatCtx != nil and container.formatCtx.oformat != nil:
-    let codecId = container.formatCtx.oformat.subtitle_codec
-    if codecId != AV_CODEC_ID_NONE:
-      let codecName = avcodec_get_name(codecId)
-      if codecName != nil:
-        return $codecName
-  return ""
+proc defaultSubtitleCodec*(self: ptr AVOutputFormat): string =
+  let codecId = self.subtitle_codec
+  if codecId != AV_CODEC_ID_NONE:
+    let codecName = avcodec_get_name(codecId)
+    if codecName != nil:
+      return $codecName
+  return "none"
+
+func supportedCodecs*(self: ptr AVOutputFormat): seq[AVCodec] =
+  var codec: ptr AVCodec
+  let opaque: pointer = nil
+
+  while true:
+    codec = av_codec_iterate(addr opaque)
+    if codec == nil:
+      break
+    if avformat_query_codec(self, codec.id, FF_COMPLIANCE_NORMAL) == 1:
+      result.add codec[]
 
 proc addStreamFromTemplate*(self: var OutputContainer,
     streamT: ptr AVStream): ptr AVStream =
@@ -260,6 +265,8 @@ proc addStreamFromTemplate*(self: var OutputContainer,
 proc addStream*(self: var OutputContainer, codecName: string, rate: AVRational, width: cint = 640, height: cint = 480): (
     ptr AVStream, ptr AVCodecContext) =
   let codec = initCodec(codecName)
+  if codec == nil:
+    error "Codec not found: " & $codec.name
   let format = self.formatCtx
 
   # Assert that this format supports the requested codec.

@@ -28,20 +28,10 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
   if tl.a.len == 0:
     error "No audio tracks found in timeline"
 
+  var output = openWrite(outputPath)
   let (_, _, ext) = splitFile(outputPath)
 
-  var audioCodec = args.audioCodec
-  if audioCodec == "auto":
-    audioCodec = case ext.toLowerAscii():
-      of ".mp3": "libmp3lame"
-      of ".wav": "pcm_s16le"
-      of ".m4a", ".mp4": "aac"
-      of ".ogg": "libvorbis"
-      else: "pcm_s16le"
-
-  var output = openWrite(outputPath)
-
-  var (aOutStream, aEncCtx) = output.addStream(audioCodec, rate=AVRational(num: tl.sr, den: 1))
+  var (aOutStream, aEncCtx) = output.addStream(args.audioCodec, rate=AVRational(num: tl.sr, den: 1))
   let encoder = aEncCtx.codec
   if encoder.sample_fmts == nil:
     error &"{encoder.name}: No known audio formats avail."

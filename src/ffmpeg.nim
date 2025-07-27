@@ -302,6 +302,9 @@ proc av_get_pix_fmt_name*(pix_fmt: AVPixelFormat): cstring {.importc, cdecl.}
 proc avformat_query_codec*(ofmt: ptr AVOutputFormat, codec_id: AVCodecID,
   std_compliance: cint): cint {.importc, header: "<libavformat/avformat.h>".}
 
+proc av_codec_iterate*(opaque: ptr pointer): ptr AVCodec {.importc, header: "<libavcodec/avcodec.h>".}
+
+
 const FF_COMPLIANCE_STRICT*: cint = 1
 const FF_COMPLIANCE_NORMAL*: cint = 0
 const FF_COMPLIANCE_INOFFICIAL*: cint = -1
@@ -610,6 +613,8 @@ proc avio_closep*(s: ptr pointer): cint {.importc,
 proc avformat_write_header*(s: ptr AVFormatContext,
     options: pointer): cint {.importc, header: "<libavformat/avformat.h>".}
 proc av_write_trailer*(s: ptr AVFormatContext): cint {.importc,
+    header: "<libavformat/avformat.h>".}
+proc av_guess_format*(short_name: cstring, filename: cstring, mime_type: cstring): ptr AVOutputFormat {.importc,
     header: "<libavformat/avformat.h>".}
 proc avformat_free_context*(s: ptr AVFormatContext) {.importc,
     header: "<libavformat/avformat.h>".}
