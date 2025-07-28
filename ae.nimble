@@ -49,40 +49,12 @@ let decodersDisabled = disableDecoders.join(",")
 let demuxersDisabled = disableDemuxers.join(",")
 let muxersDisabled = disableMuxers.join(",")
 
-var commonFlags = &"""
-  --enable-version3 \
-  --enable-static \
-  --disable-shared \
-  --disable-programs \
-  --disable-doc \
-  --disable-network \
-  --disable-indevs \
-  --disable-outdevs \
-  --disable-xlib \
-  --disable-filters \
-  --enable-filter=scale,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume \
-  --enable-libmp3lame \
-  --enable-libx264 \
-  --disable-encoder={encodersDisabled} \
-  --disable-decoder={decodersDisabled} \
-  --disable-demuxer={demuxersDisabled} \
-  --disable-muxer={muxersDisabled} \
-"""
-
-if defined(arm) or defined(arm64):
-  commonFlags &= "  --enable-neon \\\n"
-
-if defined(macosx):
-  commonFlags &= "  --enable-videotoolbox \\\n"
-  commonFlags &= "  --enable-audiotoolbox \\\n"
-
-commonFlags &= "--disable-autodetect"
-
 type Package = object
   name: string
   sourceUrl: string
   sha256: string
   buildArguments: seq[string]
+  buildSystem: string = "autoconf"
 
 let lame = Package(
   name: "lame",
@@ -96,6 +68,13 @@ let twolame = Package(
   sha256: "cc35424f6019a88c6f52570b63e1baf50f62963a3eac52a03a800bb070d7c87d",
   buildArguments: @["--disable-sndfile"],
 )
+let svtav1 = Package(
+  name: "libsvtav1",
+  sourceUrl: "https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/v3.1.0/SVT-AV1-v3.1.0.tar.bz2",
+  sha256: "8231b63ea6c50bae46a019908786ebfa2696e5743487270538f3c25fddfa215a",
+  buildSystem: "cmake",
+)
+
 let x264 = Package(
   name: "x264",
   sourceUrl: "https://code.videolan.org/videolan/x264/-/archive/32c3b801191522961102d4bea292cdb61068d0dd/x264-32c3b801191522961102d4bea292cdb61068d0dd.tar.bz2",
@@ -119,7 +98,7 @@ func dirName(package: Package): string =
       break
   return name.replace("_", "-")
 
-let packages = @[lame, twolame, x264]
+let packages = @[lame, twolame, svtav1, x264]
 
 proc getFileHash(filename: string): string =
   let (existsOutput, existsCode) = gorgeEx("test -f " & filename)
@@ -147,6 +126,35 @@ proc makeInstall() =
   else:
     exec "make -j4"
   exec "make install"
+
+proc cmakeBuild(buildPath: string, crossWindows: bool = false) =
+  mkDir("build_cmake")
+
+  var cmakeArgs = @[
+    &"-DCMAKE_INSTALL_PREFIX={buildPath}",
+    "-DCMAKE_BUILD_TYPE=Release",
+    "-DBUILD_SHARED_LIBS=OFF",
+    "-DBUILD_STATIC_LIBS=ON",
+    "-DBUILD_APPS=OFF",
+    "-DBUILD_DEC=OFF",
+    "-DBUILD_ENC=ON",
+    "-DENABLE_NASM=ON"
+  ]
+
+  if crossWindows:
+    cmakeArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
+    cmakeArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc")
+    cmakeArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++")
+    cmakeArgs.add("-DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres")
+    cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
+    cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
+    cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
+
+  withDir "build_cmake":
+    let cmakeCmd = "cmake " & cmakeArgs.join(" ") & " .."
+    echo "RUN: ", cmakeCmd
+    exec cmakeCmd
+    makeInstall()
 
 proc ffmpegSetup(crossWindows: bool) =
   # Create directories
@@ -177,16 +185,50 @@ proc ffmpegSetup(crossWindows: bool) =
         continue
 
       withDir package.name:
-        if not fileExists("Makefile") or package.name == "x264":
-          var args = package.buildArguments
-          var envPrefix = ""
-          if crossWindows:
-            args.add("--host=x86_64-w64-mingw32")
-            envPrefix = "CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib "
-          let cmd = &"{envPrefix}./configure --prefix=\"{buildPath}\" --disable-shared --enable-static " & args.join(" ")
-          echo "RUN: ", cmd
-          exec cmd
-        makeInstall()
+        if package.buildSystem == "cmake":
+          cmakeBuild(buildPath, crossWindows)
+        else:
+          if not fileExists("Makefile") or package.name == "x264":
+            var args = package.buildArguments
+            var envPrefix = ""
+            if crossWindows:
+              args.add("--host=x86_64-w64-mingw32")
+              envPrefix = "CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib "
+            let cmd = &"{envPrefix}./configure --prefix=\"{buildPath}\" --disable-shared --enable-static " & args.join(" ")
+            echo "RUN: ", cmd
+            exec cmd
+          makeInstall()
+
+
+var commonFlags = &"""
+  --enable-version3 \
+  --enable-static \
+  --disable-shared \
+  --disable-programs \
+  --disable-doc \
+  --disable-network \
+  --disable-indevs \
+  --disable-outdevs \
+  --disable-xlib \
+  --disable-filters \
+  --enable-filter=scale,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume \
+  --enable-libmp3lame \
+  --enable-libsvtav1 \
+  --enable-libx264 \
+  --disable-encoder={encodersDisabled} \
+  --disable-decoder={decodersDisabled} \
+  --disable-demuxer={demuxersDisabled} \
+  --disable-muxer={muxersDisabled} \
+"""
+
+if defined(arm) or defined(arm64):
+  commonFlags &= "  --enable-neon \\\n"
+
+if defined(macosx):
+  commonFlags &= "  --enable-videotoolbox \\\n"
+  commonFlags &= "  --enable-audiotoolbox \\\n"
+
+commonFlags &= "--disable-autodetect"
 
 
 task makeff, "Build FFmpeg from source":
