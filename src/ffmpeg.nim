@@ -1,7 +1,9 @@
 {.passC: "-I./build/include".}
 when defined(macosx):
   {.passL: "-framework VideoToolbox -framework AudioToolbox -framework CoreFoundation -framework CoreMedia -framework CoreVideo".}
-{.passL: "-L./build/lib -lavfilter -lavformat -lavcodec -lswresample -lswscale -lavutil -lmp3lame -lx264 -lSvtAv1Enc -lm".}
+when defined(linux):
+  {.passL: "-L./build/lib/x86_64-linux-gnu -L./build/lib64"}
+{.passL: "-L./build/lib -lavfilter -lavformat -lavcodec -lswresample -lswscale -lavutil -lmp3lame -lx264 -ldav1d -lSvtAv1Enc -lm".}
 
 import std/posix
 
@@ -584,6 +586,7 @@ proc av_get_sample_fmt_name*(sample_fmt: cint): cstring {.importc,
 
 const
   AV_CODEC_ID_NONE* = AVCodecID(0)
+  AV_CODEC_ID_AV1* = AVCodecID(225)
   AV_CODEC_ID_PCM_S16LE* = AVCodecID(65536)
   AVFMT_NOFILE* = 0x0001
   AVIO_FLAG_WRITE* = 2

@@ -68,6 +68,12 @@ let twolame = Package(
   sha256: "cc35424f6019a88c6f52570b63e1baf50f62963a3eac52a03a800bb070d7c87d",
   buildArguments: @["--disable-sndfile"],
 )
+let dav1d = Package(
+  name: "dav1d",
+  sourceUrl: "https://code.videolan.org/videolan/dav1d/-/archive/1.5.1/dav1d-1.5.1.tar.bz2",
+  sha256: "4eddffd108f098e307b93c9da57b6125224dc5877b1b3d157b31be6ae8f1f093",
+  buildSystem: "meson",
+)
 let svtav1 = Package(
   name: "libsvtav1",
   sourceUrl: "https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/v3.1.0/SVT-AV1-v3.1.0.tar.bz2",
@@ -98,7 +104,7 @@ func dirName(package: Package): string =
       break
   return name.replace("_", "-")
 
-let packages = @[lame, twolame, svtav1, x264]
+let packages = @[lame, twolame, dav1d, svtav1, x264]
 
 proc getFileHash(filename: string): string =
   let (existsOutput, existsCode) = gorgeEx("test -f " & filename)
@@ -156,6 +162,45 @@ proc cmakeBuild(buildPath: string, crossWindows: bool = false) =
     exec cmakeCmd
     makeInstall()
 
+proc mesonBuild(buildPath: string, crossWindows: bool = false) =
+  mkDir("build_meson")
+
+  var mesonArgs = @[
+    &"--prefix={buildPath}",
+    "--buildtype=release",
+    "--default-library=static",
+    "-Denable_docs=false",
+    "-Denable_tools=false",
+    "-Denable_examples=false",
+    "-Denable_tests=false"
+  ]
+
+  if crossWindows:
+    # Create cross-compilation file for meson
+    let crossFile = "build_meson/meson-cross.txt"
+    writeFile(crossFile, """
+[binaries]
+c = 'x86_64-w64-mingw32-gcc'
+cpp = 'x86_64-w64-mingw32-g++'
+ar = 'x86_64-w64-mingw32-ar'
+strip = 'x86_64-w64-mingw32-strip'
+pkgconfig = 'x86_64-w64-mingw32-pkg-config'
+
+[host_machine]
+system = 'windows'
+cpu_family = 'x86_64'
+cpu = 'x86_64'
+endian = 'little'
+""")
+    mesonArgs.add("--cross-file=meson-cross.txt")
+
+  withDir "build_meson":
+    let mesonCmd = "meson setup " & mesonArgs.join(" ") & " .."
+    echo "RUN: ", mesonCmd
+    exec mesonCmd
+    exec "ninja"
+    exec "ninja install"
+
 proc ffmpegSetup(crossWindows: bool) =
   # Create directories
   mkDir("ffmpeg_sources")
@@ -187,6 +232,8 @@ proc ffmpegSetup(crossWindows: bool) =
       withDir package.name:
         if package.buildSystem == "cmake":
           cmakeBuild(buildPath, crossWindows)
+        elif package.buildSystem == "meson":
+          mesonBuild(buildPath, crossWindows)
         else:
           if not fileExists("Makefile") or package.name == "x264":
             var args = package.buildArguments
@@ -213,6 +260,7 @@ var commonFlags = &"""
   --disable-filters \
   --enable-filter=scale,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume \
   --enable-libmp3lame \
+  --enable-libdav1d \
   --enable-libsvtav1 \
   --enable-libx264 \
   --disable-encoder={encodersDisabled} \
@@ -231,22 +279,35 @@ if defined(macosx):
 commonFlags &= "--disable-autodetect"
 
 
+proc setupDeps() =
+  exec "pip install meson ninja"
+
 task makeff, "Build FFmpeg from source":
+  setupDeps()
   let buildPath = absolutePath("build")
-  putEnv("PKG_CONFIG_PATH", buildPath / "lib/pkgconfig")
+  # Set PKG_CONFIG_PATH to include both standard and architecture-specific paths
+  var pkgConfigPaths = @[buildPath / "lib/pkgconfig"]
+  when defined(linux):
+    pkgConfigPaths.add(buildPath / "lib/x86_64-linux-gnu/pkgconfig")
+    pkgConfigPaths.add(buildPath / "lib64/pkgconfig")
+  putEnv("PKG_CONFIG_PATH", pkgConfigPaths.join(":"))
 
   ffmpegSetup(crossWindows=false)
 
   # Configure and build FFmpeg
   withDir "ffmpeg_sources/ffmpeg":
+    var ldflags = &"-L{buildPath}/lib"
+    when defined(linux):
+      ldflags &= &" -L{buildPath}/lib/x86_64-linux-gnu -L{buildPath}/lib64"
     exec &"""./configure --prefix="{buildPath}" \
       --pkg-config-flags="--static" \
       --extra-cflags="-I{buildPath}/include" \
-      --extra-ldflags="-L{buildPath}/lib" \
+      --extra-ldflags="{ldflags}" \
       --extra-libs="-lpthread -lm" \""" & "\n" & commonFlags
     makeInstall()
 
 task makeffwin, "Build FFmpeg for Windows cross-compilation":
+  setupDeps()
   let buildPath = absolutePath("build")
   putEnv("PKG_CONFIG_PATH", buildPath / "lib/pkgconfig")
 
@@ -254,10 +315,13 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
 
   # Configure and build FFmpeg with MinGW
   withDir "ffmpeg_sources/ffmpeg":
+    var ldflags = &"-L{buildPath}/lib"
+    when defined(linux):
+      ldflags &= &" -L{buildPath}/lib/x86_64-linux-gnu -L{buildPath}/lib64"
     exec (&"""CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib ./configure --prefix="{buildPath}" \
       --pkg-config-flags="--static" \
       --extra-cflags="-I{buildPath}/include" \
-      --extra-ldflags="-L{buildPath}/lib" \
+      --extra-ldflags="{ldflags}" \
       --extra-libs="-lpthread -lm" \
       --arch=x86_64 \
       --target-os=mingw32 \

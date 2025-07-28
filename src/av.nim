@@ -141,15 +141,16 @@ iterator decode*(container: var InputContainer, index: cint, codecCtx: ptr AVCod
     defer: av_packet_unref(packet)
 
     if packet.stream_index == index:
-      if avcodec_send_packet(codecCtx, packet) < 0:
-        error "sending packet to decoder"
+      ret = avcodec_send_packet(codecCtx, packet)
+      if ret < 0 and ret != AVERROR_EAGAIN:
+        error &"Error sending packet to decoder: {av_err2str(ret)}"
 
       while true:
         ret = avcodec_receive_frame(codecCtx, frame)
         if ret == AVERROR_EAGAIN or ret == AVERROR_EOF:
           break
         elif ret < 0:
-          error &"Error receiving frame from decoder: {ret}"
+          error &"Error receiving frame from decoder: {av_err2str(ret)}"
 
         yield frame
 

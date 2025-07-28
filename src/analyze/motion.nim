@@ -111,15 +111,15 @@ iterator videoPipeline*(processor: VideoProcessor, filter: string): ptr AVFrame 
 
     if packet.stream_index == processor.videoIndex:
       ret = avcodec_send_packet(processor.codecCtx, packet)
-      if ret < 0:
-        error "Error sending packet to decoder"
+      if ret < 0 and ret != AVERROR_EAGAIN:
+        error &"Error sending packet to decoder: {av_err2str(ret)}"
 
       while ret >= 0:
         ret = avcodec_receive_frame(processor.codecCtx, frame)
         if ret == AVERROR_EAGAIN or ret == AVERROR_EOF:
           break
         elif ret < 0:
-          error &"Error receiving frame from decoder: {ret}"
+          error &"Error receiving frame from decoder: {av_err2str(ret)}"
 
         if frame.pts == AV_NOPTS_VALUE:
           continue
