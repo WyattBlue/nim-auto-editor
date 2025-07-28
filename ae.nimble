@@ -83,7 +83,6 @@ type Package = object
   sourceUrl: string
   location: string
   sha256: string
-  dirName: string
   buildArguments: seq[string]
 
 let lame = Package(
@@ -91,14 +90,12 @@ let lame = Package(
   sourceUrl: "http://deb.debian.org/debian/pool/main/l/lame/lame_3.100.orig.tar.gz",
   location: "lame_3.100.orig.tar.gz",
   sha256: "ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e",
-  dirName: "lame-3.100",
   buildArguments: @["--disable-frontend", "--disable-decoder", "--disable-gtktest"],
 )
 let twolame = Package(
   name: "twolame",
   sourceUrl: "http://deb.debian.org/debian/pool/main/t/twolame/twolame_0.4.0.orig.tar.gz",
   location: "twolame_0.4.0.orig.tar.gz",
-  dirName: "twolame-0.4.0",
   sha256: "cc35424f6019a88c6f52570b63e1baf50f62963a3eac52a03a800bb070d7c87d",
   buildArguments: @["--disable-sndfile"],
 )
@@ -106,7 +103,6 @@ let x264 = Package(
   name: "x264",
   sourceUrl: "https://code.videolan.org/videolan/x264/-/archive/32c3b801191522961102d4bea292cdb61068d0dd/x264-32c3b801191522961102d4bea292cdb61068d0dd.tar.bz2",
   location: "x264-32c3b801191522961102d4bea292cdb61068d0dd.tar.bz2",
-  dirName: "x264-32c3b801191522961102d4bea292cdb61068d0dd",
   sha256: "d7748f350127cea138ad97479c385c9a35a6f8527bc6ef7a52236777cf30b839",
   buildArguments: "--disable-cli --disable-lsmash --disable-swscale --disable-ffms --enable-strip".split(" "),
 )
@@ -114,9 +110,17 @@ let ffmpeg = Package(
   name: "ffmpeg",
   sourceUrl: "https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz",
   location: "ffmpeg-7.1.1.tar.xz",
-  dirName: "ffmpeg-7.1.1",
   sha256: "733984395e0dbbe5c046abda2dc49a5544e7e0e1e2366bba849222ae9e3a03b1",
 )
+
+func dirName(package: Package): string =
+  var name = package.location
+  for ext in [".orig.tar.gz", ".tar.xz", ".tar.bz2"]:
+    if name.endsWith(ext):
+      name = name[0..^ext.len+1]
+      break
+  return name.replace("_", "-")
+
 let packages = @[lame, twolame, x264]
 
 proc getFileHash(filename: string): string =
