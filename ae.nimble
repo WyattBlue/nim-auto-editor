@@ -249,7 +249,10 @@ proc ffmpegSetup(crossWindows: bool) =
             var args = package.buildArguments
             var envPrefix = ""
             if crossWindows:
-              args.add("--host=x86_64-w64-mingw32")
+              if package.name == "libvpx":
+                args.add("--target=x86_64-win64-gcc")
+              else:
+                args.add("--host=x86_64-w64-mingw32")
               envPrefix = "CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib "
             let cmd = &"{envPrefix}./configure --prefix=\"{buildPath}\" --disable-shared --enable-static " & args.join(" ")
             echo "RUN: ", cmd
