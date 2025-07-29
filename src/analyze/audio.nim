@@ -29,7 +29,6 @@ type
     maxBufferSize: int
 
   AudioProcessor* = object
-    formatCtx*: ptr AVFormatContext
     `iterator`*: AudioIterator
     codecCtx*: ptr AVCodecContext
     audioIndex*: cint
@@ -151,53 +150,27 @@ proc flushResampler(iter: AudioIterator) =
   except ValueError as e:
     error fmt"Error flushing audio resampler: {e.msg}"
 
-iterator loudness*(processor: var AudioProcessor): float32 =
-  var packet = av_packet_alloc()
+iterator loudness*(processor: var AudioProcessor, container: InputContainer): float32 =
   var frame = av_frame_alloc()
-  if packet == nil or frame == nil:
-    error "Could not allocate packet/frame"
+  if frame == nil:
+    error "Could not allocate frame"
 
   defer:
-    av_packet_free(addr packet)
     av_frame_free(addr frame)
     if processor.`iterator` != nil:
       processor.`iterator`.cleanup()
     avcodec_free_context(addr processor.codecCtx)
 
-  var ret: cint
-  while av_read_frame(processor.formatCtx, packet) >= 0:
-    defer: av_packet_unref(packet)
+  for decodedFrame in container.decode(processor.audioIndex, processor.codecCtx, frame):
+    if processor.`iterator` == nil:
+      processor.`iterator` = newAudioIterator(decodedFrame.sample_rate,
+        decodedFrame.ch_layout, processor.chunkDuration)
 
-    if packet.stream_index == processor.audioIndex:
-      ret = avcodec_send_packet(processor.codecCtx, packet)
-      if ret < 0 and ret != AVERROR_EAGAIN:
-        error &"Error sending packet to decoder: {av_err2str(ret)}"
+    processor.`iterator`.writeFrame(decodedFrame)
 
-      while ret >= 0:
-        ret = avcodec_receive_frame(processor.codecCtx, frame)
-        if ret == AVERROR_EAGAIN or ret == AVERROR_EOF:
-          break
-        elif ret < 0:
-          error &"Error receiving frame from decoder: {av_err2str(ret)}"
+    while processor.`iterator`.hasChunk():
+      yield processor.`iterator`.readChunk()
 
-        if processor.`iterator` == nil:
-          processor.`iterator` = newAudioIterator(frame.sample_rate,
-              frame.ch_layout, processor.chunkDuration)
-
-        processor.`iterator`.writeFrame(frame)
-
-        while processor.`iterator`.hasChunk():
-          yield processor.`iterator`.readChunk()
-
-  # Flush decoder
-  discard avcodec_send_packet(processor.codecCtx, nil)
-  while avcodec_receive_frame(processor.codecCtx, frame) >= 0:
-    if processor.`iterator` != nil:
-      processor.`iterator`.writeFrame(frame)
-      while processor.`iterator`.hasChunk():
-        yield processor.`iterator`.readChunk()
-
-  # Flush resampler to get any remaining samples
   if processor.`iterator` != nil:
     processor.`iterator`.flushResampler()
     while processor.`iterator`.hasChunk():
@@ -215,7 +188,6 @@ proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
   let audioStream: ptr AVStream = container.audio[stream]
 
   var processor = AudioProcessor(
-    formatCtx: container.formatContext,
     codecCtx: initDecoder(audioStream.codecpar),
     audioIndex: audioStream.index,
     chunkDuration: av_inv_q(tb),
@@ -229,7 +201,7 @@ proc audio*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
 
   bar.start(inaccurateDur, "Analyzing audio volume")
   var i: float = 0
-  for value in processor.loudness():
+  for value in processor.loudness(container):
     result.add value
     bar.tick(i)
     i += 1

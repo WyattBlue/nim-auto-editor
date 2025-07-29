@@ -167,13 +167,12 @@ proc main*(strArgs: seq[string]) =
 
     let audioStream: ptr AVStream = container.audio[userStream]
     var processor = AudioProcessor(
-      formatCtx: container.formatContext,
       codecCtx: initDecoder(audioStream.codecpar),
       audioIndex: audioStream.index,
       chunkDuration: chunkDuration
     )
 
-    for loudnessValue in processor.loudness():
+    for loudnessValue in processor.loudness(container):
       echo loudnessValue
       data.add loudnessValue
     echo ""

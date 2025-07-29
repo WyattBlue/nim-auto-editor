@@ -134,7 +134,7 @@ proc mediaLength*(container: InputContainer): AVRational =
 
   error "No audio or video stream found"
 
-iterator decode*(container: var InputContainer, index: cint, codecCtx: ptr AVCodecContext, frame: ptr AVFrame): ptr AVFrame =
+iterator decode*(container: InputContainer, index: cint, codecCtx: ptr AVCodecContext, frame: ptr AVFrame): ptr AVFrame =
   var ret: cint
   var packet = container.packet
   while av_read_frame(container.formatContext, packet) >= 0:
