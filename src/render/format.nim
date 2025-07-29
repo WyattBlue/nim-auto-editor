@@ -44,7 +44,12 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
     error "Could not allocate output packet"
   defer: av_packet_free(addr outPacket)
 
-  let (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(output, tl, args)
+  var vEncCtx: ptr AVCodecContext = nil
+  var vOutStream: ptr AVStream = nil
+  var videoFrameIter: iterator(): (ptr AVFrame, int) = iterator(): (ptr AVFrame, int) =
+    return
+  if tl.v.len > 0 and tl.v[0].len > 0:
+    (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(output, tl, args)
 
   let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
   let audioFrameIter = makeNewAudioFrames(encoder.sample_fmts[0], tl, frameSize)
@@ -134,16 +139,18 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
   bar.`end`()
 
   # Flush streams
-  for outPacket in vEncCtx.encode(nil, outPacket):
-    outPacket.stream_index = vOutStream.index
-    av_packet_rescale_ts(outPacket, vEncCtx.time_base, vOutStream.time_base)
-    output.mux(outPacket[])
-    av_packet_unref(outPacket)
+  if vEncCtx != nil:
+    for outPacket in vEncCtx.encode(nil, outPacket):
+      outPacket.stream_index = vOutStream.index
+      av_packet_rescale_ts(outPacket, vEncCtx.time_base, vOutStream.time_base)
+      output.mux(outPacket[])
+      av_packet_unref(outPacket)
 
-  for outPacket in aEncCtx.encode(nil, outPacket):
-    outPacket.stream_index = aOutStream.index
-    av_packet_rescale_ts(outPacket, aEncCtx.time_base, aOutStream.time_base)
-    output.mux(outPacket[])
-    av_packet_unref(outPacket)
+  if aEncCtx != nil:
+    for outPacket in aEncCtx.encode(nil, outPacket):
+      outPacket.stream_index = aOutStream.index
+      av_packet_rescale_ts(outPacket, aEncCtx.time_base, aOutStream.time_base)
+      output.mux(outPacket[])
+      av_packet_unref(outPacket)
 
   output.close()
