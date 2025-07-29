@@ -1,4 +1,4 @@
-import std/[os, terminal, browsers]
+import std/[os, times, terminal, browsers]
 import std/[strutils, strformat]
 import std/sequtils
 import std/sets
@@ -19,6 +19,13 @@ import imports/json
 import exports/[fcp7, fcp11, json, shotcut]
 import preview
 import render/format
+
+proc stopTimer() =
+  let secondLen: float = round(epochTime() - start, 2)
+  let minuteLen = toTimecode(secondLen, display)
+
+  echo &"Finished. took {secondLen} seconds ({minuteLen})"
+
 
 proc parseExportString*(exportStr: string): (string, string, string) =
   var kind = exportStr
@@ -387,6 +394,8 @@ proc editMedia*(args: var mainArgs) =
 
   debug &"Temp Directory: {tempDir}"
   makeMedia(args, tlV3, output, bar)
+
+  stopTimer()
 
   if not args.noOpen and exportKind == "default":
     openDefaultBrowser(output)

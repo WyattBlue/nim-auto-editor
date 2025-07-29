@@ -1,4 +1,6 @@
 import std/os
+import std/times
+
 import std/tables
 import std/terminal
 import std/[strutils, strformat]
@@ -69,6 +71,7 @@ type mainArgs* = object
 var isDebug* = false
 var quiet* = false
 var tempDir* = ""
+var start* = epochTime()
 
 proc conwrite*(msg: string) =
   if not quiet:
@@ -125,7 +128,7 @@ proc cleanup*(interner: var StringInterner) =
 
 
 type Code* = enum
-  webvtt, srt, mov_text, standard, ass, rass
+  webvtt, srt, mov_text, standard, ass, rass, display
 
 func toTimecode*(secs: float, fmt: Code): string =
   var sign = ""
@@ -156,3 +159,5 @@ func toTimecode*(secs: float, fmt: Code): string =
     return fmt"{sign}{h:d}:{m:02d}:{s:05.2f}"
   of rass:
     return fmt"{sign}{h:d}:{m:02d}:{s:02.0f}"
+  of display:
+    return fmt"{sign}{h:d}:{m:02d}:{s.round.int:02d}"
