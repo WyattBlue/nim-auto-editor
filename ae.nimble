@@ -68,6 +68,12 @@ let twolame = Package(
   sha256: "cc35424f6019a88c6f52570b63e1baf50f62963a3eac52a03a800bb070d7c87d",
   buildArguments: @["--disable-sndfile"],
 )
+let vpx = Package(
+  name: "libvpx",
+  sourceUrl: "https://github.com/webmproject/libvpx/archive/refs/tags/v1.15.2.tar.gz",
+  sha256: "26fcd3db88045dee380e581862a6ef106f49b74b6396ee95c2993a260b4636aa",
+  buildArguments: "--disable-dependency-tracking --disable-examples --disable-unit-tests --enable-pic --enable-runtime-cpu-detect --enable-vp9-highbitdepth".split(" "),
+)
 let dav1d = Package(
   name: "dav1d",
   sourceUrl: "https://code.videolan.org/videolan/dav1d/-/archive/1.5.1/dav1d-1.5.1.tar.bz2",
@@ -80,7 +86,6 @@ let svtav1 = Package(
   sha256: "8231b63ea6c50bae46a019908786ebfa2696e5743487270538f3c25fddfa215a",
   buildSystem: "cmake",
 )
-
 let x264 = Package(
   name: "x264",
   sourceUrl: "https://code.videolan.org/videolan/x264/-/archive/32c3b801191522961102d4bea292cdb61068d0dd/x264-32c3b801191522961102d4bea292cdb61068d0dd.tar.bz2",
@@ -92,19 +97,24 @@ let ffmpeg = Package(
   sourceUrl: "https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz",
   sha256: "733984395e0dbbe5c046abda2dc49a5544e7e0e1e2366bba849222ae9e3a03b1",
 )
+let packages = @[lame, twolame, vpx, dav1d, svtav1, x264]
 
 func location(package: Package): string = # tar location
-  package.sourceUrl.split("/")[^1]
+  if package.name == "libvpx":
+    "v1.15.2.tar.gz"
+  else:
+    package.sourceUrl.split("/")[^1]
 
 func dirName(package: Package): string =
+  if package.name == "libvpx":
+    return "libvpx-1.15.2"
+
   var name = package.location
-  for ext in [".orig.tar.gz", ".tar.xz", ".tar.bz2"]:
+  for ext in [".tar.gz", ".tar.xz", ".tar.bz2", ".orig"]:
     if name.endsWith(ext):
       name = name[0..^ext.len+1]
-      break
   return name.replace("_", "-")
 
-let packages = @[lame, twolame, dav1d, svtav1, x264]
 
 proc getFileHash(filename: string): string =
   let (existsOutput, existsCode) = gorgeEx("test -f " & filename)
@@ -260,6 +270,7 @@ var commonFlags = &"""
   --disable-filters \
   --enable-filter=scale,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume \
   --enable-libmp3lame \
+  --enable-libvpx \
   --enable-libdav1d \
   --enable-libsvtav1 \
   --enable-libx264 \
