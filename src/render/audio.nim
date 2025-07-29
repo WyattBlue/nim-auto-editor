@@ -375,29 +375,21 @@ proc processAudioClip*(clip: Clip, data: seq[seq[int16]], sr: cint): seq[seq[int
         result[1][i] = result[0][i]
 
 
-proc makeNewAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int): iterator(): (ptr AVFrame, int) =
-  let targetSampleRate = tl.sr
+proc makeNewAudioFrames*(fmt: AVSampleFormat, tb: AVRational, sr: cint, layer: seq[Clip], frameSize: int): iterator(): (ptr AVFrame, int) =
   var samples: Table[(string, int32), Getter]
-
-  if tl.a.len == 0 or tl.a[0].len == 0:
-    error "Trying to render empty audio timeline"
-
   let targetChannels = 2
-
-  let layer = tl.a[0]
 
   for clip in layer:
     let key = (clip.src[], clip.stream)
     if key notin samples:
-      samples[key] = newGetter(clip.src[], clip.stream.int, targetSampleRate)
+      samples[key] = newGetter(clip.src[], clip.stream.int, sr)
 
   # Calculate total duration and create audio buffer
   var totalDuration = 0
   for clip in layer:
     totalDuration = max(totalDuration, clip.start + clip.dur)
 
-  let totalSamples = int(totalDuration * targetSampleRate.int64 *
-      tl.tb.den div tl.tb.num)
+  let totalSamples = int(totalDuration * sr.int64 * tb.den div tb.num)
   var audioData = @[newSeq[int16](totalSamples), newSeq[int16](totalSamples)]
 
   # Initialize with silence
@@ -409,19 +401,15 @@ proc makeNewAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int): iterator(
   for clip in layer:
     let key = (clip.src[], clip.stream)
     if key in samples:
-      let sampStart = int(clip.offset.float64 * clip.speed *
-          targetSampleRate.float64 / tl.tb)
-      let sampEnd = int(float64(clip.offset + clip.dur) * clip.speed *
-          targetSampleRate.float64 / tl.tb)
+      let sampStart = int(clip.offset.float64 * clip.speed * sr.float64 / tb)
+      let sampEnd = int(float64(clip.offset + clip.dur) * clip.speed * sr.float64 / tb)
 
       let getter = samples[key]
       let srcData = getter.get(sampStart, sampEnd)
 
-      let startSample = int(clip.start * targetSampleRate.int64 *
-          tl.tb.den div tl.tb.num)
-      let durSamples = int(clip.dur * targetSampleRate.int64 *
-          tl.tb.den div tl.tb.num)
-      let processedData = processAudioClip(clip, srcData, targetSampleRate)
+      let startSample = int(clip.start * sr.int64 * tb.den div tb.num)
+      let durSamples = int(clip.dur * sr.int64 * tb.den div tb.num)
+      let processedData = processAudioClip(clip, srcData, sr)
 
       if processedData.len > 0:
         for ch in 0 ..< min(audioData.len, processedData.len):
@@ -437,12 +425,7 @@ proc makeNewAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int): iterator(
   # Yield audio frames in chunks
   var samplesYielded = 0
   var frameIndex = 0
-  var resampler = newAudioResampler(fmt, "stereo", tl.sr)
-
-  # defer:
-  #   # Close all getters
-  #   for getter in samples.values:
-  #     getter.close()
+  var resampler = newAudioResampler(fmt, "stereo", sr)
 
   return iterator(): (ptr AVFrame, int) =
     while samplesYielded < totalSamples:
@@ -457,7 +440,7 @@ proc makeNewAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int): iterator(
       frame.ch_layout.nb_channels = targetChannels.cint
       frame.ch_layout.order = 0
       frame.ch_layout.u.mask = 3 # AV_CH_LAYOUT_STEREO
-      frame.sample_rate = targetSampleRate.cint
+      frame.sample_rate = sr.cint
       frame.pts = samplesYielded.int64
 
       if av_frame_get_buffer(frame, 0) < 0:
