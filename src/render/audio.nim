@@ -390,12 +390,12 @@ proc makeNewAudioFrames*(fmt: AVSampleFormat, tb: AVRational, sr: cint, layer: s
     totalDuration = max(totalDuration, clip.start + clip.dur)
 
   let totalSamples = int(totalDuration * sr.int64 * tb.den div tb.num)
-  var audioData = @[newSeq[int16](totalSamples), newSeq[int16](totalSamples)]
+  # Flat array with interleaved stereo samples: [L0, R0, L1, R1, L2, R2, ...]
+  var audioData = newSeq[int16](totalSamples * targetChannels)
 
   # Initialize with silence
-  for ch in 0..<audioData.len:
-    for i in 0..<totalSamples:
-      audioData[ch][i] = 0
+  for i in 0..<audioData.len:
+    audioData[i] = 0
 
   # Process each clip and mix into the output
   for clip in layer:
@@ -412,15 +412,30 @@ proc makeNewAudioFrames*(fmt: AVSampleFormat, tb: AVRational, sr: cint, layer: s
       let processedData = processAudioClip(clip, srcData, sr)
 
       if processedData.len > 0:
-        for ch in 0 ..< min(audioData.len, processedData.len):
-          for i in 0 ..< min(durSamples, processedData[ch].len):
-            let outputIndex = startSample + i
-            if outputIndex < audioData[ch].len:
-              let currentSample = audioData[ch][outputIndex].int32
-              let newSample = processedData[ch][i].int32
-              let mixed = currentSample + newSample
-              # Clamp to 16-bit range to prevent overflow distortion
-              audioData[ch][outputIndex] = int16(max(-32768, min(32767, mixed)))
+        let numChannels = min(targetChannels, processedData.len)
+        for i in 0 ..< min(durSamples, processedData[0].len):
+          let outputSampleIndex = startSample + i
+          if outputSampleIndex < totalSamples:
+            # Calculate the base index in the flat array for this sample
+            let baseIndex = outputSampleIndex * targetChannels
+
+            for ch in 0 ..< numChannels:
+              let flatIndex = baseIndex + ch
+              if flatIndex < audioData.len and i < processedData[ch].len:
+                let currentSample = audioData[flatIndex].int32
+                let newSample = processedData[ch][i].int32
+                let mixed = currentSample + newSample
+                # Clamp to 16-bit range to prevent overflow distortion
+                audioData[flatIndex] = int16(max(-32768, min(32767, mixed)))
+
+            # If source has fewer channels than target, duplicate the last channel
+            if numChannels < targetChannels:
+              for ch in numChannels ..< targetChannels:
+                let flatIndex = baseIndex + ch
+                let sourceChannel = numChannels - 1 # Use the last available channel
+                let sourceFlatIndex = baseIndex + sourceChannel
+                if flatIndex < audioData.len and sourceFlatIndex < audioData.len:
+                  audioData[flatIndex] = audioData[sourceFlatIndex]
 
   # Yield audio frames in chunks
   var samplesYielded = 0
@@ -438,20 +453,25 @@ proc makeNewAudioFrames*(fmt: AVSampleFormat, tb: AVRational, sr: cint, layer: s
       frame.format = AV_SAMPLE_FMT_S16P.cint # Planar format
       frame.ch_layout.nb_channels = targetChannels.cint
       frame.ch_layout.order = 0
-      frame.ch_layout.u.mask = 3 # AV_CH_LAYOUT_STEREO
+      frame.ch_layout.u.mask = AV_CH_LAYOUT_STEREO
       frame.sample_rate = sr.cint
       frame.pts = samplesYielded.int64
 
       if av_frame_get_buffer(frame, 0) < 0:
         error "Could not allocate audio frame buffer"
 
-      # Copy audio data to frame (planar format)
-      for ch in 0 ..< min(targetChannels, audioData.len):
+      # Copy audio data from flat array to frame (convert to planar format)
+      for ch in 0 ..< targetChannels:
         let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
         for i in 0..<currentFrameSize:
-          let srcIndex = samplesYielded + i
-          if ch < audioData.len and srcIndex < audioData[ch].len:
-            channelData[i] = audioData[ch][srcIndex]
+          let srcSampleIndex = samplesYielded + i
+          if srcSampleIndex < totalSamples:
+            # Calculate index in flat interleaved array
+            let flatIndex = srcSampleIndex * targetChannels + ch
+            if flatIndex < audioData.len:
+              channelData[i] = audioData[flatIndex]
+            else:
+              channelData[i] = 0
           else:
             channelData[i] = 0
 
