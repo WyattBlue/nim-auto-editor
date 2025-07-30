@@ -48,7 +48,7 @@ proc `[]`*(buffer: AudioBuffer, index: int): int16 {.inline.} =
 proc `[]=`*(buffer: AudioBuffer, index: int, value: int16) {.inline.} =
   buffer.data[index] = value
 
-proc len*(buffer: AudioBuffer): int {.inline.} =
+proc len(buffer: AudioBuffer): int {.inline.} =
   ## Get total number of samples (all channels)
   buffer.size div sizeof(int16)
 
@@ -421,12 +421,6 @@ proc makeNewAudioFrames*(fmt: AVSampleFormat, tb: AVRational, sr: cint, layer: s
   # Create memory-mapped buffer instead of regular seq
   var audioBuffer = newAudioBuffer(totalSamples, targetChannels)
 
-  # Ensure cleanup happens when iterator is done
-  # defer:
-  #   audioBuffer.close()
-  #   for getter in samples.values:
-  #     getter.close()
-
   # Process each clip and mix into the memory-mapped buffer
   for clip in layer:
     let key = (clip.src[], clip.stream)
@@ -509,3 +503,12 @@ proc makeNewAudioFrames*(fmt: AVSampleFormat, tb: AVRational, sr: cint, layer: s
         yield (newFrame, frameIndex)
         frameIndex += 1
       samplesYielded += currentFrameSize
+
+
+    # Ensure cleanup happens when iterator is done
+    defer:
+      av_frame_free(addr frame)
+      for getter in samples.values:
+        getter.close()
+      audioBuffer.memFile.close()
+
