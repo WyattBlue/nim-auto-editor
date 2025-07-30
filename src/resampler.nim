@@ -1,4 +1,5 @@
 import std/strformat
+import log
 import ffmpeg
 
 type AudioResampler* = object
@@ -155,23 +156,19 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
 
   let ret = av_buffersrc_write_frame(resampler.abuffer, frame)
   if ret < 0:
-    raise newException(ValueError, fmt"Error pushing frame to filter: {ret}")
+    error &"Error pushing frame to filter: {ret}"
 
   # Pull output frames
   var output: seq[ptr AVFrame] = @[]
   while true:
-    var out_frame = av_frame_alloc()
-    if out_frame == nil:
-      # Free any frames we've already allocated
-      for f in output:
-        av_frame_free(addr f)
-      raise newException(ValueError, "Could not allocate output frame")
+    var outFrame = av_frame_alloc()
+    if outFrame == nil:
+      error "Could not alloc output frame"
 
-    let ret = av_buffersink_get_frame(resampler.abuffersink, out_frame)
-    if ret < 0:
-      av_frame_free(addr out_frame)
+    if av_buffersink_get_frame(resampler.abuffersink, outFrame) < 0:
+      av_frame_free(addr outFrame)
       break
 
-    output.add(out_frame)
+    output.add(outFrame)
 
   return output

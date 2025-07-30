@@ -49,8 +49,9 @@ proc initDecoder*(codecpar: ptr AVCodecParameters): ptr AVCodecContext =
   if result == nil:
     error "Could not allocate decoder ctx"
 
-  # Setting thread_count to zero can be problamtic for vp9, and possibly other decoders.
-  # result.thread_count = 0 # Auto-detect CPU cores
+  # TODO
+  # Setting thread_count to zero can be problematic for vp9, and possibly other decoders.
+  result.thread_count = 0 # Auto-detect CPU cores
   if result.codec_type == AVMEDIA_TYPE_VIDEO:
     result.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
 

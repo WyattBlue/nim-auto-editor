@@ -426,14 +426,13 @@ proc makeNewAudioFrames*(fmt: AVSampleFormat, tb: AVRational, sr: cint, layer: s
   var samplesYielded = 0
   var frameIndex = 0
   var resampler = newAudioResampler(fmt, "stereo", sr)
+  var frame = av_frame_alloc()
+  if frame == nil:
+    error "Could not allocate audio frame"
 
   return iterator(): (ptr AVFrame, int) =
     while samplesYielded < totalSamples:
       let currentFrameSize = min(frameSize, totalSamples - samplesYielded)
-
-      var frame = av_frame_alloc()
-      if frame == nil:
-        error "Could not allocate audio frame"
 
       frame.nb_samples = currentFrameSize.cint
       frame.format = AV_SAMPLE_FMT_S16P.cint # Planar format
@@ -444,7 +443,6 @@ proc makeNewAudioFrames*(fmt: AVSampleFormat, tb: AVRational, sr: cint, layer: s
       frame.pts = samplesYielded.int64
 
       if av_frame_get_buffer(frame, 0) < 0:
-        av_frame_free(addr frame)
         error "Could not allocate audio frame buffer"
 
       # Copy audio data to frame (planar format)

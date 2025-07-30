@@ -25,9 +25,6 @@ proc initPriority(index: float64, frame: ptr AVFrame, stream: ptr AVStream): Pri
 proc `<`(a, b: Priority): bool = a.index < b.index
 
 proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
-  if tl.a.len == 0:
-    error "No audio tracks found in timeline"
-
   var output = openWrite(outputPath)
   let (_, _, ext) = splitFile(outputPath)
 
@@ -169,6 +166,9 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
             bar.tick(round(time * tl.tb))
         output.mux(outPacket[])
         av_packet_unref(outPacket)
+
+        if frameType == AVMEDIA_TYPE_AUDIO:
+          av_frame_free(addr frame)
 
   bar.`end`()
 
