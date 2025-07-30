@@ -1,5 +1,8 @@
 import std/strformat
 import std/tables
+import std/os
+import std/times
+import std/memfiles
 
 import ../log
 import ../timeline
@@ -10,32 +13,57 @@ const AV_CH_LAYOUT_STEREO = 3
 const AV_CH_LAYOUT_MONO = 1
 
 type
-  AudioFrame* = ref object
-    data*: ptr UncheckedArray[ptr uint8]
-    nb_samples*: int
-    format*: AVSampleFormat
-    sample_rate*: int
-    ch_layout*: AVChannelLayout
-    pts*: int64
-
-  Getter* = ref object
+  Getter = ref object
     container*: InputContainer
     stream*: ptr AVStream
     decoderCtx*: ptr AVCodecContext
     rate*: int
 
-proc newGetter*(path: string, stream: int, rate: int): Getter =
+  AudioBuffer = ref object
+    memFile*: MemFile
+    data*: ptr UncheckedArray[int16]
+    size*: int
+    channels*: int
+    samples*: int
+    tempFilePath*: string
+
+proc newAudioBuffer(samples: int, channels: int): AudioBuffer =
+  result = new(AudioBuffer)
+  result.samples = samples
+  result.channels = channels
+  result.size = samples * channels * sizeof(int16)
+  result.tempFilePath = tempDir / ("abuf" & $getCurrentProcessId() & "_" & $epochTime().int & ".map")
+
+  # Memory map the file
+  result.memFile = memfiles.open(result.tempFilePath, mode = fmReadWrite, newFileSize = result.size)
+  result.data = cast[ptr UncheckedArray[int16]](result.memFile.mem)
+
+  # Initialize with silence
+  for i in 0..<(result.size div sizeof(int16)):
+    result.data[i] = 0
+
+proc `[]`*(buffer: AudioBuffer, index: int): int16 {.inline.} =
+  buffer.data[index]
+
+proc `[]=`*(buffer: AudioBuffer, index: int, value: int16) {.inline.} =
+  buffer.data[index] = value
+
+proc len*(buffer: AudioBuffer): int {.inline.} =
+  ## Get total number of samples (all channels)
+  buffer.size div sizeof(int16)
+
+proc newGetter(path: string, stream: int, rate: int): Getter =
   result = new(Getter)
   result.container = av.open(path)
   result.stream = result.container.audio[stream]
   result.rate = rate
   result.decoderCtx = initDecoder(result.stream.codecpar)
 
-proc close*(getter: Getter) =
+proc close(getter: Getter) =
   avcodec_free_context(addr getter.decoderCtx)
   getter.container.close()
 
-proc get*(getter: Getter, start: int, endSample: int): seq[seq[int16]] =
+proc get(getter: Getter, start: int, endSample: int): seq[seq[int16]] =
   # start/end is in samples
   let container = getter.container
   let stream = getter.stream
@@ -236,8 +264,7 @@ proc createAudioFilterGraph(clip: Clip, sr: int, layout: string): (ptr AVFilterG
 
   return (filterGraph, bufferSrc, bufferSink)
 
-proc processAudioClip*(clip: Clip, data: seq[seq[int16]], sr: cint): seq[seq[int16]] =
-
+proc processAudioClip(clip: Clip, data: seq[seq[int16]], sr: cint): seq[seq[int16]] =
   if clip.speed == 1.0 and clip.volume == 1.0:
     return data
   if data.len == 0 or data[0].len == 0:
@@ -384,20 +411,23 @@ proc makeNewAudioFrames*(fmt: AVSampleFormat, tb: AVRational, sr: cint, layer: s
     if key notin samples:
       samples[key] = newGetter(clip.src[], clip.stream.int, sr)
 
-  # Calculate total duration and create audio buffer
+  # Calculate total duration and create memory-mapped audio buffer
   var totalDuration = 0
   for clip in layer:
     totalDuration = max(totalDuration, clip.start + clip.dur)
 
   let totalSamples = int(totalDuration * sr.int64 * tb.den div tb.num)
-  # Flat array with interleaved stereo samples: [L0, R0, L1, R1, L2, R2, ...]
-  var audioData = newSeq[int16](totalSamples * targetChannels)
 
-  # Initialize with silence
-  for i in 0..<audioData.len:
-    audioData[i] = 0
+  # Create memory-mapped buffer instead of regular seq
+  var audioBuffer = newAudioBuffer(totalSamples, targetChannels)
 
-  # Process each clip and mix into the output
+  # Ensure cleanup happens when iterator is done
+  # defer:
+  #   audioBuffer.close()
+  #   for getter in samples.values:
+  #     getter.close()
+
+  # Process each clip and mix into the memory-mapped buffer
   for clip in layer:
     let key = (clip.src[], clip.stream)
     if key in samples:
@@ -416,17 +446,17 @@ proc makeNewAudioFrames*(fmt: AVSampleFormat, tb: AVRational, sr: cint, layer: s
         for i in 0 ..< min(durSamples, processedData[0].len):
           let outputSampleIndex = startSample + i
           if outputSampleIndex < totalSamples:
-            # Calculate the base index in the flat array for this sample
+            # Calculate the base index in the memory-mapped array for this sample
             let baseIndex = outputSampleIndex * targetChannels
 
             for ch in 0 ..< numChannels:
               let flatIndex = baseIndex + ch
-              if flatIndex < audioData.len and i < processedData[ch].len:
-                let currentSample = audioData[flatIndex].int32
+              if flatIndex < audioBuffer.len and i < processedData[ch].len:
+                let currentSample = audioBuffer[flatIndex].int32
                 let newSample = processedData[ch][i].int32
                 let mixed = currentSample + newSample
                 # Clamp to 16-bit range to prevent overflow distortion
-                audioData[flatIndex] = int16(max(-32768, min(32767, mixed)))
+                audioBuffer[flatIndex] = int16(max(-32768, min(32767, mixed)))
 
             # If source has fewer channels than target, duplicate the last channel
             if numChannels < targetChannels:
@@ -434,8 +464,8 @@ proc makeNewAudioFrames*(fmt: AVSampleFormat, tb: AVRational, sr: cint, layer: s
                 let flatIndex = baseIndex + ch
                 let sourceChannel = numChannels - 1 # Use the last available channel
                 let sourceFlatIndex = baseIndex + sourceChannel
-                if flatIndex < audioData.len and sourceFlatIndex < audioData.len:
-                  audioData[flatIndex] = audioData[sourceFlatIndex]
+                if flatIndex < audioBuffer.len and sourceFlatIndex < audioBuffer.len:
+                  audioBuffer[flatIndex] = audioBuffer[sourceFlatIndex]
 
   # Yield audio frames in chunks
   var samplesYielded = 0
@@ -460,16 +490,16 @@ proc makeNewAudioFrames*(fmt: AVSampleFormat, tb: AVRational, sr: cint, layer: s
       if av_frame_get_buffer(frame, 0) < 0:
         error "Could not allocate audio frame buffer"
 
-      # Copy audio data from flat array to frame (convert to planar format)
+      # Copy audio data from memory-mapped buffer to frame (convert to planar format)
       for ch in 0 ..< targetChannels:
         let channelData = cast[ptr UncheckedArray[int16]](frame.data[ch])
         for i in 0..<currentFrameSize:
           let srcSampleIndex = samplesYielded + i
           if srcSampleIndex < totalSamples:
-            # Calculate index in flat interleaved array
+            # Calculate index in memory-mapped interleaved array
             let flatIndex = srcSampleIndex * targetChannels + ch
-            if flatIndex < audioData.len:
-              channelData[i] = audioData[flatIndex]
+            if flatIndex < audioBuffer.len:
+              channelData[i] = audioBuffer[flatIndex]
             else:
               channelData[i] = 0
           else:
