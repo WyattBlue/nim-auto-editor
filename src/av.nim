@@ -6,6 +6,11 @@ import log
 proc `|=`*[T](a: var T, b: T) =
   a = a or b
 
+# func pretty(ctx: ptr AVCodecContext): string =
+#   if ctx == nil:
+#     return "nil"
+#   return &"<AVCodecContext width: {ctx.width}, height: {ctx.height}, bit_rate={ctx.bit_rate}, framerate={ctx.framerate}>"
+
 proc initCodec(name: string): ptr AVCodec =
   result = avcodec_find_encoder_by_name(name.cstring)
   if result == nil:
@@ -44,10 +49,14 @@ proc initDecoder*(codecpar: ptr AVCodecParameters): ptr AVCodecContext =
   if result == nil:
     error "Could not allocate decoder ctx"
 
-  result.thread_count = 0 # Auto-detect CPU cores
+  # Setting thread_count to zero can be problamtic for vp9, and possibly other decoders.
+  # result.thread_count = 0 # Auto-detect CPU cores
   result.thread_type = FF_THREAD_FRAME or FF_THREAD_SLICE
 
-  discard avcodec_parameters_to_context(result, codecpar)
+  let ret = avcodec_parameters_to_context(result, codecpar)
+  if ret < 0:
+    error &"Failed to copy codec parameters: {av_err2str(ret)}"
+
   if avcodec_open2(result, codec, nil) < 0:
     error "Could not open codec"
 
@@ -267,7 +276,7 @@ proc addStream*(self: var OutputContainer, codecName: string, rate: AVRational, 
     ptr AVStream, ptr AVCodecContext) =
   let codec = initCodec(codecName)
   if codec == nil:
-    error "Codec not found: " & $codec.name
+    error "Codec not found: " & codecName
   let format = self.formatCtx
 
   # Assert that this format supports the requested codec.
