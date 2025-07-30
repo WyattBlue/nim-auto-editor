@@ -1,10 +1,9 @@
-# 0.7.0
+# 0.7.1
 
 ## Major
 
 ## Features
-- Implement video and audio rendering. Supports multiple audio streams.
-- Build twolame, x264, dav1d, and libsvtav1
+- Build libvpx
 
 ## Fixes
-- Fix issue with Final Cut Pro/DaVinci Resolve when timebase is not a whole number.
+- Fix issue caused by hardcoding stream index.

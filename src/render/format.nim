@@ -31,7 +31,13 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
   var output = openWrite(outputPath)
   let (_, _, ext) = splitFile(outputPath)
 
-  # Create multiple audio streams - one for each audio track
+  var vEncCtx: ptr AVCodecContext = nil
+  var vOutStream: ptr AVStream = nil
+  var videoFrameIter: iterator(): (ptr AVFrame, int) = iterator(): (ptr AVFrame, int) =
+    return
+  if tl.v.len > 0 and tl.v[0].len > 0:
+    (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(output, tl, args)
+
   var audioStreams: seq[ptr AVStream] = @[]
   var audioEncoders: seq[ptr AVCodecContext] = @[]
   var audioFrameIters: seq[iterator(): (ptr AVFrame, int)] = @[]
@@ -60,13 +66,6 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
   if outPacket == nil:
     error "Could not allocate output packet"
   defer: av_packet_free(addr outPacket)
-
-  var vEncCtx: ptr AVCodecContext = nil
-  var vOutStream: ptr AVStream = nil
-  var videoFrameIter: iterator(): (ptr AVFrame, int) = iterator(): (ptr AVFrame, int) =
-    return
-  if tl.v.len > 0 and tl.v[0].len > 0:
-    (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(output, tl, args)
 
   output.startEncoding()
 
