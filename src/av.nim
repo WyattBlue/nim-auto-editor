@@ -165,15 +165,40 @@ iterator decode*(container: InputContainer, index: cint, codecCtx: ptr AVCodecCo
 
         yield frame
 
+iterator flushDecode*(container: InputContainer, index: cint, codecCtx: ptr AVCodecContext, frame: ptr AVFrame): ptr AVFrame =
+  var ret: cint
+  var packet = container.packet
+  var flushing = false
+
+  while not flushing:
+    ret = av_read_frame(container.formatContext, packet)
+    if ret < 0:
+      flushing = true
+      ret = avcodec_send_packet(codecCtx, nil)  # Flush
+    else:
+      if packet.stream_index == index:
+        ret = avcodec_send_packet(codecCtx, packet)
+      av_packet_unref(packet)
+
+    # Only try to receive frames if we're processing the right stream or flushing
+    if (not flushing and packet.stream_index == index) or flushing:
+      while true:
+        ret = avcodec_receive_frame(codecCtx, frame)
+        if ret == AVERROR_EAGAIN or ret == AVERROR_EOF:
+          break
+        elif ret < 0:
+          break
+        else:
+          yield frame
+
 proc seek*(container: InputContainer, offset: int64, backward: bool = true, stream: ptr AVStream = nil) =
   var flags: cint = 0
-  var ret: cint
 
   if backward:
     flags |= AVSEEK_FLAG_BACKWARD
 
   var stream_index: cint = (if stream == nil: -1 else: stream.index)
-  ret = av_seek_frame(container.formatContext, stream_index, offset, flags)
+  var ret = av_seek_frame(container.formatContext, stream_index, offset, flags)
   if ret < 0:
     error "Error seeking frame"
   # Callers need to call `avcodec_flush_buffers()` after.
@@ -337,9 +362,9 @@ proc startEncoding*(self: var OutputContainer) =
     if avio_open(addr outputCtx.pb, self.file.cstring, AVIO_FLAG_WRITE) < 0:
       error &"Could not open output file '{self.file}'"
 
-  if avformat_write_header(outputCtx, nil) < 0:
-    error "Error occurred when opening output file"
-
+  var ret = avformat_write_header(outputCtx, nil)
+  if ret < 0:
+    error &"Write header: {av_err2str(ret)}"
 
 proc mux*(self: var OutputContainer, packet: var AVPacket) =
   self.startEncoding()

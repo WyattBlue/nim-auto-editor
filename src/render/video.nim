@@ -204,7 +204,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
 
           let decoder: ptr AVCodecContext = decoders[obj.src]
           var foundFrame = false
-          for decodedFrame in cns[obj.src].decode(myStream.index.cint, decoder, frame):
+          for decodedFrame in cns[obj.src].flushDecode(myStream.index.cint, decoder, frame):
             frame = decodedFrame
             frameIndex = int(round(decodedFrame.time(myStream.time_base) * tl.tb.float))
             foundFrame = true
