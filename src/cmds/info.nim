@@ -15,6 +15,10 @@ proc genericTrack(lang: string, bitrate: int) =
   if lang != "und":
     echo fmt"     - lang: {lang}"
 
+func bt709(val: int): string =
+  if val == 1:
+    return "1 (bt709)"
+  return $val
 
 proc printYamlInfo(fileInfo: MediaInfo) =
   echo fileInfo.path, ":"
@@ -38,10 +42,20 @@ proc printYamlInfo(fileInfo: MediaInfo) =
     if v.duration != 0.0:
       echo fmt"     - duration: {v.duration:.1f}"
     echo fmt"     - pix fmt: {v.pix_fmt}"
-    echo fmt"     - color range: {v.color_range}"
-    echo fmt"     - color space: {v.color_space}"
-    echo fmt"     - color primaries: {v.color_primaries}"
-    echo fmt"     - color transfer: {v.color_transfer}"
+
+    echo if v.color_range == 1:
+      fmt"     - color range: 1 (tv)"
+    elif v.color_range == 2:
+      fmt"     - color range: 2 (pc)"
+    else:
+      fmt"     - color range: {v.color_range}"
+
+    if v.color_space != 2:
+      echo fmt"     - color space: {v.color_space.bt709}"
+    if v.color_primaries != 2:
+      echo fmt"     - color primaries: {v.color_primaries.bt709}"
+    if v.color_transfer != 2:
+      echo fmt"     - color transfer: {v.color_transfer.bt709}"
     echo fmt"     - timebase: {v.timebase}"
     genericTrack(v.lang, v.bitrate)
 
