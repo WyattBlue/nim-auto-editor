@@ -1,7 +1,9 @@
 import std/strformat
+import std/[tables, sets]
 
 import ffmpeg
 import log
+import utils
 
 proc `|=`*[T](a: var T, b: T) =
   a = a or b
@@ -213,6 +215,7 @@ type OutputContainer* = object
   file: string
   streams: seq[ptr AVStream] = @[]
   video*: seq[ptr AVStream] = @[]
+  options*: Table[string, string]
   formatCtx*: ptr AVFormatContext
   packet: ptr AVPacket
   started: bool = false
@@ -362,9 +365,26 @@ proc startEncoding*(self: var OutputContainer) =
     if avio_open(addr outputCtx.pb, self.file.cstring, AVIO_FLAG_WRITE) < 0:
       error &"Could not open output file '{self.file}'"
 
-  var ret = avformat_write_header(outputCtx, nil)
+  let options: ptr AVDictionary = nil
+  dictToAvdict(addr options, self.options)
+
+  var ret = avformat_write_header(outputCtx, addr options)
   if ret < 0:
     error &"Write header: {av_err2str(ret)}"
+
+  let remainOptions = avdict_to_dict(options)
+  var usedOptions: HashSet[string]
+  for k, v in self.options:
+    if k notin remainOptions:
+      usedOptions.incl k
+
+  var unusedOptions = initTable[string, string]()
+  for k, v in self.options:
+    if k notin usedOptions:
+      unusedOptions[k] = v
+
+  if unusedOptions.len > 0:
+    echo "Warning: some options weren't used ", $unusedOptions
 
 proc mux*(self: var OutputContainer, packet: var AVPacket) =
   self.startEncoding()

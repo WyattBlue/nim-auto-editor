@@ -64,9 +64,16 @@ Options:
     --preview, --stats            Show stats on how the input will be cut
                                   and halt
 
-  Audio Rendering:
-    -c:a, -acodec, --audio-codec ENCODER
-                                  Set audio codec for output media
+  Container Settings:
+    --faststart                   Enable movflags +faststart, recommended for
+                                  web (default)
+    --no-faststart                Disable movflags +faststart, will be faster
+                                  for large files
+    --fragmented                  Use fragmented mp4/mov to allow playback
+                                  before video is complete. See:
+                                  ffmpeg.org/ffmpeg-formats.html#Fragmentation
+    --no-fragmented               Do not use fragmented mp4/mov for better
+                                  compatibility (default)
 
   Video Rendering:
     -c:v, -vcodec, --video-codec ENCODER
@@ -80,6 +87,10 @@ Options:
                                   factor
     --no-seek                     Disable file seeking when rendering video.
                                   Helpful for debugging desync issues
+
+  Audio Rendering:
+    -c:a, -acodec, --audio-codec ENCODER
+                                  Set audio codec for output media
 
   Miscellaneous:
     --no-open                     Do not open the output file after editing
@@ -243,6 +254,14 @@ judge making cuts.
       args.noOpen = true
     of "--no-seek":
       args.noSeek = true
+    of "--faststart":
+      args.faststart = true
+    of "--no-faststart":
+      args.noFaststart = true
+    of "--fragmented":
+      args.fragmented = true
+    of "--no-fragmented":
+      args.noFragmented = true
     of "-dn", "-sn":
       discard
     of "-ex", "--export":

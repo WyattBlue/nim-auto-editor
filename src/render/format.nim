@@ -1,5 +1,6 @@
 import std/os
 import std/options
+import std/tables
 import std/heapqueue
 import std/[strformat, strutils]
 from std/math import round
@@ -25,7 +26,21 @@ proc initPriority(index: float64, frame: ptr AVFrame, stream: ptr AVStream): Pri
 proc `<`(a, b: Priority): bool = a.index < b.index
 
 proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
+  var options: Table[string, string]
+  var movFlags: seq[string] = @[]
+  if args.fragmented and not args.noFragmented:
+    movFlags &= @["default_base_moof", "frag_keyframe", "separate_moof"]
+    options["frag_duration"] = "0.2"
+    if args.faststart:
+      echo("Fragmented is enabled, will not apply faststart.")
+  elif not args.noFaststart:
+    movFlags.add "faststart"
+  if movFlags.len > 0:
+    options["movflags"] = movFlags.join("+")
+
   var output = openWrite(outputPath)
+  output.options = options
+
   let (_, _, ext) = splitFile(outputPath)
 
   var vEncCtx: ptr AVCodecContext = nil

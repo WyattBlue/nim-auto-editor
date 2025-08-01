@@ -57,13 +57,19 @@ type mainArgs* = object
   progress*: BarType = modern
   preview*: bool = false
 
-  # Audio Rendering
-  audioCodec*: string = "auto"
+  # Container Settings
+  faststart*: bool = false
+  noFaststart*: bool = false
+  fragmented*: bool = false
+  noFragmented*: bool = false
 
   # Video Rendering
   videoCodec*: string = "auto"
   noSeek*: bool = false
   scale*: float = 1.0
+
+  # Audio Rendering
+  audioCodec*: string = "auto"
 
   # Misc.
   noOpen*: bool = false
