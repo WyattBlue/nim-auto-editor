@@ -483,8 +483,11 @@ proc avcodec_flush_buffers*(avctx: ptr AVCodecContext) {.importc,
     header: "<libavcodec/avcodec.h>".}
 
 # Error
-proc AVERROR*(e: cint): cint {.inline.} = (-e)
-const AVERROR_EOF* = AVERROR(0x10000051)
+func MKTAG*(a, b, c, d: char): cint {.inline.} =
+  cast[cint]((a.uint32) or (b.uint32 shl 8) or (c.uint32 shl 16) or (d.uint32 shl 24))
+
+func AVERROR*(e: cint): cint {.inline.} = (-e)
+const AVERROR_EOF* = AVERROR(MKTAG('E','O','F',' '))
 let AVERROR_EAGAIN* = AVERROR(EAGAIN)
 
 const AV_ERROR_MAX_STRING_SIZE* = 64
