@@ -302,7 +302,7 @@ proc addStreamFromTemplate*(self: var OutputContainer,
 
   return stream
 
-proc addStream*(self: var OutputContainer, codecName: string, rate: AVRational, width: cint = 640, height: cint = 480): (
+proc addStream*(self: var OutputContainer, codecName: string, rate: AVRational, width: cint = 640, height: cint = 480, metadata: Table[string, string] = initTable[string, string]()): (
     ptr AVStream, ptr AVCodecContext) =
   let codec = initCodec(codecName)
   if codec == nil:
@@ -350,6 +350,9 @@ proc addStream*(self: var OutputContainer, codecName: string, rate: AVRational, 
   # the codec context will be applied just before encoding starts in `startEncoding()`.
   if avcodec_parameters_from_context(stream.codecpar, ctx) < 0:
     error "Could not set ctx parameters"
+
+  if metadata.len > 0:
+    dictToAvdict(addr stream.metadata, metadata)
 
   return (stream, ctx)
 

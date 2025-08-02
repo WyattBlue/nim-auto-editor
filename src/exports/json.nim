@@ -14,7 +14,7 @@ func `%`*(self: v3): JsonNode =
   var videoTracks = newJArray()
   for track in self.v:
     var trackArray = newJArray()
-    for clip in track:
+    for clip in track.clips:
       var clipObj = newJObject()
       clipObj["name"] = %"video"
       clipObj["src"] = %(if clip.src != nil: clip.src[] else: "")
@@ -29,7 +29,7 @@ func `%`*(self: v3): JsonNode =
   var audioTracks = newJArray()
   for track in self.a:
     var trackArray = newJArray()
-    for clip in track:
+    for clip in track.clips:
       var clipObj = newJObject()
       clipObj["name"] = %"audio"
       clipObj["src"] = %(if clip.src != nil: clip.src[] else: "")
@@ -62,9 +62,9 @@ proc exportJsonTl*(tlV3: v3, `export`: string, output: string) =
 
     var source: string = ""
     if tlV3.v.len > 0 and tlV3.v[0].len > 0:
-      source = tlV3.v[0][0].src[]
+      source = tlV3.v[0].c[0].src[]
     elif tlV3.a.len > 0 and tlV3.a[0].len > 0:
-      source = tlV3.a[0][0].src[]
+      source = tlV3.a[0].c[0].src[]
 
     tlJson = %v1(chunks: tlV3.chunks.get, source: source)
   else:

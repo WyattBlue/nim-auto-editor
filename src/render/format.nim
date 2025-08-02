@@ -56,7 +56,8 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
 
   for i in 0..<tl.a.len:
     if tl.a[i].len > 0:  # Only create stream if track has clips
-      var (aOutStream, aEncCtx) = output.addStream(args.audioCodec, rate=AVRational(num: tl.sr, den: 1))
+      let rate = AVRational(num: tl.sr, den: 1)
+      var (aOutStream, aEncCtx) = output.addStream(args.audioCodec, rate=rate, metadata={"language": tl.a[i].lang}.toTable)
       let encoder = aEncCtx.codec
       if encoder.sample_fmts == nil:
         error &"{encoder.name}: No known audio formats avail."
@@ -67,7 +68,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
       audioEncoders.add(aEncCtx)
 
       let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
-      let audioFrameIter = makeNewAudioFrames(encoder.sample_fmts[0], tl.tb, tl.sr, tl.a[i], frameSize)
+      let audioFrameIter = makeNewAudioFrames(encoder.sample_fmts[0], i.int32, tl, frameSize)
       audioFrameIters.add(audioFrameIter)
 
   defer:

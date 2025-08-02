@@ -23,14 +23,25 @@ type Clip* = object
   volume*: float64
   stream*: int32
 
+type ClipLayer* = object
+  lang*: string = "und"
+  c*: seq[Clip] = @[]
+
+# Whatever floats your boat
+func clips*(layer: ClipLayer): seq[Clip] =
+  layer.c
+
+func len*(layer: ClipLayer): int =
+  len(layer.c)
+
 type v3* = object
   tb*: AVRational
   background*: RGBColor
   sr*: cint
   layout*: string
   res*: (int64, int64)
-  v*: seq[seq[Clip]]
-  a*: seq[seq[Clip]]
+  v*: seq[ClipLayer]
+  a*: seq[ClipLayer]
   chunks*: Option[seq[(int64, int64, float64)]]
 
 
@@ -38,30 +49,30 @@ func len*(self: v3): int64 =
   result = 0
   for clips in self.v:
     if len(clips) > 0:
-      result = max(result, clips[^1].start + clips[^1].dur)
+      result = max(result, clips.c[^1].start + clips.c[^1].dur)
   for clips in self.a:
     if len(clips) > 0:
-      result = max(result, clips[^1].start + clips[^1].dur)
+      result = max(result, clips.c[^1].start + clips.c[^1].dur)
 
 func uniqueSources*(self: v3): HashSet[ptr string] =
   for vlayer in self.v:
-    for video in vlayer:
+    for video in vlayer.c:
       result.incl(video.src)
 
   for alayer in self.a:
-    for audio in alayer:
+    for audio in alayer.c:
       result.incl(audio.src)
 
 
 func `end`*(self: v3): int64 =
   result = 0
-  for vclips in self.v:
-    if vclips.len > 0:
-      let v = vclips[^1]
+  for vlayer in self.v:
+    if vlayer.c.len > 0:
+      let v = vlayer.c[^1]
       result = max(result, v.start + v.dur)
-  for aclips in self.a:
-    if aclips.len > 0:
-      let a = aclips[^1]
+  for alayer in self.a:
+    if alayer.c.len > 0:
+      let a = alayer.c[^1]
       result = max(result, a.start + a.dur)
 
 func toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
@@ -86,23 +97,23 @@ func toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
       start += dur
       i += 1
 
-  var vspace: seq[seq[Clip]] = @[]
-  var aspace: seq[seq[Clip]] = @[]
+  var vspace: seq[ClipLayer] = @[]
+  var aspace: seq[ClipLayer] = @[]
 
   if mi.v.len > 0:
-    var vlayer: seq[Clip] = @[]
+    var vlayer = ClipLayer(lang: mi.v[0].lang, c: @[])
     for clip in clips:
       var videoClip = clip
       videoClip.stream = 0
-      vlayer.add(videoClip)
+      vlayer.c.add(videoClip)
     vspace.add(vlayer)
 
   for i in 0 ..< mi.a.len:
-    var alayer: seq[Clip] = @[]
+    var alayer = ClipLayer(lang: mi.a[i].lang, c: @[])
     for clip in clips:
       var audioClip = clip
       audioClip.stream = i.int32
-      alayer.add(audioClip)
+      alayer.c.add(audioClip)
     aspace.add(alayer)
 
   result = v3(v: vspace, a: aspace, chunks: some(chunks))
@@ -155,7 +166,7 @@ proc setStreamTo0*(tl: var v3, interner: var StringInterner) =
     return cache[newtrack]
 
   for layer in tl.a.mitems:
-    for clip in layer.mitems:
+    for clip in layer.c.mitems:
       if clip.stream > 0:
         let mi = makeTrack(clip.stream, clip.src[])
         clip.src = interner.intern(mi.path)

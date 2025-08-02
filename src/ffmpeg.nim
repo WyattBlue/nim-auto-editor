@@ -150,7 +150,7 @@ type
     nb_frames*: int64
     disposition*: cint
     sample_aspect_ratio*: AVRational
-    metadata*: pointer
+    metadata*: ptr AVDictionary
     avg_frame_rate*: AVRational
 
   AVCodec* {.importc, header: "<libavcodec/codec.h>", bycopy.} = object

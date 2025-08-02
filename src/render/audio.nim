@@ -1,7 +1,6 @@
 import std/strformat
 import std/tables
 import std/os
-import std/times
 import std/memfiles
 
 import ../log
@@ -27,12 +26,12 @@ type
     samples*: int
     tempFilePath*: string
 
-proc newAudioBuffer(samples: int, channels: int): AudioBuffer =
+proc newAudioBuffer(index: int32, samples: int, channels: int): AudioBuffer =
   result = new(AudioBuffer)
   result.samples = samples
   result.channels = channels
   result.size = samples * channels * sizeof(int16)
-  result.tempFilePath = tempDir / ("abuf" & $getCurrentProcessId() & "_" & $epochTime().int & ".map")
+  result.tempFilePath = tempDir / &"{index}.map"
 
   # Memory map the file
   result.memFile = memfiles.open(result.tempFilePath, mode = fmReadWrite, newFileSize = result.size)
@@ -402,27 +401,31 @@ proc processAudioClip(clip: Clip, data: seq[seq[int16]], sr: cint): seq[seq[int1
         result[1][i] = result[0][i]
 
 
-proc makeNewAudioFrames*(fmt: AVSampleFormat, tb: AVRational, sr: cint, layer: seq[Clip], frameSize: int): iterator(): (ptr AVFrame, int) =
+proc makeNewAudioFrames*(fmt: AVSampleFormat, index: int32, tl: v3, frameSize: int): iterator(): (ptr AVFrame, int) =
   var samples: Table[(string, int32), Getter]
   let targetChannels = 2
 
-  for clip in layer:
+  let tb = tl.tb
+  let sr = tl.sr
+  let layer = tl.a[index]
+
+  for clip in layer.clips:
     let key = (clip.src[], clip.stream)
     if key notin samples:
       samples[key] = newGetter(clip.src[], clip.stream.int, sr)
 
   # Calculate total duration and create memory-mapped audio buffer
   var totalDuration = 0
-  for clip in layer:
+  for clip in layer.clips:
     totalDuration = max(totalDuration, clip.start + clip.dur)
 
   let totalSamples = int(totalDuration * sr.int64 * tb.den div tb.num)
 
   # Create memory-mapped buffer instead of regular seq
-  var audioBuffer = newAudioBuffer(totalSamples, targetChannels)
+  var audioBuffer = newAudioBuffer(index, totalSamples, targetChannels)
 
   # Process each clip and mix into the memory-mapped buffer
-  for clip in layer:
+  for clip in layer.clips:
     let key = (clip.src[], clip.stream)
     if key in samples:
       let sampStart = int(clip.offset.float64 * clip.speed * sr.float64 / tb)

@@ -102,7 +102,8 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
 
   debug &"Creating video stream with codec: {args.videoCodec}"
   var (outputStream, encoderCtx) = output.addStream(args.videoCodec,
-      rate = targetFps, width = targetWidth, height = targetHeight)
+      rate = targetFps, width = targetWidth, height = targetHeight, metadata = {
+          "language": tl.v[0].lang}.toTable)
   let codec = encoderCtx.codec
 
   encoderCtx.framerate = targetFps
@@ -115,13 +116,13 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
   let color_trc = src.video[0].codecpar.color_trc
 
   if color_range in [1, 2]:
-      encoderCtx.color_range = color_range
+    encoderCtx.color_range = color_range
   if colorspace in [0, 1] or (colorspace >= 3 and colorspace < 16):
-      encoderCtx.colorspace = colorspace
+    encoderCtx.colorspace = colorspace
   if color_prim == 1 or (color_prim >= 4 and color_prim < 17):
-      encoderCtx.color_primaries = color_prim
+    encoderCtx.color_primaries = color_prim
   if color_trc == 1 or (color_trc >= 4 and color_trc < 22):
-      encoderCtx.color_trc = color_trc
+    encoderCtx.color_trc = color_trc
 
   # Open encoder and copy encoder parameters to stream
   if avcodec_open2(encoderCtx, codec, nil) < 0:
@@ -176,7 +177,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
       objList = @[]
 
       for layer in tl.v:
-        for obj in layer:
+        for obj in layer.clips:
           if index >= obj.start and index < (obj.start + obj.dur):
             let i = int(round(float(obj.offset + index - obj.start) * obj.speed))
             objList.add VideoFrame(index: i, src: obj.src)

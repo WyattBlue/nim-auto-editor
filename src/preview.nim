@@ -64,7 +64,7 @@ func allCuts(tl: v3, inLen: int): seq[int] =
   let tb = tl.tb
   var clipSpans: seq[(int, int)] = @[]
 
-  for clip in tl.a[0]:
+  for clip in tl.a[0].clips:
     let oldOffset = clip.offset.float64 * clip.speed
     clipSpans.add((round(oldOffset), round(oldOffset + clip.dur.float64)))
 
@@ -108,7 +108,7 @@ proc preview*(tl: v3) =
     echo timeFrame("diff", diff, tb, "0.0%")
 
   var clipLens: seq[int] = @[]
-  for clip in tl.a[0]:
+  for clip in tl.a[0].clips:
     clipLens.add clip.dur
 
   stdout.write("clips:\n - amount:    " & $clipLens.len & "\n")

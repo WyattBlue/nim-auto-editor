@@ -116,9 +116,9 @@ proc media_def(filedef: XmlNode, url: string, mi: MediaInfo, tl: v3, tb: int64,
 
 proc resolve_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
     mi: MediaInfo), tl: v3) =
-  for t, aclips in tl.a.pairs:
+  for t, alayer in tl.a.pairs:
     let track = newElement("track")
-    for j, aclip in aclips.pairs:
+    for j, aclip in alayer.c.pairs:
       let mi = initMediaInfo(aclip.src[])
 
       let start_val = $aclip.start
@@ -126,7 +126,7 @@ proc resolve_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
       let in_val = $aclip.offset
       let out_val = $(aclip.offset + aclip.dur)
 
-      let clip_item_num = if mi.v.len == 0: j + 1 else: aclips.len + 1 + j
+      let clip_item_num = if mi.v.len == 0: j + 1 else: alayer.c.len + 1 + j
 
       let clipitem = newElement("clipitem")
       clipitem.attrs = {"id": &"clipitem-{clip_item_num}"}.toXmlAttributes
@@ -171,7 +171,7 @@ proc premiere_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
 
   let has_video = tl.v.len > 0 and tl.v[0].len > 0
   var t = 0
-  for aclips in tl.a:
+  for alayer in tl.a:
     for channelcount in 0..1: # Because "stereo" is hardcoded
       t += 1
       let track = newElement("track")
@@ -184,7 +184,7 @@ proc premiere_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
       if has_video:
         track.add elem("outputchannelindex", $(channelcount + 1))
 
-      for j, aclip in aclips.pairs:
+      for j, aclip in alayer.c.pairs:
         let src = initMediaInfo(aclip.src[])
 
         let start_val = $aclip.start
@@ -192,8 +192,8 @@ proc premiere_write_audio(audio: XmlNode, make_filedef: proc(clipitem: XmlNode,
         let in_val = $aclip.offset
         let out_val = $(aclip.offset + aclip.dur)
 
-        let clip_item_num = if not has_video: j + 1 else: aclips.len + 1 + j + (
-            t * aclips.len)
+        let clip_item_num = if not has_video: j + 1 else: alayer.len + 1 + j + (
+            t * alayer.len)
 
         let clipitem = newElement("clipitem")
         clipitem.attrs = {
@@ -279,7 +279,7 @@ proc fcp7_write_xml*(name: string, output: string, resolve: bool, tl: v3) =
   if tl.v.len > 0 and tl.v[0].len > 0:
     let track = newElement("track")
 
-    for j, clip in tl.v[0].pairs:
+    for j, clip in tl.v[0].c.pairs:
       let start_val = $clip.start
       let end_val = $(clip.start + clip.dur)
       let in_val = $clip.offset
