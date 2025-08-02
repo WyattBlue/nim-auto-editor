@@ -58,15 +58,16 @@ proc exportJsonTl*(tlV3: v3, `export`: string, output: string) =
 
   if `export` == "v1":
     if tlV3.chunks.isNone:
-      error("No chunks available for export")
+      error "No chunks available for export"
 
+    let chunks = tlV3.chunks.unsafeGet()
     var source: string = ""
     if tlV3.v.len > 0 and tlV3.v[0].len > 0:
       source = tlV3.v[0].c[0].src[]
     elif tlV3.a.len > 0 and tlV3.a[0].len > 0:
       source = tlV3.a[0].c[0].src[]
 
-    tlJson = %v1(chunks: tlV3.chunks.get, source: source)
+    tlJson = %v1(chunks: chunks, source: source)
   else:
     tlJson = %tlV3
 

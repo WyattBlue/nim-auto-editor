@@ -1,8 +1,7 @@
-import std/[os, times, terminal, browsers]
+import std/[os, options, times, terminal, browsers]
 import std/[strutils, strformat]
 import std/sequtils
-import std/sets
-import std/tables
+import std/[sets, tables]
 import std/random
 from std/math import round
 
@@ -13,6 +12,7 @@ import ffmpeg
 import timeline
 import util/[bar, fun]
 import cmds/levels
+import util/color
 import analyze/[audio, motion, subtitle]
 
 import imports/json
@@ -355,7 +355,7 @@ proc editMedia*(args: var mainArgs) =
   of "shotcut":
     shotcut_write_mlt(output, tlV3)
     return
-  of "default":
+  of "default", "clip-sequence":
     discard
   else:
     error &"Unknown export format: {exportKind}"
@@ -393,7 +393,46 @@ proc editMedia*(args: var mainArgs) =
       createDir(tempDir)
 
   debug &"Temp Directory: {tempDir}"
-  makeMedia(args, tlV3, output, bar)
+
+
+  if args.`export` == "clip-sequence":
+    if not isSome(tlV3.chunks):
+      error "Timeline too complex to use clip-sequence export"
+
+    let chunks: seq[(int64, int64, float64)] = tlV3.chunks.unsafeGet()
+
+    proc padChunk(chunk: (int64, int64, float64), total: int64): seq[(int64, int64, float64)] =
+      let start = (if chunk[0] == 0'i64: @[] else: @[(0'i64, chunk[0], 99999.0)])
+      let `end` = (if chunk[1] == total: @[] else: @[(chunk[1], total, 99999.0)])
+      return start & @[chunk] & `end`
+
+    func appendFilename(path: string, val: string): string =
+      let (dir, name, ext) = splitFile(path)
+      return (dir / name) & val & ext
+
+    const black = RGBColor(red: 0, green: 0, blue: 0)
+    let totalFrames: int64 = chunks[^1][1] - 1
+    var clipNum = 0
+
+    let unique = tlV3.uniqueSources()
+    var src: ptr string
+    for u in unique:
+      src = u
+      break
+    if src == nil:
+      error "Trying to render an empty timeline"
+    let mi = initMediaInfo(src[])
+
+    for chunk in chunks:
+      if chunk[2] <= 0 or chunk[2] >= 99999:
+        continue
+
+      let paddedChunks = padChunk(chunk, totalFrames)
+      let myTimeline = toNonLinear(src, tlV3.tb, black, mi, paddedChunks)
+      makeMedia(args, myTimeline, appendFilename(output, &"-{clipNum}"), bar)
+      clipNum += 1
+  else:
+    makeMedia(args, tlV3, output, bar)
 
   stopTimer()
 
