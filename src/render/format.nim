@@ -32,7 +32,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
     movFlags &= @["default_base_moof", "frag_keyframe", "separate_moof"]
     options["frag_duration"] = "0.2"
     if args.faststart:
-      echo("Fragmented is enabled, will not apply faststart.")
+      warning "Fragmented is enabled, will not apply faststart."
   elif not args.noFaststart:
     movFlags.add "faststart"
   if movFlags.len > 0:

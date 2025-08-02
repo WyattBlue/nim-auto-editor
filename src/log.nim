@@ -91,6 +91,11 @@ proc debug*(msg: string) =
     conwrite("")
     stderr.styledWriteLine(fgGreen, "Debug: ", resetStyle, msg)
 
+proc warning*(msg: string) =
+  if not quiet:
+    conwrite("")
+    stderr.write(&"Warning! {msg}\n")
+
 proc closeTempDir*() =
   if tempDir != "":
     try:
