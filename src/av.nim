@@ -350,7 +350,7 @@ proc startEncoding*(self: var OutputContainer) =
       unusedOptions[k] = v
 
   if unusedOptions.len > 0:
-    echo "Warning: some options weren't used ", $unusedOptions
+    debug "Some options weren't used ", $unusedOptions
 
 proc mux*(self: var OutputContainer, packet: var AVPacket) =
   self.startEncoding()
