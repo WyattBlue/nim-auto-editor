@@ -91,6 +91,15 @@ Options:
   Audio Rendering:
     -c:a, -acodec, --audio-codec ENCODER
                                   Set audio codec for output media
+    -layout, -channel-layout, --audio-layout LAYOUT
+                                  Set the audio layout for the output
+                                  media/timeline
+    -b:a, --audio-bitrate BITRATE
+                                  Set the number of bits per second for audio
+    --mix-audio-streams           Mix all audio streams together into one
+    --audio-normalize NORM-TYPE   Apply audio rendering to all audio tracks.
+                                  Applied right before rendering the output
+                                  file
 
   Miscellaneous:
     --no-open                     Do not open the output file after editing
@@ -262,6 +271,8 @@ judge making cuts.
       args.fragmented = true
     of "--no-fragmented":
       args.noFragmented = true
+    of "--mix-audio-streams":
+      args.mixAudioStreams = true
     of "-dn", "-sn":
       discard
     of "-ex", "--export":
@@ -290,6 +301,8 @@ judge making cuts.
       expecting = "audio-codec"
     of "-b:a", "--audio-bitrate":
       expecting = "audio-bitrate"
+    of "-layout", "-channel-layout", "--audio-layout":
+      expecting = "layout"
     of "--edit", "--edit-based-on":
       expecting = "edit"
     of "--set-speed", "--set-speed-for-range":
@@ -298,8 +311,8 @@ judge making cuts.
       expecting = "background"
     of "-ar", "--sample-rate":
       expecting = "sample-rate"
-    of "--temp-dir", "--progress", "--add-in", "--cut-out", "--yt-dlp-location",
-        "--download-format", "--output-format", "--yt-dlp-extras", "--scale":
+    of "--temp-dir", "--progress", "--add-in", "--cut-out",  "--scale", "--audio-normalize",
+        "--yt-dlp-location", "--download-format", "--output-format", "--yt-dlp-extras":
       expecting = key[2..^1]
     else:
       if key.startsWith("--"):
@@ -344,6 +357,10 @@ judge making cuts.
         args.videoBitrate = parseBitrate(key)
       of "audio-codec":
         args.audioCodec = key
+      of "layout":
+        args.audioLayout = key
+      of "audio-normalize":
+        args.audioNormalize = key
       of "audio-bitrate":
         args.audioBitrate = parseBitrate(key)
       of "progress":

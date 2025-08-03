@@ -71,7 +71,10 @@ type mainArgs* = object
 
   # Audio Rendering
   audioCodec*: string = "auto"
+  audioLayout*: string = ""
   audioBitrate*: int = -1
+  mixAudioStreams*: bool = false
+  audioNormalize*: string = "#f"
 
   # Misc.
   noOpen*: bool = false
