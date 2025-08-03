@@ -10,9 +10,8 @@ import log
 import media
 import ffmpeg
 import timeline
-import util/[bar, fun]
+import util/[color, bar, fun, rules]
 import cmds/levels
-import util/color
 import analyze/[audio, motion, subtitle]
 
 import imports/json
@@ -162,37 +161,6 @@ proc setOutput(userOut, userExport, path: string): (string, string) =
 
   return (&"{root}{ext}", outExport)
 
-type Rules = object
-  allowImage: bool
-  vcodecs: HashSet[string]
-  acodecs: HashSet[string]
-  scodecs: HashSet[string]
-  defaultVid: string
-  defaultAud: string
-  defaultSub: string
-  maxVideos: int = -1
-  maxAudios: int = -1
-  maxSubtitles: int = -1
-
-proc initRules(ext: string): Rules =
-  let dummy = cstring(&".{ext}")
-  let format = av_guess_format(nil, dummy, nil)
-  if format == nil:
-    echo $dummy
-    error "Why no formats?"
-
-  result.defaultVid = format.defaultVideoCodec()
-  result.defaultAud = format.defaultAudioCodec()
-  result.defaultSub = format.defaultSubtitleCodec()
-  result.allowImage = ext in ["mp4", "mkv"]
-
-  for codec in format.supportedCodecs:
-    if codec.`type` == AVMEDIA_TYPE_VIDEO:
-      result.vcodecs.incl $codec.name
-    elif codec.`type` == AVMEDIA_TYPE_AUDIO:
-      result.acodecs.incl $codec.name
-    elif codec.`type` == AVMEDIA_TYPE_SUBTITLE:
-      result.scodecs.incl $codec.name
 
 proc setAudioCodec(codec: var string, ext: string, src: MediaInfo, rule: Rules): string =
   if codec == "auto":
@@ -394,7 +362,6 @@ proc editMedia*(args: var mainArgs) =
 
   debug &"Temp Directory: {tempDir}"
 
-
   if args.`export` == "clip-sequence":
     if not isSome(tlV3.chunks):
       error "Timeline too complex to use clip-sequence export"
@@ -429,10 +396,10 @@ proc editMedia*(args: var mainArgs) =
 
       let paddedChunks = padChunk(chunk, totalFrames)
       let myTimeline = toNonLinear(src, tlV3.tb, black, mi, paddedChunks)
-      makeMedia(args, myTimeline, appendFilename(output, &"-{clipNum}"), bar)
+      makeMedia(args, myTimeline, appendFilename(output, &"-{clipNum}"), rule, bar)
       clipNum += 1
   else:
-    makeMedia(args, tlV3, output, bar)
+    makeMedia(args, tlV3, output, rule, bar)
 
   stopTimer()
 

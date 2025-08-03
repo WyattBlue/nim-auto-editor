@@ -9,7 +9,7 @@ import ../timeline
 import ../ffmpeg
 import ../log
 import ../av
-import ../util/bar
+import ../util/[bar, rules]
 import video
 import audio
 
@@ -25,7 +25,7 @@ proc initPriority(index: float64, frame: ptr AVFrame, stream: ptr AVStream): Pri
 
 proc `<`(a, b: Priority): bool = a.index < b.index
 
-proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
+proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: Bar) =
   var options: Table[string, string]
   var movFlags: seq[string] = @[]
   if args.fragmented and not args.noFragmented:
@@ -47,7 +47,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
   var vOutStream: ptr AVStream = nil
   var videoFrameIter: iterator(): (ptr AVFrame, int) = iterator(): (ptr AVFrame, int) =
     return
-  if tl.v.len > 0 and tl.v[0].len > 0:
+  if rules.defaultVid notin ["none", "png"] and tl.v.len > 0 and tl.v[0].len > 0:
     (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(output, tl, args)
 
   var audioStreams: seq[ptr AVStream] = @[]

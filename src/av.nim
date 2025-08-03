@@ -3,7 +3,7 @@ import std/[tables, sets]
 
 import ffmpeg
 import log
-import utils
+import util/dict
 
 proc `|=`*[T](a: var T, b: T) =
   a = a or b
@@ -231,41 +231,6 @@ proc openWrite*(file: string): OutputContainer =
   result.file = file
   result.formatCtx = formatCtx
   result.packet = av_packet_alloc()
-
-proc defaultVideoCodec*(self: ptr AVOutputFormat): string =
-  let codecId = self.video_codec
-  if codecId != AV_CODEC_ID_NONE:
-    let codecName = avcodec_get_name(codecId)
-    if codecName != nil:
-      return $codecName
-  return "none"
-
-proc defaultAudioCodec*(self: ptr AVOutputFormat): string =
-  let codecId = self.audio_codec
-  if codecId != AV_CODEC_ID_NONE:
-    let codecName = avcodec_get_name(codecId)
-    if codecName != nil:
-      return $codecName
-  return "none"
-
-proc defaultSubtitleCodec*(self: ptr AVOutputFormat): string =
-  let codecId = self.subtitle_codec
-  if codecId != AV_CODEC_ID_NONE:
-    let codecName = avcodec_get_name(codecId)
-    if codecName != nil:
-      return $codecName
-  return "none"
-
-func supportedCodecs*(self: ptr AVOutputFormat): seq[AVCodec] =
-  var codec: ptr AVCodec
-  let opaque: pointer = nil
-
-  while true:
-    codec = av_codec_iterate(addr opaque)
-    if codec == nil:
-      break
-    if avformat_query_codec(self, codec.id, FF_COMPLIANCE_NORMAL) == 1:
-      result.add codec[]
 
 proc addStreamFromTemplate*(self: var OutputContainer,
     streamT: ptr AVStream): ptr AVStream =

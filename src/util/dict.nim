@@ -1,6 +1,6 @@
 import std/tables
 
-import ffmpeg
+import ../ffmpeg
 
 const AV_DICT_IGNORE_SUFFIX = 2
 
@@ -18,4 +18,3 @@ proc dictToAvdict*(dst: ptr ptr AVDictionary, src: Table[string, string]) =
   var ret: cint
   for key, value in src:
     ret = av_dict_set(dst, key.cstring, value.cstring, 0)
-
