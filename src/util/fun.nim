@@ -68,7 +68,26 @@ func toTb*(val: PackedInt, tb: float64): int64 =
     return int64(val.getNumber / 1000 * tb)
   return val.getNumber
 
-proc mutMargin*(arr: var seq[bool], startM: int, endM: int) =
+proc mutRemoveSmall*(arr: var seq[bool], lim: int, replace, with: bool) =
+  var startP = 0
+  var active = false
+  for j, item in arr.pairs:
+    if item == replace:
+      if not active:
+        startP = j
+        active = true
+
+      if j == len(arr) - 1 and j - startP < lim:
+        for i in startP ..< arr.len:
+          arr[i] = with
+    elif active:
+      if j - startP < lim:
+        for i in startP ..< j:
+          arr[i] = with
+      active = false
+
+
+proc mutMargin*(arr: var seq[bool], startM, endM: int) =
   # Find start and end indexes
   var startIndex: seq[int] = @[]
   var endIndex: seq[int] = @[]

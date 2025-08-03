@@ -93,6 +93,14 @@ test "margin":
   mutMargin(levels, 2, 2)
   check(levels == @[true, true, true, true, true])
 
+  levels = @[false, true, true, true, false]
+  mutMargin(levels, -1, -1)
+  check(levels == @[false, false, true, false, false])
+
+  levels = @[false, true, true, true, true, true, true, true, false]
+  mutMargin(levels, 3, -4)
+  check(levels == @[true, true, true, true, false, false, false, false, false])
+
 test "aac-mux":
   let tempDir = createTempDir("tmp", "")
   defer: removeDir(tempDir)

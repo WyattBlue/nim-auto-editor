@@ -241,6 +241,9 @@ proc editMedia*(args: var mainArgs) =
           motion(bar, container, args.input, tb, stream, width, blur)
         )
         hasLoud = levels.mapIt(it >= threshold)
+        if editMethod == "audio":
+          mutRemoveSmall(hasLoud, 3, true, false)  # minclip
+          mutRemoveSmall(hasLoud, 6, false, true)  # mincut
       elif editMethod == "subtitle":
         hasLoud = subtitle(container, tb, pattern, stream)
       elif editMethod == "none":
