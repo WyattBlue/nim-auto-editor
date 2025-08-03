@@ -124,6 +124,12 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
   if color_trc == 1 or (color_trc >= 4 and color_trc < 22):
     encoderCtx.color_trc = color_trc
 
+  if args.videoBitrate >= 0:
+    encoderCtx.bit_rate = args.videoBitrate
+    debug(&"video bitrate: {encoderCtx.bit_rate}")
+  else:
+    debug(&"[auto] video bitrate: {encoderCtx.bit_rate}")
+
   # Open encoder and copy encoder parameters to stream
   if avcodec_open2(encoderCtx, codec, nil) < 0:
     error "Could not open encoder"

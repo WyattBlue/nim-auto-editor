@@ -65,11 +65,13 @@ type mainArgs* = object
 
   # Video Rendering
   videoCodec*: string = "auto"
+  videoBitrate*: int = -1
   noSeek*: bool = false
   scale*: float = 1.0
 
   # Audio Rendering
   audioCodec*: string = "auto"
+  audioBitrate*: int = -1
 
   # Misc.
   noOpen*: bool = false

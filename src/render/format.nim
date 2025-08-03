@@ -64,6 +64,12 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, bar: Bar) =
       if avcodec_open2(aEncCtx, encoder, nil) < 0:
         error "Could not open encoder"
 
+      if args.audioBitrate >= 0:
+        aEncCtx.bit_rate = args.audioBitrate
+        debug(&"audio bitrate: {aEncCtx.bit_rate}")
+      else:
+        debug(&"[auto] audio bitrate: {aEncCtx.bit_rate}")
+
       audioStreams.add(aOutStream)
       audioEncoders.add(aEncCtx)
 

@@ -282,10 +282,14 @@ judge making cuts.
       expecting = "silent-speed"
     of "-v", "--video-speed", "--sounded-speed":
       expecting = "video-speed"
-    of "-c:a", "-acodec", "--audio-codec":
-      expecting = "audio-codec"
     of "-c:v", "-vcodec", "--video-codec":
       expecting = "video-codec"
+    of "-b:v", "--video-bitrate":
+      expecting = "video-bitrate"
+    of "-c:a", "-acodec", "--audio-codec":
+      expecting = "audio-codec"
+    of "-b:a", "--audio-bitrate":
+      expecting = "audio-bitrate"
     of "--edit", "--edit-based-on":
       expecting = "edit"
     of "--set-speed", "--set-speed-for-range":
@@ -334,10 +338,14 @@ judge making cuts.
         args.background = parseColor(key)
       of "sample-rate":
         args.sampleRate = parseSampleRate(key)
-      of "audio-codec":
-        args.audioCodec = key
       of "video-codec":
         args.videoCodec = key
+      of "video-bitrate":
+        args.videoBitrate = parseBitrate(key)
+      of "audio-codec":
+        args.audioCodec = key
+      of "audio-bitrate":
+        args.audioBitrate = parseBitrate(key)
       of "progress":
         try:
           args.progress = parseEnum[BarType](key)
