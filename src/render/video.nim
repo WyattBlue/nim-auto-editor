@@ -130,9 +130,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
   else:
     debug(&"[auto] video bitrate: {encoderCtx.bit_rate}")
 
-  # Open encoder and copy encoder parameters to stream
-  if avcodec_open2(encoderCtx, codec, nil) < 0:
-    error "Could not open encoder"
+  encoderCtx.open()
   if avcodec_parameters_from_context(outputStream.codecpar, encoderCtx) < 0:
     error "Could not copy encoder parameters to stream"
 

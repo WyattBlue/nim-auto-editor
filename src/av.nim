@@ -352,6 +352,21 @@ proc startEncoding*(self: var OutputContainer) =
   if unusedOptions.len > 0:
     debug &"Some options weren't used: {unusedOptions}"
 
+proc open*(ctx: ptr AVCodecContext) =
+  # Only for encoders
+  if ctx.time_base == 0:
+    if ctx.codec_type == AVMEDIA_TYPE_VIDEO:
+      if ctx.framerate == 0:
+        ctx.time_base = AVRational(num: 1, den: AV_TIME_BASE)
+      else:
+        ctx.time_base = av_inv_q(ctx.framerate)
+    elif ctx.codec_type == AVMEDIA_TYPE_AUDIO:
+      ctx.time_base = AVRational(num: 1, den: ctx.sample_rate)
+    else:
+      ctx.time_base = AVRational(num: 1, den: AV_TIME_BASE)
+  if avcodec_open2(ctx, ctx.codec, nil) < 0:
+    error "Could not open encoder"
+
 proc mux*(self: var OutputContainer, packet: var AVPacket) =
   self.startEncoding()
 

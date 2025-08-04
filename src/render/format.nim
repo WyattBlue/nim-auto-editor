@@ -61,8 +61,8 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
       let encoder = aEncCtx.codec
       if encoder.sample_fmts == nil:
         error &"{encoder.name}: No known audio formats avail."
-      if avcodec_open2(aEncCtx, encoder, nil) < 0:
-        error "Could not open encoder"
+
+      aEncCtx.open()
 
       if args.audioBitrate >= 0:
         aEncCtx.bit_rate = args.audioBitrate
