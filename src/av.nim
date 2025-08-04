@@ -344,6 +344,8 @@ proc startEncoding*(self: var OutputContainer) =
     if k notin remainOptions:
       usedOptions.incl k
 
+  av_dict_free(addr options)
+
   var unusedOptions = initTable[string, string]()
   for k, v in self.options:
     if k notin usedOptions:
