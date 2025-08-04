@@ -46,6 +46,7 @@ type mainArgs* = object
   # Timeline Options
   sampleRate*: cint = -1
   background* = RGBColor(red: 0, green: 0, blue: 0)
+  resolution*: (int, int) = (0, 0)
 
   # URL download Options
   ytDlpLocation*: string = "yt-dlp"

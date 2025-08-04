@@ -2,6 +2,7 @@ import std/[os, osproc, posix_utils]
 import std/[strformat, strutils]
 import std/terminal
 import std/uri
+import std/parseutils
 
 import about
 import edit
@@ -45,7 +46,11 @@ Options:
                                   Set the SPEED for a given range
 
   Timeline Options:
+    -tb, --time-base, -r, -fps, --frame-rate NUM
+                                  Set timeline frame rate
     -ar, --sample-rate NAT        Set timeline sample rate
+    -res, --resolution WIDTH,HEIGHT
+                                  Set timeline width and height
     -b, -bg, --background COLOR   Set the background as a solid RGB color
 
   URL Download Options:
@@ -65,6 +70,10 @@ Options:
                                   and halt
 
   Container Settings:
+    -sn                           Disable the inclusion of subtitle streams in
+                                  the output file
+    -dn                           Disable the inclusion of data streams in the
+                                  output file
     --faststart                   Enable movflags +faststart, recommended for
                                   web (default)
     --no-faststart                Disable movflags +faststart, will be faster
@@ -140,13 +149,23 @@ proc parseNum(val, opt: string): float64 =
   else:
     error &"--{opt} has unknown unit: {unit}"
 
+proc parseResolution(val, opt: string): (int, int) =
+  let vals = val.strip().split(",")
+  if len(vals) != 2:
+    error &"'{val}': --{opt} takes two numbers"
+
+  discard parseSaturatedNatural(vals[0], result[0])
+  discard parseSaturatedNatural(vals[1], result[1])
+  if result[0] < 1 or result[1] < 1:
+    error &"--{opt} must be positive"
+
 proc parseSpeed(val, opt: string): float64 =
   result = parseNum(val, opt)
   if result <= 0.0 or result > 99999.0:
     result = 99999.0
 
 proc parseSpeedRange(val: string): (float64, PackedInt, PackedInt) =
-  var vals = val.strip().split(",")
+  let vals = val.strip().split(",")
   if vals.len < 3:
     error &"--set-speed has too few arguments"
   if vals.len > 3:
@@ -157,10 +176,13 @@ proc parseSpeedRange(val: string): (float64, PackedInt, PackedInt) =
 proc parseSampleRate(val: string): cint =
   let (num, unit) = splitNumStr(val)
   if unit == "kHz" or unit == "KHz":
-    return cint(num * 1000)
-  if unit notin ["", "Hz"]:
+    result = cint(num * 1000)
+  elif unit notin ["", "Hz"]:
     error &"Unknown unit: '{unit}'"
-  return cint(num)
+  else:
+    result = cint(num)
+  if result < 1:
+    error "Samplerate must be positive"
 
 
 func handleKey(val: string): string =
@@ -311,6 +333,10 @@ judge making cuts.
       expecting = "background"
     of "-ar", "--sample-rate":
       expecting = "sample-rate"
+    # of "-tb", "--time-base", "-r", "-fps", "--frame-rate":
+    #   expecting = "frame-rate"
+    of "-res", "--resolution":
+      expecting = "resolution"
     of "--temp-dir", "--progress", "--add-in", "--cut-out",  "--scale", "--audio-normalize",
         "--yt-dlp-location", "--download-format", "--output-format", "--yt-dlp-extras":
       expecting = key[2..^1]
@@ -347,6 +373,8 @@ judge making cuts.
         args.ytDlpExtras = key
       of "scale":
         args.scale = parseNum(key, expecting)
+      of "resolution":
+        args.resolution = parseResolution(key, expecting)
       of "background":
         args.background = parseColor(key)
       of "sample-rate":
