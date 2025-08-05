@@ -82,6 +82,7 @@ type
   AVPixelFormat* = distinct cint
 
 proc `==`*(x, y: AVPixelFormat): bool {.borrow.}
+proc `$`*(a: AVPixelFormat): string {.borrow.}
 
 const AV_PIX_FMT_NONE* = AVPixelFormat(-1)
 const AV_PIX_FMT_YUV420P* = AVPixelFormat(0)
@@ -747,3 +748,24 @@ proc av_seek_frame*(s: ptr AVFormatContext, stream_index: cint, timestamp: int64
 proc avformat_seek_file*(s: ptr AVFormatContext, stream_index: cint, min_ts: int64,
     ts: int64, max_ts: int64, flags: cint): cint {.importc,
     header: "<libavformat/avformat.h>".}
+
+# SwScale context and functions
+type SwsContext* {.importc: "struct SwsContext", header: "<libswscale/swscale.h>".} = object
+
+proc sws_getCachedContext*(context: ptr SwsContext, srcW: cint, srcH: cint,
+    srcFormat: AVPixelFormat, dstW: cint, dstH: cint, dstFormat: AVPixelFormat,
+    flags: cint, srcFilter: pointer, dstFilter: pointer,
+    param: pointer): ptr SwsContext {.importc, header: "<libswscale/swscale.h>".}
+
+proc sws_scale*(c: ptr SwsContext, srcSlice: ptr ptr uint8, srcStride: ptr cint,
+    srcSliceY: cint, srcSliceH: cint, dst: ptr ptr uint8,
+    dstStride: ptr cint): cint {.importc, header: "<libswscale/swscale.h>".}
+
+proc sws_freeContext*(swsContext: ptr SwsContext) {.importc,
+    header: "<libswscale/swscale.h>".}
+
+# SwScale constants
+const
+  SWS_BILINEAR* = 2
+  SWS_BICUBIC* = 4
+  SWS_LANCZOS* = 512

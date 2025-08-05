@@ -17,6 +17,66 @@ type VideoFrame = object
 func toInt(r: AVRational): int =
   (r.num div r.den).int
 
+proc reformat*(frame: ptr AVFrame, format: AVPixelFormat, width: cint = 0, height: cint = 0): ptr AVFrame =
+  if frame == nil:
+    return nil
+
+  let srcFormat = AVPixelFormat(frame.format)
+  let srcWidth = frame.width
+  let srcHeight = frame.height
+  let dstWidth = if width > 0: width else: srcWidth
+  let dstHeight = if height > 0: height else: srcHeight
+
+  # Shortcut: if format and dimensions are the same, return original frame
+  if srcFormat == format and srcWidth == dstWidth and srcHeight == dstHeight:
+    return frame
+
+  # Create new frame for output
+  let newFrame = av_frame_alloc()
+  if newFrame == nil:
+    error "Failed to allocate new frame"
+
+  newFrame.format = format.cint
+  newFrame.width = dstWidth
+  newFrame.height = dstHeight
+  newFrame.pts = frame.pts
+  newFrame.time_base = frame.time_base
+
+  # Allocate buffer for new frame
+  if av_frame_get_buffer(newFrame, 32) < 0:
+    error "Failed to allocate buffer for new frame"
+
+  # Create swscale context
+  let swsContext = sws_getCachedContext(
+    nil,  # No cached context for now
+    srcWidth, srcHeight, srcFormat,
+    dstWidth, dstHeight, format,
+    SWS_BILINEAR,  # Use bilinear interpolation
+    nil, nil, nil
+  )
+
+  if swsContext == nil:
+    error "Failed to create swscale context"
+
+  # Perform the conversion
+  let ret = sws_scale(
+    swsContext,
+    cast[ptr ptr uint8](addr frame.data[0]),
+    cast[ptr cint](addr frame.linesize[0]),
+    0,  # srcSliceY
+    srcHeight,  # srcSliceH
+    cast[ptr ptr uint8](addr newFrame.data[0]),
+    cast[ptr cint](addr newFrame.linesize[0])
+  )
+
+  # Clean up the context
+  sws_freeContext(swsContext)
+
+  if ret < 0:
+    error "Failed to scale frame"  # Noreturn
+
+  return newFrame
+
 proc makeSolid(width: cint, height: cint, color: RGBColor): ptr AVFrame =
   let frame: ptr AVFrame = av_frame_alloc()
   if frame == nil:
@@ -130,10 +190,6 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
   else:
     debug(&"[auto] video bitrate: {encoderCtx.bit_rate}")
 
-  encoderCtx.open()
-  if avcodec_parameters_from_context(outputStream.codecpar, encoderCtx) < 0:
-    error "Could not copy encoder parameters to stream"
-
   for src, cn in cns:
     if len(cn.video) > 0:
       if args.noSeek:
@@ -145,25 +201,31 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
         tous[src] = 1000
 
       if src == firstSrc and encoderCtx.pix_fmt != AV_PIX_FMT_NONE:
-        pix_fmt = encoderCtx.pix_fmt
+        pix_fmt = AVPixelFormat(cn.video[0].codecpar.format)
 
   debug(&"Clips: {tl.v}")
 
-  var need_valid_fmt = true
-  if codec.pix_fmts != nil and codec.pix_fmts[0].cint != 0:
+  var needValidFmt = true
+  if codec.pix_fmts != nil:
     var i = 0
     while codec.pix_fmts[i].cint != -1:
       if pix_fmt == codec.pix_fmts[i]:
-        need_valid_fmt = false
+        needValidFmt = false
+        break
       i += 1
 
-  if need_valid_fmt:
+  if needValidFmt:
     if codec.canonicalName == "gif":
       pix_fmt = AV_PIX_FMT_RGB8
     elif codec.canonicalName == "prores":
       pix_fmt = AV_PIX_FMT_YUV422P10LE
     else:
       pix_fmt = AV_PIX_FMT_YUV420P
+
+  encoderCtx.pix_fmt = pix_fmt
+  encoderCtx.open()
+  if avcodec_parameters_from_context(outputStream.codecpar, encoderCtx) < 0:
+    error "Could not copy encoder parameters to stream"
 
   # First few frames can have an abnormal keyframe count, so never seek there.
   var seekThreshold = 10
@@ -223,6 +285,14 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
             debug &"Skipped {frameIndex - seekFrame.get} frame indexes"
             framesSaved += frameIndex - seekFrame.get
             seekFrame = none(int)
+
+      # Reformat frame to target pixel format if needed
+      let reformattedFrame = frame.reformat(pix_fmt)
+      if reformattedFrame != nil and reformattedFrame != frame:
+        let oldFrame = frame
+        frame = reformattedFrame
+        if oldFrame != nil and oldFrame != nullFrame:
+          av_frame_free(addr oldFrame)
 
       frame.pts = index.int64
       frame.time_base = av_inv_q(tl.tb)
