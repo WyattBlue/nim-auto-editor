@@ -340,4 +340,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
       frame.time_base = av_inv_q(tl.tb)
       yield (frame, index)
 
+    if scaleGraph != nil:
+      scaleGraph.cleanup()
+    av_frame_free(addr nullFrame)
     debug(&"Total frames saved seeking: {framesSaved}"))
