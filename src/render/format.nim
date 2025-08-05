@@ -191,6 +191,8 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
 
         if frameType == AVMEDIA_TYPE_AUDIO:
           av_frame_free(addr frame)
+        elif frameType == AVMEDIA_TYPE_VIDEO:
+          av_frame_unref(frame)
 
   bar.`end`()
 
