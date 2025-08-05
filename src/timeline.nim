@@ -39,7 +39,7 @@ type v3* = object
   background*: RGBColor
   sr*: cint
   layout*: string
-  res*: (int64, int64)
+  res*: (int, int)
   v*: seq[ClipLayer]
   a*: seq[ClipLayer]
   chunks*: Option[seq[(int64, int64, float64)]]
@@ -119,7 +119,7 @@ func toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
   result = v3(v: vspace, a: aspace, chunks: some(chunks))
   result.background = bg
   result.tb = tb
-  result.res = mi.get_res()
+  result.res = mi.getRes()
   result.sr = 48000
   result.layout = "stereo"
   if mi.a.len > 0:

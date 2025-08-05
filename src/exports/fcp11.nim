@@ -41,11 +41,11 @@ func getColorspace(mi: MediaInfo): string =
   return "1-1-1 (Rec. 709)"
 
 func makeName(mi: MediaInfo, tb: AVRational): string =
-  if mi.get_res()[1] == 720 and tb == 30:
+  if mi.getRes()[1] == 720 and tb == 30:
     return "FFVideoFormat720p30"
-  if mi.get_res()[1] == 720 and tb == 25:
+  if mi.getRes()[1] == 720 and tb == 25:
     return "FFVideoFormat720p25"
-  if mi.get_res() == (3840'i64, 2160'i64) and tb == AVRational(num: 24000, den: 1001):
+  if mi.getRes() == (3840, 2160) and tb == AVRational(num: 24000, den: 1001):
     return "FFVideoFormat3840x2160p2398"
   return "FFVideoFormatRateUndefined"
 

@@ -59,7 +59,7 @@ proc hash*(mi: MediaInfo): Hash =
 proc `==`*(a, b: MediaInfo): bool =
   a.path == b.path
 
-func get_res*(self: MediaInfo): (int64, int64) =
+func getRes*(self: MediaInfo): (int, int) =
   if self.v.len > 0:
     return (self.v[0].width, self.v[0].height)
   else:

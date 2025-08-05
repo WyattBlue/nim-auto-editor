@@ -290,6 +290,8 @@ proc editMedia*(args: var mainArgs) =
       tlV3 = toNonLinear(addr args.input, tb, args.background, src, chunks)
       if args.sampleRate != -1:
         tlV3.sr = args.sampleRate
+      if args.resolution[0] != 0:
+        tlV3.res = args.resolution
       if args.sampleRate < -1:
         error "Bad sample rate"
 
