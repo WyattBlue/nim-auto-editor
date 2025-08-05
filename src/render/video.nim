@@ -8,6 +8,7 @@ import ../av
 import ../ffmpeg
 import ../timeline
 import ../util/color
+import ../graph
 
 # Helps with timing, may be extended.
 type VideoFrame = object
