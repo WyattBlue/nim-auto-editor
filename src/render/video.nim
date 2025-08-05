@@ -228,32 +228,24 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
       pix_fmt = AV_PIX_FMT_YUV420P
 
   encoderCtx.pix_fmt = pix_fmt
+  encoderCtx.open()
+  if avcodec_parameters_from_context(outputStream.codecpar, encoderCtx) < 0:
+    error "Could not copy encoder parameters to stream"
 
   let pixFmtName = $av_get_pix_fmt_name(pix_fmt)
   let graphTb = av_inv_q(targetFps)
   let bg = tl.background.toString
-  let bufferArgs = &"video_size={tl.res[0]}x{tl.res[1]}:pix_fmt={pixFmtName}:time_base={graphTb}:pixel_aspect=1/1"
-
-  var resGraph = newGraph()
-  let bufferSrc = resGraph.add("buffer", bufferArgs)
-  let scaleFilter = resGraph.add("scale", &"{tl.res[0]}:{tl.res[1]}:force_original_aspect_ratio=decrease:eval=frame")
-  let padFilter = resGraph.add("pad", &"{tl.res[0]}:{tl.res[1]}:-1:-1:color={bg}")
-  let bufferSink = resGraph.add("buffersink")
-
-  discard resGraph.linkNodes(bufferSrc, scaleFilter, padFilter, bufferSink).configure()
-  defer: resGraph.cleanup()
+  let globalScaleArgs = &"{tl.res[0]}:{tl.res[1]}:force_original_aspect_ratio=decrease:eval=frame"
 
   if needsScaling:
+    let bufferArgs = &"video_size={tl.res[0]}x{tl.res[1]}:pix_fmt={pixFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+
     scaleGraph = newGraph()
     let bufferSrc = scaleGraph.add("buffer", bufferArgs)
     let scaleFilter = scaleGraph.add("scale", &"{targetWidth}:{targetHeight}")
     let bufferSink = scaleGraph.add("buffersink")
 
-    discard scaleGraph.linkNodes(bufferSrc, scaleFilter, bufferSink).configure()
-
-  encoderCtx.open()
-  if avcodec_parameters_from_context(outputStream.codecpar, encoderCtx) < 0:
-    error "Could not copy encoder parameters to stream"
+    scaleGraph.linkNodes(@[bufferSrc, scaleFilter, bufferSink]).configure()
 
   # First few frames can have an abnormal keyframe count, so never seek there.
   var seekThreshold = 10
@@ -315,11 +307,20 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
             seekFrame = none(int)
 
           if (frame.width.int, frame.height.int) != tl.res:
+            var resGraph = newGraph()
+            let bufferArgs = &"video_size={frame.width}x{frame.height}:pix_fmt={pixFmtName}:time_base={graphTb}:pixel_aspect=1/1"
+            let bufferSrc = resGraph.add("buffer", bufferArgs)
+            let scaleFilter = resGraph.add("scale", globalScaleArgs)
+            let padFilter = resGraph.add("pad", &"{tl.res[0]}:{tl.res[1]}:-1:-1:color={bg}")
+            let bufferSink = resGraph.add("buffersink")
+
+            resGraph.linkNodes(@[bufferSrc, scaleFilter, padFilter, bufferSink]).configure()
             resGraph.push(frame)
             let oldFrame = frame
             frame = resGraph.pull()
             if oldFrame != nil and oldFrame != nullFrame:
               av_frame_free(addr oldFrame)
+            resGraph.cleanup()
 
       if scaleGraph != nil and frame.width != targetWidth:
         scaleGraph.push(frame)
@@ -338,6 +339,5 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
       frame.pts = index.int64
       frame.time_base = av_inv_q(tl.tb)
       yield (frame, index)
-
 
     debug(&"Total frames saved seeking: {framesSaved}"))

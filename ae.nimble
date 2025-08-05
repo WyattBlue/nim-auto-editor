@@ -271,7 +271,7 @@ var commonFlags = &"""
   --disable-outdevs \
   --disable-xlib \
   --disable-filters \
-  --enable-filter=scale,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume \
+  --enable-filter=scale,pad,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume \
   --enable-libmp3lame \
   --enable-libvpx \
   --enable-libdav1d \

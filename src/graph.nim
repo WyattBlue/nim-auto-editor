@@ -56,34 +56,30 @@ proc add*(graph: Graph, name: string, filterArgs: string = ""): ptr AVFilterCont
 
   return filterCtx
 
-proc linkNodes*(graph: Graph, src, filter, sink: ptr AVFilterContext): Graph =
+proc linkNodes*(graph: Graph, nodes: seq[ptr AVFilterContext]): Graph =
   if graph.configured:
     error "Cannot link nodes after graph is configured"
 
-  # Link src -> filter
-  var ret = avfilter_link(src, 0, filter, 0)
-  if ret < 0:
-    error fmt"Could not link source to filter: {ret}"
+  if nodes.len < 2:
+    error "Need at least 2 nodes to link"
 
-  # Link filter -> sink
-  ret = avfilter_link(filter, 0, sink, 0)
-  if ret < 0:
-    error fmt"Could not link filter to sink: {ret}"
+  # Link nodes sequentially: nodes[0] -> nodes[1] -> nodes[2] -> ...
+  for i in 0..<(nodes.len - 1):
+    var ret = avfilter_link(nodes[i], 0, nodes[i + 1], 0)
+    if ret < 0:
+      error fmt"Could not link node {i} to node {i + 1}: {ret}"
 
   return graph
 
-proc configure*(graph: Graph): Graph =
-  ## Configure the filter graph (equivalent to PyAV's configure)
-  ## Returns self for method chaining
+proc configure*(graph: Graph) =
   if graph.configured:
-    return graph
+    return
 
   let ret = avfilter_graph_config(graph.graph, nil)
   if ret < 0:
     error fmt"Could not configure filter graph: {ret}"
 
   graph.configured = true
-  return graph
 
 proc findBufferSource(graph: Graph): ptr AVFilterContext =
   if not graph.configured:
