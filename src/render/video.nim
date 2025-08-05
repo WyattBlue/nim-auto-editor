@@ -156,10 +156,14 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
 
   var targetWidth: cint = cint(tl.res[0])
   var targetHeight: cint = cint(tl.res[1])
+  var scaleGraph: Graph = nil
+  var needsScaling = false
 
   if args.scale != 1.0:
     targetWidth = max(cint(round(tl.res[0].float64 * args.scale)), 2)
     targetHeight = max(cint(round(tl.res[1].float64 * args.scale)), 2)
+    needsScaling = true
+
 
   debug &"Creating video stream with codec: {args.videoCodec}"
   var (outputStream, encoderCtx) = output.addStream(args.videoCodec,
@@ -224,6 +228,19 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
       pix_fmt = AV_PIX_FMT_YUV420P
 
   encoderCtx.pix_fmt = pix_fmt
+
+  # Set up scaling graph after pixel format is determined
+  if needsScaling:
+    scaleGraph = newGraph()
+    let bufferArgs = &"video_size={tl.res[0]}x{tl.res[1]}:pix_fmt={av_get_pix_fmt_name(pix_fmt)}:time_base={targetFps.den}/{targetFps.num}:pixel_aspect=1/1"
+
+    let bufferSrc = scaleGraph.add("buffer", bufferArgs)
+    let scaleFilter = scaleGraph.add("scale", &"{targetWidth}:{targetHeight}")
+    let bufferSink = scaleGraph.add("buffersink")
+
+    discard scaleGraph.linkNodes(bufferSrc, scaleFilter, bufferSink)
+    discard scaleGraph.configure()
+
   encoderCtx.open()
   if avcodec_parameters_from_context(outputStream.codecpar, encoderCtx) < 0:
     error "Could not copy encoder parameters to stream"
@@ -287,7 +304,13 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
             framesSaved += frameIndex - seekFrame.get
             seekFrame = none(int)
 
-      # Reformat frame to target pixel format if needed
+      if scaleGraph != nil and frame.width != targetWidth:
+        scaleGraph.push(frame)
+        let oldFrame = frame
+        frame = scaleGraph.pull()
+        if oldFrame != nil and oldFrame != nullFrame:
+          av_frame_free(addr oldFrame)
+
       let reformattedFrame = frame.reformat(pix_fmt)
       if reformattedFrame != nil and reformattedFrame != frame:
         let oldFrame = frame
