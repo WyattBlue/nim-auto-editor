@@ -287,13 +287,7 @@ proc editMedia*(args: var mainArgs) =
         applyToRange(speedIndex, span, tb.float64, getSpeedIndex(speed))
 
       chunks = chunkify(speedIndex, speedHash)
-      tlV3 = toNonLinear(addr args.input, tb, args.background, src, chunks)
-      if args.sampleRate != -1:
-        tlV3.sr = args.sampleRate
-      if args.resolution[0] != 0:
-        tlV3.res = args.resolution
-      if args.sampleRate < -1:
-        error "Bad sample rate"
+      tlV3 = makeTimeline(args, addr args.input, tb, args.background, src, chunks)
 
   var exportKind, tlName, fcpVersion: string
   if args.`export` == "":
@@ -400,7 +394,7 @@ proc editMedia*(args: var mainArgs) =
         continue
 
       let paddedChunks = padChunk(chunk, totalFrames)
-      let myTimeline = toNonLinear(src, tlV3.tb, black, mi, paddedChunks)
+      let myTimeline = makeTimeline(args, src, tlV3.tb, black, mi, paddedChunks)
       makeMedia(args, myTimeline, appendFilename(output, &"-{clipNum}"), rule, bar)
       clipNum += 1
   else:

@@ -126,6 +126,16 @@ func toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
     result.sr = mi.a[0].sampleRate
     result.layout = mi.a[0].layout
 
+func makeTimeline*(args: mainArgs, src: ptr string, tb: AvRational, bg: RGBColor,
+    mi: MediaInfo, chunks: seq[(int64, int64, float64)]): v3 =
+  result = toNonLinear(src, tb, bg, mi, chunks)
+  if args.sampleRate != -1:
+    result.sr = args.sampleRate
+  if args.resolution[0] != 0:
+    result.res = args.resolution
+  if args.audioLayout != "":
+    result.layout = args.audioLayout
+
 
 func stem(path: string): string =
   splitFile(path).name

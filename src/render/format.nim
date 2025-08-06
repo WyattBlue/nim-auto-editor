@@ -55,9 +55,10 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
   var audioFrameIters: seq[iterator(): (ptr AVFrame, int)] = @[]
 
   for i in 0..<tl.a.len:
-    if tl.a[i].len > 0:  # Only create stream if track has clips
+    if tl.a[i].len > 0: # Only create stream if track has clips
       let rate = AVRational(num: tl.sr, den: 1)
-      var (aOutStream, aEncCtx) = output.addStream(args.audioCodec, rate=rate, metadata={"language": tl.a[i].lang}.toTable)
+      var (aOutStream, aEncCtx) = output.addStream(args.audioCodec, rate = rate,
+          layout = tl.layout, metadata = {"language": tl.a[i].lang}.toTable)
       let encoder = aEncCtx.codec
       if encoder.sample_fmts == nil:
         error &"{encoder.name}: No known audio formats avail."
@@ -106,7 +107,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
   bar.start(tl.`end`.float, title)
 
   var shouldGetAudio: seq[bool] = newSeq[bool](audioFrameIters.len)
-  const MAX_AUDIO_AHEAD = 30  # In timebase, how far audio can be ahead of video.
+  const MAX_AUDIO_AHEAD = 30 # In timebase, how far audio can be ahead of video.
 
   # Priority queue for ordered frames by time_base.
   var frameQueue = initHeapQueue[Priority]()
@@ -128,7 +129,8 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
         for item in frameQueue:
           if item.stream == audioStreams[i]:
             latestAudioIndices[i] = max(latestAudioIndices[i], item.index.float64)
-        shouldGetAudio[i] = (latestAudioIndices[i] <= float(earliestVideoIndex.get() + MAX_AUDIO_AHEAD))
+        shouldGetAudio[i] = (latestAudioIndices[i] <= float(earliestVideoIndex.get() +
+            MAX_AUDIO_AHEAD))
 
     if finished(videoFrameIter):
       videoFrame = nil
