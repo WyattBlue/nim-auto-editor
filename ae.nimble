@@ -215,7 +215,7 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
   echo "Building x265 12-bit..."
   mkDir("x265-12bits")
   withDir("x265-12bits"):
-    let cmakeCmd = "cmake ../source " & (@[
+    var cmakeArgs = @[
       &"-DCMAKE_INSTALL_PREFIX={dummyInstallPath}",
       "-DCMAKE_BUILD_TYPE=Release",
       "-DBUILD_SHARED_LIBS=OFF",
@@ -225,7 +225,19 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
       "-DEXPORT_C_API=0",
       "-DENABLE_CLI=0",
       "-DENABLE_SHARED=0"
-    ] & flagsHighBits).join(" ")
+    ] & flagsHighBits
+    
+    # Add cross-compilation flags if needed
+    if crossWindows:
+      cmakeArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
+      cmakeArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc")
+      cmakeArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++")
+      cmakeArgs.add("-DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres")
+      cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
+      cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
+      cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
+    
+    let cmakeCmd = "cmake ../source " & cmakeArgs.join(" ")
     echo "RUN: ", cmakeCmd
     exec cmakeCmd
     makeInstall()
@@ -236,7 +248,7 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
   echo "Building x265 10-bit..."
   mkDir("x265-10bits")
   withDir("x265-10bits"):
-    let cmakeCmd = "cmake ../source " & (@[
+    var cmakeArgs = @[
       &"-DCMAKE_INSTALL_PREFIX={dummyInstallPath}",
       "-DCMAKE_BUILD_TYPE=Release",
       "-DBUILD_SHARED_LIBS=OFF",
@@ -245,7 +257,19 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
       "-DEXPORT_C_API=0",
       "-DENABLE_CLI=0",
       "-DENABLE_SHARED=0"
-    ] & flagsHighBits).join(" ")
+    ] & flagsHighBits
+    
+    # Add cross-compilation flags if needed
+    if crossWindows:
+      cmakeArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
+      cmakeArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc")
+      cmakeArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++")
+      cmakeArgs.add("-DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres")
+      cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
+      cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
+      cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
+    
+    let cmakeCmd = "cmake ../source " & cmakeArgs.join(" ")
     echo "RUN: ", cmakeCmd
     exec cmakeCmd
     makeInstall()
@@ -254,19 +278,28 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
 
   # Build 8-bit version (without multi-bit linking via CMake)
   echo "Building x265 8-bit..."
-  var x265_8bit_flags = @[
+  var cmakeArgs = @[
+    &"-DCMAKE_INSTALL_PREFIX={buildPath}",
+    "-DCMAKE_BUILD_TYPE=Release",
+    "-DBUILD_SHARED_LIBS=OFF",
+    "-DBUILD_STATIC_LIBS=ON",
     "-DENABLE_SHARED=0"
   ]
   
   if isLinuxAarch64:
-    x265_8bit_flags.add("-DENABLE_SVE2=OFF")
+    cmakeArgs.add("-DENABLE_SVE2=OFF")
 
-  let cmakeCmd = "cmake source " & (@[
-    &"-DCMAKE_INSTALL_PREFIX={buildPath}",
-    "-DCMAKE_BUILD_TYPE=Release",
-    "-DBUILD_SHARED_LIBS=OFF",
-    "-DBUILD_STATIC_LIBS=ON"
-  ] & x265_8bit_flags).join(" ")
+  # Add cross-compilation flags if needed
+  if crossWindows:
+    cmakeArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
+    cmakeArgs.add("-DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc")
+    cmakeArgs.add("-DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++")
+    cmakeArgs.add("-DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres")
+    cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_PROGRAM=NEVER")
+    cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=ONLY")
+    cmakeArgs.add("-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=ONLY")
+
+  let cmakeCmd = "cmake source " & cmakeArgs.join(" ")
   echo "RUN: ", cmakeCmd
   exec cmakeCmd
   exec "make x265-static"  # Only build the static target
@@ -280,18 +313,22 @@ proc x265Build(buildPath: string, crossWindows: bool = false) =
     cpFile("../x265-10bits/libx265-10bits.a", "libx265-10bits.a") 
     cpFile("../x265-12bits/libx265-12bits.a", "libx265-12bits.a")
     
-    # Combine using libtool (macOS/BSD) or ar (Linux)
+    # Combine using libtool (macOS/BSD) or ar (Linux/Windows cross-compilation)
     when defined(macosx):
       exec "libtool -static -o libx265_combined.a libx265_8bit.a libx265-10bits.a libx265-12bits.a"
     else:
-      # For Linux, use ar with a script
+      # For Linux or cross-compilation, use ar with a script
+      var arCommand = "ar"
+      if crossWindows:
+        arCommand = "x86_64-w64-mingw32-ar"
+      
       exec "echo 'CREATE libx265_combined.a' > combine.mri"
       exec "echo 'ADDLIB libx265_8bit.a' >> combine.mri"
       exec "echo 'ADDLIB libx265-10bits.a' >> combine.mri" 
       exec "echo 'ADDLIB libx265-12bits.a' >> combine.mri"
       exec "echo 'SAVE' >> combine.mri"
       exec "echo 'END' >> combine.mri"
-      exec "ar -M < combine.mri"
+      exec &"{arCommand} -M < combine.mri"
     
     # Install the combined library and headers manually
     mkDir(&"{buildPath}/lib")
@@ -462,16 +499,22 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
 
   ffmpegSetup(crossWindows=true)
 
+
   # Configure and build FFmpeg with MinGW
   withDir "ffmpeg_sources/ffmpeg":
     var ldflags = &"-L{buildPath}/lib"
+    var extraLibs = "-lpthread -lm -lstdc++"
     when defined(linux):
       ldflags &= &" -L{buildPath}/lib/x86_64-linux-gnu -L{buildPath}/lib64"
-    exec (&"""CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib ./configure --prefix="{buildPath}" \
+    
+    # For cross-compilation, manually specify x265 since pkg-config might not work
+    extraLibs &= " -lx265"
+    
+    exec (&"""CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib PKG_CONFIG_PATH="{buildPath}/lib/pkgconfig" ./configure --prefix="{buildPath}" \
       --pkg-config-flags="--static" \
       --extra-cflags="-I{buildPath}/include" \
       --extra-ldflags="{ldflags}" \
-      --extra-libs="-lpthread -lm" \
+      --extra-libs="{extraLibs}" \
       --arch=x86_64 \
       --target-os=mingw32 \
       --cross-prefix=x86_64-w64-mingw32- \
