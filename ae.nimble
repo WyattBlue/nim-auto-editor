@@ -19,7 +19,15 @@ task test, "Test the project":
   exec "nim c -r tests/rationals"
 
 task make, "Export the project":
-  exec "nim c -d:danger --out:auto-editor src/main.nim"
+  var linkFlags = ""
+  when defined(macosx):
+    linkFlags = "--passL:-lc++"
+  elif defined(linux):
+    linkFlags = "--passL:-lstdc++"
+  else:
+    linkFlags = "--passL:-lstdc++"
+  
+  exec &"nim c -d:danger {linkFlags} --out:auto-editor src/main.nim"
   when defined(macosx):
     exec "strip -ur auto-editor"
   when defined(linux):
@@ -85,6 +93,7 @@ let svtav1 = Package(
   sourceUrl: "https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/v3.1.0/SVT-AV1-v3.1.0.tar.bz2",
   sha256: "8231b63ea6c50bae46a019908786ebfa2696e5743487270538f3c25fddfa215a",
   buildSystem: "cmake",
+  buildArguments: @["-DBUILD_APPS=OFF", "-DBUILD_DEC=OFF", "-DBUILD_ENC=ON", "-DENABLE_NASM=ON"],
 )
 let x264 = Package(
   name: "x264",
@@ -92,12 +101,18 @@ let x264 = Package(
   sha256: "d7748f350127cea138ad97479c385c9a35a6f8527bc6ef7a52236777cf30b839",
   buildArguments: "--disable-cli --disable-lsmash --disable-swscale --disable-ffms --enable-strip".split(" "),
 )
+let x265 = Package(
+  name: "x265",
+  sourceUrl: "https://bitbucket.org/multicoreware/x265_git/downloads/x265_4.1.tar.gz",
+  sha256: "a31699c6a89806b74b0151e5e6a7df65de4b49050482fe5ebf8a4379d7af8f29",
+  buildSystem: "x265",
+)
 let ffmpeg = Package(
   name: "ffmpeg",
   sourceUrl: "https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz",
   sha256: "733984395e0dbbe5c046abda2dc49a5544e7e0e1e2366bba849222ae9e3a03b1",
 )
-let packages = @[lame, twolame, vpx, dav1d, svtav1, x264]
+let packages = @[x265, lame, twolame, vpx, dav1d, svtav1, x264]
 
 func location(package: Package): string = # tar location
   if package.name == "libvpx":
@@ -113,7 +128,10 @@ func dirName(package: Package): string =
   for ext in [".tar.gz", ".tar.xz", ".tar.bz2", ".orig"]:
     if name.endsWith(ext):
       name = name[0..^ext.len+1]
-  return name.replace("_", "-")
+
+  if package.name != "x265":
+    return name.replace("_", "-")
+  return name
 
 
 proc getFileHash(filename: string): string =
@@ -143,7 +161,7 @@ proc makeInstall() =
     exec "make -j4"
   exec "make install"
 
-proc cmakeBuild(buildPath: string, crossWindows: bool = false) =
+proc cmakeBuild(package: Package, buildPath: string, crossWindows: bool = false) =
   mkDir("build_cmake")
 
   var cmakeArgs = @[
@@ -151,11 +169,7 @@ proc cmakeBuild(buildPath: string, crossWindows: bool = false) =
     "-DCMAKE_BUILD_TYPE=Release",
     "-DBUILD_SHARED_LIBS=OFF",
     "-DBUILD_STATIC_LIBS=ON",
-    "-DBUILD_APPS=OFF",
-    "-DBUILD_DEC=OFF",
-    "-DBUILD_ENC=ON",
-    "-DENABLE_NASM=ON"
-  ]
+  ] & package.buildArguments
 
   if crossWindows:
     cmakeArgs.add("-DCMAKE_SYSTEM_NAME=Windows")
@@ -171,6 +185,123 @@ proc cmakeBuild(buildPath: string, crossWindows: bool = false) =
     echo "RUN: ", cmakeCmd
     exec cmakeCmd
     makeInstall()
+
+proc x265Build(buildPath: string, crossWindows: bool = false) =
+  # Build x265 three times following the Python approach:
+  #  1: Build 12 bits static library version in separate directory
+  #  2: Build 10 bits static library version in separate directory  
+  #  3: Build 8 bits version, linking also 10 and 12 bits
+  # This last version will support 8, 10 and 12 bits pixel formats
+
+  # Install intermediate builds in dummy directory
+  let dummyInstallPath = absolutePath("dummy_install_path")
+  mkDir(dummyInstallPath)
+
+  # For 10/12 bits version, only x86_64 has assembly instructions available
+  var flagsHighBits: seq[string] = @[]
+
+  let isLinuxAarch64 = defined(linux) and hostCPU == "arm64"
+  let isX86_64 = hostCPU in ["amd64", "i386"] # Nim uses "amd64" for x86_64
+
+  if not isX86_64:
+    flagsHighBits.add("-DENABLE_ASSEMBLY=0")
+    flagsHighBits.add("-DENABLE_ALTIVEC=0")
+
+    if isLinuxAarch64:
+      flagsHighBits.add("-DENABLE_SVE2=OFF")
+
+  # Build 12-bit version in x265-12bits directory
+  echo "Building x265 12-bit..."
+  mkDir("x265-12bits")
+  withDir("x265-12bits"):
+    let cmakeCmd = "cmake ../source " & (@[
+      &"-DCMAKE_INSTALL_PREFIX={dummyInstallPath}",
+      "-DCMAKE_BUILD_TYPE=Release",
+      "-DBUILD_SHARED_LIBS=OFF",
+      "-DBUILD_STATIC_LIBS=ON",
+      "-DHIGH_BIT_DEPTH=1",
+      "-DMAIN12=1",
+      "-DEXPORT_C_API=0",
+      "-DENABLE_CLI=0",
+      "-DENABLE_SHARED=0"
+    ] & flagsHighBits).join(" ")
+    echo "RUN: ", cmakeCmd
+    exec cmakeCmd
+    makeInstall()
+    # Rename library in build directory
+    exec "mv libx265.a libx265-12bits.a"
+
+  # Build 10-bit version in x265-10bits directory
+  echo "Building x265 10-bit..."
+  mkDir("x265-10bits")
+  withDir("x265-10bits"):
+    let cmakeCmd = "cmake ../source " & (@[
+      &"-DCMAKE_INSTALL_PREFIX={dummyInstallPath}",
+      "-DCMAKE_BUILD_TYPE=Release",
+      "-DBUILD_SHARED_LIBS=OFF",
+      "-DBUILD_STATIC_LIBS=ON",
+      "-DHIGH_BIT_DEPTH=1",
+      "-DEXPORT_C_API=0",
+      "-DENABLE_CLI=0",
+      "-DENABLE_SHARED=0"
+    ] & flagsHighBits).join(" ")
+    echo "RUN: ", cmakeCmd
+    exec cmakeCmd
+    makeInstall()
+    # Rename library in build directory
+    exec "mv libx265.a libx265-10bits.a"
+
+  # Build 8-bit version (without multi-bit linking via CMake)
+  echo "Building x265 8-bit..."
+  var x265_8bit_flags = @[
+    "-DENABLE_SHARED=0"
+  ]
+  
+  if isLinuxAarch64:
+    x265_8bit_flags.add("-DENABLE_SVE2=OFF")
+
+  let cmakeCmd = "cmake source " & (@[
+    &"-DCMAKE_INSTALL_PREFIX={buildPath}",
+    "-DCMAKE_BUILD_TYPE=Release",
+    "-DBUILD_SHARED_LIBS=OFF",
+    "-DBUILD_STATIC_LIBS=ON"
+  ] & x265_8bit_flags).join(" ")
+  echo "RUN: ", cmakeCmd
+  exec cmakeCmd
+  exec "make x265-static"  # Only build the static target
+  
+  # Manually combine all three libraries using libtool
+  echo "Combining x265 libraries for multi-bit depth support..."
+  mkDir("temp_combine")
+  withDir("temp_combine"):
+    # Copy all three libraries
+    cpFile("../libx265.a", "libx265_8bit.a")
+    cpFile("../x265-10bits/libx265-10bits.a", "libx265-10bits.a") 
+    cpFile("../x265-12bits/libx265-12bits.a", "libx265-12bits.a")
+    
+    # Combine using libtool (macOS/BSD) or ar (Linux)
+    when defined(macosx):
+      exec "libtool -static -o libx265_combined.a libx265_8bit.a libx265-10bits.a libx265-12bits.a"
+    else:
+      # For Linux, use ar with a script
+      exec "echo 'CREATE libx265_combined.a' > combine.mri"
+      exec "echo 'ADDLIB libx265_8bit.a' >> combine.mri"
+      exec "echo 'ADDLIB libx265-10bits.a' >> combine.mri" 
+      exec "echo 'ADDLIB libx265-12bits.a' >> combine.mri"
+      exec "echo 'SAVE' >> combine.mri"
+      exec "echo 'END' >> combine.mri"
+      exec "ar -M < combine.mri"
+    
+    # Install the combined library and headers manually
+    mkDir(&"{buildPath}/lib")
+    mkDir(&"{buildPath}/include") 
+    mkDir(&"{buildPath}/lib/pkgconfig")
+    
+    cpFile("libx265_combined.a", &"{buildPath}/lib/libx265.a")
+    cpFile("../x265_config.h", &"{buildPath}/include/x265_config.h")
+    cpFile("../source/x265.h", &"{buildPath}/include/x265.h")
+    cpFile("../x265.pc", &"{buildPath}/lib/pkgconfig/x265.pc")
+
 
 proc mesonBuild(buildPath: string, crossWindows: bool = false) =
   mkDir("build_meson")
@@ -241,7 +372,9 @@ proc ffmpegSetup(crossWindows: bool) =
 
       withDir package.name:
         if package.buildSystem == "cmake":
-          cmakeBuild(buildPath, crossWindows)
+          cmakeBuild(package, buildPath, crossWindows)
+        elif package.buildSystem == "x265":
+          x265build(buildPath, crossWindows)
         elif package.buildSystem == "meson":
           mesonBuild(buildPath, crossWindows)
         else:
@@ -277,6 +410,7 @@ var commonFlags = &"""
   --enable-libdav1d \
   --enable-libsvtav1 \
   --enable-libx264 \
+  --enable-libx265 \
   --disable-encoder={encodersDisabled} \
   --disable-decoder={decodersDisabled} \
   --disable-demuxer={demuxersDisabled} \
