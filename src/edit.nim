@@ -202,6 +202,8 @@ proc editMedia*(args: var mainArgs) =
   var tlV3: v3
   var interner = newStringInterner()
   var output: string
+  var usePath: string = ""
+  var mi: MediaInfo
   defer: interner.cleanup()
 
   if args.progress == BarType.machine and args.output != "-":
@@ -223,13 +225,15 @@ proc editMedia*(args: var mainArgs) =
       # Make `timeline` from media file
       var container = av.open(args.input)
       defer: container.close()
+
+      usePath = args.input
       var tb = AVRational(30)
       if container.video.len > 0:
         tb = makeSaneTimebase(container.video[0].avg_frame_rate)
 
       var hasLoud: seq[bool]
       var chunks: seq[(int64, int64, float64)] = @[]
-      let src = initMediaInfo(container.formatContext, args.input)
+      mi = initMediaInfo(container.formatContext, args.input)
 
       let (editMethod, threshold, stream, width, blur,
         pattern) = parseEditString(args.edit)
@@ -287,22 +291,25 @@ proc editMedia*(args: var mainArgs) =
         applyToRange(speedIndex, span, tb.float64, getSpeedIndex(speed))
 
       chunks = chunkify(speedIndex, speedHash)
-      tlV3 = makeTimeline(args, addr args.input, tb, args.background, src, chunks)
+      tlV3 = makeTimeline(args, addr args.input, tb, args.background, mi, chunks)
 
   var exportKind, tlName, fcpVersion: string
   if args.`export` == "":
-    (output, exportKind) = setOutput(args.output, "", args.input)
+    (output, exportKind) = setOutput(args.output, "", usePath)
     tlName = "Auto-Editor Media Group"
     fcpVersion = "11"
   else:
     (exportKind, tlName, fcpVersion) = parseExportString(args.`export`)
-    (output, _) = setOutput(args.output, exportKind, args.input)
+    (output, _) = setOutput(args.output, exportKind, usePath)
 
   if args.preview:
     preview(tlV3)
     return
 
   case exportKind:
+  of "v1", "v3":
+    exportJsonTl(tlV3, exportKind, output)
+    return
   of "premiere":
     fcp7_write_xml(tlName, output, false, tlV3)
     return
@@ -315,9 +322,6 @@ proc editMedia*(args: var mainArgs) =
   of "resolve":
     tlV3.setStreamTo0(interner)
     fcp11_write_xml(tlName, fcpVersion, output, true, tlV3)
-    return
-  of "v1", "v3":
-    exportJsonTl(tlV3, exportKind, output)
     return
   of "shotcut":
     shotcut_write_mlt(output, tlV3)
@@ -332,9 +336,8 @@ proc editMedia*(args: var mainArgs) =
 
   let (_, _, outExt) = splitFile(output)
   let rule = initRules(outExt.toLowerAscii)
-  let src = initMediaInfo(args.input)
-  args.videoCodec = setVideoCodec(args.videoCodec, outExt, src, rule)
-  args.audioCodec = setAudioCodec(args.audioCodec, outExt, src, rule)
+  args.videoCodec = setVideoCodec(args.videoCodec, outExt, mi, rule)
+  args.audioCodec = setAudioCodec(args.audioCodec, outExt, mi, rule)
 
   proc createAlphanumTempDir(length: int = 8): string =
     const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
