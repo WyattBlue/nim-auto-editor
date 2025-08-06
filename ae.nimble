@@ -15,18 +15,19 @@ requires "checksums"
 import std/os
 import std/[strutils, strformat]
 
+var linkFlags = ""
+when defined(macosx):
+  linkFlags = "--passL:-lc++"
+elif defined(linux):
+  linkFlags = "--passL:-lstdc++ --passL:-lm"
+else:
+  linkFlags = "--passL:-lstdc++ --passL:-lm"
+
+
 task test, "Test the project":
-  exec "nim c -r tests/rationals"
+  exec &"nim c {linkFlags} -r tests/rationals"
 
 task make, "Export the project":
-  var linkFlags = ""
-  when defined(macosx):
-    linkFlags = "--passL:-lc++"
-  elif defined(linux):
-    linkFlags = "--passL:-lstdc++"
-  else:
-    linkFlags = "--passL:-lstdc++"
-  
   exec &"nim c -d:danger {linkFlags} --out:auto-editor src/main.nim"
   when defined(macosx):
     exec "strip -ur auto-editor"
@@ -112,7 +113,7 @@ let ffmpeg = Package(
   sourceUrl: "https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz",
   sha256: "733984395e0dbbe5c046abda2dc49a5544e7e0e1e2366bba849222ae9e3a03b1",
 )
-let packages = @[x265, lame, twolame, vpx, dav1d, svtav1, x264]
+let packages = @[lame, twolame, vpx, dav1d, svtav1, x264, x265]
 
 func location(package: Package): string = # tar location
   if package.name == "libvpx":
@@ -486,6 +487,7 @@ task windows, "Cross-compile to Windows (requires mingw-w64)":
          "--gcc.exe:x86_64-w64-mingw32-gcc " &
          "--gcc.linkerexe:x86_64-w64-mingw32-gcc " &
          "--passL:-lbcrypt " & # Add Windows Bcrypt library
+         "--passL:-lstdc++ " & # Add C++ standard library
          "--passL:-static " &
          "--out:auto-editor.exe src/main.nim"
 
