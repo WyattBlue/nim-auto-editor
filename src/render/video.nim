@@ -254,7 +254,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
 
   var nullFrame = makeSolid(targetWidth, targetHeight, args.background)
   var frameIndex = -1
-  var frame: ptr AVFrame = nullFrame
+  var frame: ptr AVFrame = av_frame_clone(nullFrame)
   var objList: seq[VideoFrame] = @[]
 
   return (encoderCtx, outputStream, iterator(): (ptr AVFrame, int) =
@@ -270,7 +270,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
 
       if tl.chunks.isSome:
         # When there can be valid gaps in the timeline.
-        frame = nullFrame
+        frame = av_frame_clone(nullFrame)
       # else, use the last frame
 
       for obj in objList:
@@ -298,7 +298,7 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
             break
 
           if not foundFrame:
-            frame = nullFrame
+            frame = av_frame_clone(nullFrame)
             break
 
           if seekFrame.isSome:
