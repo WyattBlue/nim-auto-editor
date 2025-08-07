@@ -23,8 +23,10 @@ proc splitNumStr*(val: string): (float64, string) =
   return (floatNum, unit)
 
 proc parseBitrate*(input: string): int =
-  let (val, unit) = split_num_str(input)
+  if input == "auto":
+    return -1
 
+  let (val, unit) = split_num_str(input)
   if unit.toLowerAscii() == "k":
     return int(val * 1000)
   if unit == "M":
