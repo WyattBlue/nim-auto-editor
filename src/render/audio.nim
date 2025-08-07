@@ -483,6 +483,7 @@ proc makeNewAudioFrames*(fmt: AVSampleFormat, index: int32, tl: v3, frameSize: i
       frame.ch_layout.u.mask = AV_CH_LAYOUT_STEREO
       frame.sample_rate = sr.cint
       frame.pts = samplesYielded.int64
+      frame.time_base = AVRational(num: 1, den: sr.cint)
 
       if av_frame_get_buffer(frame, 0) < 0:
         error "Could not allocate audio frame buffer"

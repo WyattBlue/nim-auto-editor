@@ -146,7 +146,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
       elif shouldGetAudio[i]:
         (audioFrames[i], _) = audioFrameIters[i]()
         if audioFrames[i] != nil:
-          let audioIndex = int(round(audioFrames[i].time(audioStreams[i].time_base) * tl.tb))
+          let audioIndex = int(round(audioFrames[i].time(audioEncoders[i].time_base) * tl.tb))
           # Update index to the maximum of video and audio indices to ensure progress
           index = max(index, audioIndex)
 
@@ -162,7 +162,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
     # Add audio frames to queue
     for i in 0..<audioFrameIters.len:
       if shouldGetAudio[i] and audioFrames[i] != nil:
-        let audioIndex = int(round(audioFrames[i].time(audioStreams[i].time_base) * tl.tb))
+        let audioIndex = int(round(audioFrames[i].time(audioEncoders[i].time_base) * tl.tb))
         frameQueue.push(initPriority(float(audioIndex), audioFrames[i], audioStreams[i]))
 
     while frameQueue.len > 0 and frameQueue[0].index <= float64(index):
@@ -184,8 +184,8 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
         outPacket.stream_index = outputStream.index
         av_packet_rescale_ts(outPacket, encCtx.time_base, outputStream.time_base)
 
-        if frameType == AVMEDIA_TYPE_VIDEO:
-          let time = frame.time(1 / tl.tb)
+        if frameType == AVMEDIA_TYPE_AUDIO:
+          let time = frame.time(encCtx.time_base)
           if time != -1.0:
             bar.tick(round(time * tl.tb))
         output.mux(outPacket[])
