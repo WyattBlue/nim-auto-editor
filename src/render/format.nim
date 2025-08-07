@@ -65,6 +65,11 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
 
       aEncCtx.open()
 
+      # Update stream parameters after opening encoder for formats like AAC in MKV
+      # that need codec-specific extra data (global header) to be propagated to stream
+      if avcodec_parameters_from_context(aOutStream.codecpar, aEncCtx) < 0:
+        error "Could not update stream parameters after opening encoder"
+
       if args.audioBitrate >= 0:
         aEncCtx.bit_rate = args.audioBitrate
         debug(&"audio bitrate: {aEncCtx.bit_rate}")
