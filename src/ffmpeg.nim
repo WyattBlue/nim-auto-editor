@@ -88,8 +88,8 @@ const AV_PIX_FMT_NONE* = AVPixelFormat(-1)
 const AV_PIX_FMT_YUV420P* = AVPixelFormat(0)
 const AV_PIX_FMT_YUYV422* = AVPixelFormat(1)
 const AV_PIX_FMT_RGB24* = AVPixelFormat(2)
-const AV_PIX_FMT_RGB8* = AVPixelFormat(53)
-const AV_PIX_FMT_YUV422P10LE* = AVPixelFormat(61)
+const AV_PIX_FMT_RGB8* = AVPixelFormat(20)
+const AV_PIX_FMT_YUV422P10LE* = AVPixelFormat(64)
 
 type
   AVDictionary* {.importc, header: "<libavutil/dict.h>".} = object
