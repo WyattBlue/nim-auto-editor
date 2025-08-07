@@ -15,20 +15,12 @@ requires "checksums"
 import std/os
 import std/[strutils, strformat]
 
-var linkFlags = ""
-when defined(macosx):
-  linkFlags = "--passL:-lc++"
-elif defined(linux):
-  linkFlags = "--passL:-lstdc++ --passL:-lm"
-else:
-  linkFlags = "--passL:-lstdc++ --passL:-lm"
-
 
 task test, "Test the project":
-  exec &"nim c {linkFlags} -r tests/rationals"
+  exec &"nim c -r tests/rationals"
 
 task make, "Export the project":
-  exec &"nim c -d:danger {linkFlags} --out:auto-editor src/main.nim"
+  exec &"nim c -d:danger --out:auto-editor src/main.nim"
   when defined(macosx):
     exec "strip -ur auto-editor"
   when defined(linux):

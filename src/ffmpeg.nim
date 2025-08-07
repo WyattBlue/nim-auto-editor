@@ -5,6 +5,12 @@ when defined(linux):
   {.passL: "-L./build/lib/x86_64-linux-gnu -L./build/lib64"}
 {.passL: "-L./build/lib -lavfilter -lavformat -lavcodec -lswresample -lswscale -lavutil -lmp3lame -lvpx -lx264 -lx265 -ldav1d -lSvtAv1Enc -lm".}
 
+when defined(macosx): # For x265
+  {.passL: "-lc++"}
+else:
+  {.passL: "-lstdc++"}
+
+
 import std/posix
 
 type AVRational* {.importc, header: "<libavutil/rational.h>", bycopy.} = object
