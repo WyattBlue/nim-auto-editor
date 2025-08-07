@@ -184,7 +184,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
         outPacket.stream_index = outputStream.index
         av_packet_rescale_ts(outPacket, encCtx.time_base, outputStream.time_base)
 
-        if frameType == AVMEDIA_TYPE_AUDIO:
+        if frameType == AVMEDIA_TYPE_VIDEO or vOutStream == nil:
           let time = frame.time(encCtx.time_base)
           if time != -1.0:
             bar.tick(round(time * tl.tb))
