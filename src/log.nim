@@ -1,4 +1,4 @@
-import std/os
+import std/[os, envvars]
 import std/times
 
 import std/tables
@@ -83,7 +83,8 @@ type mainArgs* = object
 var isDebug* = false
 var quiet* = false
 var tempDir* = ""
-var start* = epochTime()
+let start* = epochTime()
+let noColor* = getEnv("NO_COLOR") != "" or getEnv("AV_LOG_FORCE_NOCOLOR") != ""
 
 proc conwrite*(msg: string) =
   if not quiet:
@@ -95,7 +96,10 @@ proc conwrite*(msg: string) =
 proc debug*(msg: string) =
   if isDebug:
     conwrite("")
-    stderr.styledWriteLine(fgGreen, "Debug: ", resetStyle, msg)
+    if not noColor:
+      stderr.styledWriteLine(fgGreen, "Debug: ", resetStyle, msg)
+    else:
+      stderr.writeLine(&"Debug: {msg}")
 
 proc warning*(msg: string) =
   if not quiet:
@@ -119,7 +123,10 @@ proc error*(msg: string) {.noreturn.} =
     raise newException(ValueError, msg)
   else:
     conwrite("")
-    stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)
+    if noColor:
+      stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)
+    else:
+      stderr.writeLine(&"Error! {msg}")
     quit(1)
 
 

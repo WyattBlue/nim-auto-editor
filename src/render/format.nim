@@ -94,7 +94,6 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
 
   output.startEncoding()
 
-  let noColor = false
   var title = fmt"({ext[1 .. ^1]}) "
   var encoderTitles: seq[string] = @[]
 
