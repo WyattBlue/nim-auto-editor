@@ -17,10 +17,10 @@ import std/[strutils, strformat]
 
 
 task test, "Test the project":
-  exec &"nim c -r tests/rationals"
+  exec "nim c -r tests/rationals"
 
 task make, "Export the project":
-  exec &"nim c -d:danger --out:auto-editor src/main.nim"
+  exec "nim c -d:danger --out:auto-editor src/main.nim"
   when defined(macosx):
     exec "strip -ur auto-editor"
   when defined(linux):
@@ -69,6 +69,12 @@ let twolame = Package(
   sha256: "cc35424f6019a88c6f52570b63e1baf50f62963a3eac52a03a800bb070d7c87d",
   buildArguments: @["--disable-sndfile"],
 )
+let opus = Package(
+  name: "opus",
+  sourceUrl: "https://github.com/xiph/opus/releases/download/v1.5.2/opus-1.5.2.tar.gz",
+  sha256: "65c1d2f78b9f2fb20082c38cbe47c951ad5839345876e46941612ee87f9a7ce1",
+  buildArguments: @["--disable-doc", "--disable-extra-programs"],
+)
 let vpx = Package(
   name: "libvpx",
   sourceUrl: "https://github.com/webmproject/libvpx/archive/refs/tags/v1.15.2.tar.gz",
@@ -105,7 +111,7 @@ let ffmpeg = Package(
   sourceUrl: "https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz",
   sha256: "733984395e0dbbe5c046abda2dc49a5544e7e0e1e2366bba849222ae9e3a03b1",
 )
-let packages = @[lame, twolame, vpx, dav1d, svtav1, x264, x265]
+let packages = @[lame, twolame, opus, vpx, dav1d, svtav1, x264, x265]
 
 func location(package: Package): string = # tar location
   if package.name == "libvpx":
@@ -436,6 +442,7 @@ var commonFlags = &"""
   --disable-filters \
   --enable-filter=scale,pad,format,gblur,aformat,abuffer,abuffersink,aresample,atempo,anull,anullsrc,volume \
   --enable-libmp3lame \
+  --enable-libopus \
   --enable-libvpx \
   --enable-libdav1d \
   --enable-libsvtav1 \
