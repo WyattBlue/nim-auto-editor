@@ -32,11 +32,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Nim
-        uses: iffy/install-nim@v5
+        uses: jiro4989/setup-nim-action@v2
         with:
-          version: binary:stable
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          nim-version: "stable"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Install packages for macOS
         if: matrix.os == 'macos-13' || matrix.os == 'macos-latest'
         run: |
@@ -77,11 +76,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Nim
-        uses: iffy/install-nim@v5
+        uses: jiro4989/setup-nim-action@v2
         with:
-          version: binary:stable
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          nim-version: "stable"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Install mingw-w64
         run: |
           sudo apt-get update
