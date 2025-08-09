@@ -1,14 +1,13 @@
-# 0.8.0
+# 0.8.1
 
 ## Major
 
 ## Features
-- Build libvpx
-- Copy language metadata
-- Implement video and audio bitrate
-- Get `--scale` and `--resolution` working
+- Build x265 and opus
+- Apply `-layout` option
+- Support 'auto' in bitrate options
 
 ## Fixes
-- Fix issue caused by hardcoding stream index.
-- Fix issue with vid -> mp3
-- video rendering: Handle pix_fmt properly
+- Fix mkv aac issue
+- Fix issue with some pix_fmts
+- Respect `NO_COLOR` env
