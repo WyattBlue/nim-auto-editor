@@ -214,6 +214,7 @@ proc editMedia*(args: var mainArgs) =
   if args.input == "" and not stdin.isatty():
     let stdinContent = readAll(stdin)
     tlV3 = readJson(stdinContent, interner)
+    applyArgs(tlV3, args)
   else:
     if args.input == "":
       error "You need to give auto-editor an input file."
@@ -221,6 +222,7 @@ proc editMedia*(args: var mainArgs) =
 
     if inputExt in [".v1", ".v3", ".json"]:
       tlV3 = readJson(readFile(args.input), interner)
+      applyArgs(tlV3, args)
     else:
       # Make `timeline` from media file
       var container = av.open(args.input)
@@ -291,7 +293,8 @@ proc editMedia*(args: var mainArgs) =
         applyToRange(speedIndex, span, tb.float64, getSpeedIndex(speed))
 
       chunks = chunkify(speedIndex, speedHash)
-      tlV3 = makeTimeline(args, addr args.input, tb, args.background, mi, chunks)
+      tlV3 = toNonLinear(addr args.input, tb, args.background, mi, chunks)
+      applyArgs(tlV3, args)
 
   var exportKind, tlName, fcpVersion: string
   if args.`export` == "":
@@ -397,7 +400,8 @@ proc editMedia*(args: var mainArgs) =
         continue
 
       let paddedChunks = padChunk(chunk, totalFrames)
-      let myTimeline = makeTimeline(args, src, tlV3.tb, black, mi, paddedChunks)
+      var myTimeline = toNonLinear(src, tlV3.tb, black, mi, paddedChunks)
+      applyArgs(myTimeline, args)
       makeMedia(args, myTimeline, appendFilename(output, &"-{clipNum}"), rule, bar)
       clipNum += 1
   else:
