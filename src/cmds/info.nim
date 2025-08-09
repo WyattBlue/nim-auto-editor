@@ -1,5 +1,4 @@
 import std/json
-import std/enumerate
 import std/[strformat, strutils]
 
 import ../av
@@ -30,7 +29,7 @@ proc printYamlInfo(fileInfo: MediaInfo) =
 
   if fileInfo.v.len > 0:
     echo fmt" - video:"
-  for track, v in enumerate(fileInfo.v):
+  for track, v in fileInfo.v:
     let (ratioWidth, ratioHeight) = aspectRatio(v.width, v.height)
 
     echo fmt"   - track {track}:"
@@ -43,12 +42,12 @@ proc printYamlInfo(fileInfo: MediaInfo) =
       echo fmt"     - duration: {v.duration:.1f}"
     echo fmt"     - pix fmt: {v.pix_fmt}"
 
-    echo if v.color_range == 1:
-      fmt"     - color range: 1 (tv)"
+    if v.color_range == 1:
+      echo "     - color range: 1 (tv)"
     elif v.color_range == 2:
-      fmt"     - color range: 2 (pc)"
-    else:
-      fmt"     - color range: {v.color_range}"
+      echo "     - color range: 2 (pc)"
+    elif v.color_range != 0:
+      echo &"     - color range: {v.color_range}"
 
     if v.color_space != 2:
       echo fmt"     - color space: {v.color_space.bt709}"
@@ -62,7 +61,7 @@ proc printYamlInfo(fileInfo: MediaInfo) =
 
   if fileInfo.a.len > 0:
     echo fmt" - audio:"
-  for track, a in enumerate(fileInfo.a):
+  for track, a in fileInfo.a:
     echo fmt"   - track {track}:"
     echo fmt"     - codec: {a.codec}"
     echo fmt"     - layout: {a.layout}"
@@ -73,14 +72,14 @@ proc printYamlInfo(fileInfo: MediaInfo) =
 
   if fileInfo.s.len > 0:
     echo fmt" - subtitle:"
-  for track, s in enumerate(fileInfo.s):
+  for track, s in fileInfo.s:
     echo fmt"   - track {track}:"
     echo fmt"     - codec: {s.codec}"
     genericTrack(s.lang, s.bitrate)
 
   if fileInfo.d.len > 0:
     echo fmt" - data:"
-  for track, d in enumerate(fileInfo.d):
+  for track, d in fileInfo.d:
     echo fmt"   - track {track}:"
     echo fmt"     - codec: {d.codec}"
     echo fmt"     - timecode: {d.timecode}"
