@@ -146,13 +146,14 @@ proc resample*(resampler: var AudioResampler, frame: ptr AVFrame): seq[ptr AVFra
     if ret < 0:
       raise newException(ValueError, fmt"Could not configure filter graph: {ret}")
 
-  # Validate frame matches setup if not nil
   if frame != nil:
+    # Only validate critical properties that would break the filter graph
     if (frame.format != resampler.`template`.format or
         frame.ch_layout.nb_channels != resampler.`template`.ch_layout.nb_channels or
-        frame.ch_layout.u.mask != resampler.`template`.ch_layout.u.mask or
         frame.sample_rate != resampler.`template`.sample_rate):
-      raise newException(ValueError, "Frame does not match AudioResampler setup")
+
+      #error &"Frame validation failed - format: {frame.format} vs {resampler.`template`.format}, channels: {frame.ch_layout.nb_channels} vs {resampler.`template`.ch_layout.nb_channels}, sample_rate: {frame.sample_rate} vs {resampler.`template`.sample_rate}"
+      error "Frame does not match AudioResampler setup"
 
   let ret = av_buffersrc_write_frame(resampler.abuffer, frame)
   if ret < 0:

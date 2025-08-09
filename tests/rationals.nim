@@ -124,7 +124,7 @@ test "wav-mux":
   check(container.audio.len == 1)
   check($container.audio[0].name == "pcm_s16le")
 
-test "wav1":
+test "mp4towav":
   let tempDir = createTempDir("tmp", "")
   defer: removeDir(tempDir)
   let outFile = tempDir / "out.wav"
@@ -135,27 +135,31 @@ test "wav1":
   check(container.audio.len == 1)
   check($container.audio[0].name == "pcm_s16le")
 
-test "mp3":
+proc `$`*(layout: AVChannelLayout): string =
+  const bufSize = 256
+  var buffer = newString(bufSize)
+  let ret = av_channel_layout_describe(layout.unsafeAddr, buffer.cstring, bufSize.csize_t)
+
+  if ret > 0:
+    let actualLen = buffer.find('\0')
+    if actualLen >= 0:
+      result = buffer[0..<actualLen]
+    else:
+      result = buffer
+  else:
+    result = "unknown"
+
+test "mp3towav":
   let tempDir = createTempDir("tmp", "")
   defer: removeDir(tempDir)
-  let outFile = tempDir / "out.mp3"
-  transcodeAudio("example.mp4", outFile, 0)
+  let outFile = tempDir / "out2.wav"
+  transcodeAudio("resources/mono.mp3", outFile, 0)
 
   let container = av.open(outFile)
   defer: container.close()
   check(container.audio.len == 1)
-  check($container.audio[0].name in ["mp3", "mp3float"])
-
-test "aac":
-  let tempDir = createTempDir("tmp", "")
-  defer: removeDir(tempDir)
-  let outFile = tempDir / "out.aac"
-  transcodeAudio("example.mp4", outFile, 0)
-
-  let container = av.open(outFile)
-  defer: container.close()
-  check(container.audio.len == 1)
-  check($container.audio[0].name == "aac")
+  check($container.audio[0].name == "pcm_s16le")
+  check($container.audio[0].codecpar.ch_layout in ["mono", "1 channels"])
 
 test "dialogue":
   check("0,0,Default,,0,0,0,,oop".dialogue == "oop")

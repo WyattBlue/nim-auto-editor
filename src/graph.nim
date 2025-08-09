@@ -146,11 +146,6 @@ proc pull*(graph: Graph): ptr AVFrame =
   let ret = av_buffersink_get_frame(bufferSink, frame)
   if ret < 0:
     av_frame_free(addr frame)
-    if ret == AVERROR_EAGAIN: # EAGAIN - would block
-      raise newException(BlockingIOError, "No frame available")
-    elif ret == AVERROR_EOF:
-      raise newException(EOFError, "End of stream")
-    else:
-      error fmt"Error pulling frame from graph: {ret}"
+    error &"Error pulling frame from graph: {ret}"
 
   return frame

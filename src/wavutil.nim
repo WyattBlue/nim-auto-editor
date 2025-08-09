@@ -3,6 +3,7 @@ import std/strformat
 import av
 import ffmpeg
 import log
+import resampler
 
 type AudioBuffer = object
   fifo: ptr AVAudioFifo
@@ -15,32 +16,15 @@ proc initAudioBuffer(sampleFmt: AVSampleFormat, channels: cint,
   if result.fifo == nil:
     error "Could not allocate audio FIFO"
 
-proc allocResampler(decoderCtx: ptr AVCodecContext): ptr SwrContext =
-  var swrCtx: ptr SwrContext = swr_alloc()
-  if swrCtx == nil:
-    error "Could not allocate resampler context"
-
-  if av_opt_set_chlayout(swrCtx, "in_chlayout", addr decoderCtx.ch_layout, 0) < 0:
-    error "Could not set input channel layout"
-
-  if av_opt_set_int(swrCtx, "in_sample_rate", decoderCtx.sample_rate, 0) < 0:
-    error "Could not set input sample rate"
-
-  if av_opt_set_sample_fmt(swrCtx, "in_sample_fmt", decoderCtx.sample_fmt, 0) < 0:
-    error "Could not set input sample format"
-  return swrCtx
-
-proc setResampler(swrCtx: ptr SwrContext, encoderCtx: ptr AVCodecContext): ptr SwrContext =
-  if av_opt_set_chlayout(swrCtx, "out_chlayout", addr encoderCtx.ch_layout, 0) < 0:
-    error "Could not set output channel layout"
-
-  if av_opt_set_int(swrCtx, "out_sample_rate", encoderCtx.sample_rate, 0) < 0:
-    error "Could not set output sample rate"
-
-  if av_opt_set_sample_fmt(swrCtx, "out_sample_fmt", encoderCtx.sample_fmt, 0) < 0:
-    error "Could not set output sample format"
-
-  return swrCtx
+proc createResampler(encoderCtx: ptr AVCodecContext): AudioResampler =
+  # Create resampler based on encoder format requirements
+  let outputLayout = if encoderCtx.ch_layout.nb_channels == 1: "mono" else: "stereo" 
+  return newAudioResampler(
+    encoderCtx.sample_fmt,
+    outputLayout,
+    encoderCtx.sample_rate,
+    if encoderCtx.frame_size > 0: encoderCtx.frame_size else: 1024
+  )
 
 proc addSamplesToBuffer(buffer: var AudioBuffer, frame: ptr AVFrame): cint =
   return av_audio_fifo_write(buffer.fifo, cast[ptr pointer](addr frame.data[0]),
@@ -60,88 +44,37 @@ proc readSamplesFromBuffer(buffer: var AudioBuffer,
   return true
 
 proc processAndEncodeFrame(
-  swrCtx: ptr SwrContext, encoderCtx: ptr AVCodecContext,
+  audioResampler: var AudioResampler, encoderCtx: ptr AVCodecContext,
   outputCtx: ptr AVFormatContext, outputStream: ptr AVStream,
   audioBuffer: var AudioBuffer, currentPts: var int64,
-  inputFrame: ptr AVFrame = nil, inputSamples: cint = 0,
-  inputData: ptr ptr uint8 = nil): bool =
+  inputFrame: ptr AVFrame = nil): bool =
 
   var ret: cint
-  let decoderSampleRate = if inputData !=
-      nil: encoderCtx.sample_rate else: inputFrame.sample_rate
 
-  # Handle input data - either from frame or raw data
+  # Handle input data
   if inputFrame != nil:
-    # Convert and add to buffer
-    let delay = swr_get_delay(swrCtx, decoderSampleRate.int64)
-    let maxDstNbSamples = cint(inputFrame.nb_samples + delay)
-
-    if maxDstNbSamples <= 0:
-      return false
-
-    # Create temporary converted frame
-    var convertedFrame = av_frame_alloc()
-    if convertedFrame == nil:
-      return false
-    defer: av_frame_free(addr convertedFrame)
-
-    convertedFrame.format = encoderCtx.sample_fmt.cint
-    convertedFrame.ch_layout = encoderCtx.ch_layout
-    convertedFrame.sample_rate = encoderCtx.sample_rate
-    convertedFrame.nb_samples = maxDstNbSamples
-
-    ret = av_frame_get_buffer(convertedFrame, 0)
-    if ret < 0:
-      error &"Error allocating converted frame buffer: {ret}"
-
-    let convertedSamples = swr_convert(swrCtx,
-                                      cast[ptr ptr uint8](
-                                          addr convertedFrame.data[0]),
-                                      maxDstNbSamples,
-                                      cast[ptr ptr uint8](addr inputFrame.data[
-                                          0]),
-                                      inputFrame.nb_samples)
-    if convertedSamples <= 0:
-      return false
-
-    convertedFrame.nb_samples = convertedSamples
-
-    # Add converted samples to buffer
-    if addSamplesToBuffer(audioBuffer, convertedFrame) < 0:
-      error "Failed to add samples to buffer"
-
-  elif inputData != nil and inputSamples > 0:
-    # Handle raw input data (for flushing)
-    var convertedFrame = av_frame_alloc()
-    if convertedFrame == nil:
-      return false
-    defer: av_frame_free(addr convertedFrame)
-
-    let delay = swr_get_delay(swrCtx, decoderSampleRate.int64)
-    let maxDstNbSamples = cint(inputSamples + delay)
-
-    convertedFrame.format = encoderCtx.sample_fmt.cint
-    convertedFrame.ch_layout = encoderCtx.ch_layout
-    convertedFrame.sample_rate = encoderCtx.sample_rate
-    convertedFrame.nb_samples = maxDstNbSamples
-
-    ret = av_frame_get_buffer(convertedFrame, 0)
-    if ret < 0:
-      return false
-
-    let convertedSamples = swr_convert(swrCtx,
-                                      cast[ptr ptr uint8](
-                                          addr convertedFrame.data[0]),
-                                      maxDstNbSamples,
-                                      inputData,
-                                      inputSamples)
-    if convertedSamples <= 0:
-      return false
-
-    convertedFrame.nb_samples = convertedSamples
-
-    if addSamplesToBuffer(audioBuffer, convertedFrame) < 0:
-      return false
+    # Check if frame is already in encoder format (bypass resampler)
+    if (inputFrame.format == encoderCtx.sample_fmt.cint and
+        inputFrame.ch_layout.nb_channels == encoderCtx.ch_layout.nb_channels and
+        inputFrame.sample_rate == encoderCtx.sample_rate):
+      # Frame is already in target format, add directly to buffer
+      if addSamplesToBuffer(audioBuffer, inputFrame) < 0:
+        error "Failed to add samples to buffer"
+    else:
+      try:
+        # Use the AudioResampler to convert the frame
+        let resampledFrames = audioResampler.resample(inputFrame)
+        
+        # Add all resampled frames to buffer
+        for resampledFrame in resampledFrames:
+          if addSamplesToBuffer(audioBuffer, resampledFrame) < 0:
+            error "Failed to add samples to buffer"
+          
+          # Free resampled frames if they're different from input frame
+          if resampledFrame != inputFrame:
+            av_frame_free(addr resampledFrame)
+      except Exception as e:
+        error &"Error during resampling: {e.msg}"
 
   # Process all complete frames from buffer
   var encoderFrame = av_frame_alloc()
@@ -242,10 +175,7 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int64) =
     if audioBuffer.fifo != nil:
       av_audio_fifo_free(audioBuffer.fifo)
 
-  let swrCtx: ptr SwrContext = allocResampler(decoderCtx).setResampler(encoderCtx)
-  if swrCtx.swr_init() < 0:
-    error "Could not initialize resampler"
-  defer: swr_free(addr swrCtx)
+  var audioResampler = createResampler(encoderCtx)
 
   let outputStream: ptr AVStream = avformat_new_stream(outputCtx, nil)
   if outputStream == nil:
@@ -292,7 +222,7 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int64) =
         elif ret < 0:
           error &"Error during decoding: {ret}"
 
-        discard processAndEncodeFrame(swrCtx, encoderCtx, outputCtx,
+        discard processAndEncodeFrame(audioResampler, encoderCtx, outputCtx,
           outputStream,
           audioBuffer, currentPts, frame)
         av_frame_unref(frame)
@@ -307,19 +237,20 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int64) =
       elif ret < 0:
         break
 
-      discard processAndEncodeFrame(swrCtx, encoderCtx, outputCtx, outputStream,
+      discard processAndEncodeFrame(audioResampler, encoderCtx, outputCtx, outputStream,
         audioBuffer, currentPts, frame)
       av_frame_unref(frame)
 
   # Flush any remaining samples from resampler
-  while true:
-    let delayedSamples = swr_get_delay(swrCtx, encoderCtx.sample_rate.int64)
-    if delayedSamples <= 0:
-      break
-
-    if not processAndEncodeFrame(swrCtx, encoderCtx, outputCtx, outputStream,
-      audioBuffer, currentPts, nil, cint(delayedSamples), nil):
-      break
+  try:
+    let finalFrames = audioResampler.resample(nil)
+    for resampledFrame in finalFrames:
+      if addSamplesToBuffer(audioBuffer, resampledFrame) >= 0:
+        discard processAndEncodeFrame(audioResampler, encoderCtx, outputCtx, outputStream,
+          audioBuffer, currentPts, nil)
+      av_frame_free(addr resampledFrame)
+  except Exception as e:
+    error &"Error during resampler flush: {e.msg}"
 
   # Process any remaining buffered samples (pad with silence if needed)
   let remainingSamples = av_audio_fifo_size(audioBuffer.fifo)
@@ -338,7 +269,7 @@ proc transcodeAudio*(inputPath, outputPath: string, streamIndex: int64) =
                                         encoderCtx.ch_layout.nb_channels,
                                         encoderCtx.sample_fmt)
 
-          discard processAndEncodeFrame(swrCtx, encoderCtx, outputCtx,
+          discard processAndEncodeFrame(audioResampler, encoderCtx, outputCtx,
             outputStream,
             audioBuffer, currentPts, silenceFrame)
 
