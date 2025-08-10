@@ -34,7 +34,8 @@ proc newAudioBuffer(index: int32, samples: int, channels: int): AudioBuffer =
   result.tempFilePath = tempDir / &"{index}.map"
 
   # Memory map the file
-  result.memFile = memfiles.open(result.tempFilePath, mode = fmReadWrite, newFileSize = result.size)
+  result.memFile = memfiles.open(result.tempFilePath, mode = fmReadWrite,
+      newFileSize = result.size)
   result.data = cast[ptr UncheckedArray[int16]](result.memFile.mem)
 
   # Initialize with silence
@@ -289,7 +290,8 @@ proc processAudioClip(clip: Clip, data: seq[seq[int16]], sr: cint): seq[seq[int1
   inputFrame.format = AV_SAMPLE_FMT_S16P.cint
   inputFrame.ch_layout.nb_channels = channels.cint
   inputFrame.ch_layout.order = 0
-  inputFrame.ch_layout.u.mask = (if channels == 1: AV_CH_LAYOUT_MONO else: AV_CH_LAYOUT_STEREO)
+  inputFrame.ch_layout.u.mask = (if channels ==
+      1: AV_CH_LAYOUT_MONO else: AV_CH_LAYOUT_STEREO)
   inputFrame.sample_rate = sr
   inputFrame.pts = AV_NOPTS_VALUE # Let the filter handle timing
 
@@ -401,68 +403,87 @@ proc processAudioClip(clip: Clip, data: seq[seq[int16]], sr: cint): seq[seq[int1
         result[1][i] = result[0][i]
 
 
-proc makeNewAudioFrames*(fmt: AVSampleFormat, index: int32, tl: v3, frameSize: int): iterator(): (ptr AVFrame, int) =
+proc makeAudioFrames(fmt: AVSampleFormat, tl: v3, frameSize: int, layerIndices: seq[
+    int], mixLayers: bool): iterator(): (ptr AVFrame, int) =
   var samples: Table[(string, int32), Getter]
   let targetChannels = 2
 
   let tb = tl.tb
   let sr = tl.sr
-  let layer = tl.a[index]
 
-  for clip in layer.clips:
-    let key = (clip.src[], clip.stream)
-    if key notin samples:
-      samples[key] = newGetter(clip.src[], clip.stream.int, sr)
+  # Collect all unique audio sources from specified layers
+  for layerIndex in layerIndices:
+    if layerIndex < tl.a.len:
+      let layer = tl.a[layerIndex]
+      for clip in layer.clips:
+        let key = (clip.src[], clip.stream)
+        if key notin samples:
+          samples[key] = newGetter(clip.src[], clip.stream.int, sr)
 
-  # Calculate total duration and create memory-mapped audio buffer
+  # Calculate total duration across specified layers
   var totalDuration = 0
-  for clip in layer.clips:
-    totalDuration = max(totalDuration, clip.start + clip.dur)
+  for layerIndex in layerIndices:
+    if layerIndex < tl.a.len:
+      let layer = tl.a[layerIndex]
+      for clip in layer.clips:
+        totalDuration = max(totalDuration, clip.start + clip.dur)
 
   let totalSamples = int(totalDuration * sr.int64 * tb.den div tb.num)
 
-  # Create memory-mapped buffer instead of regular seq
-  var audioBuffer = newAudioBuffer(index, totalSamples, targetChannels)
+  # Create memory-mapped buffer
+  let bufferIndex = if mixLayers: -1.int32 else: layerIndices[0].int32
+  var audioBuffer = newAudioBuffer(bufferIndex, totalSamples, targetChannels)
 
-  # Process each clip and mix into the memory-mapped buffer
-  for clip in layer.clips:
-    let key = (clip.src[], clip.stream)
-    if key in samples:
-      let sampStart = int(clip.offset.float64 * clip.speed * sr.float64 / tb)
-      let sampEnd = int(float64(clip.offset + clip.dur) * clip.speed * sr.float64 / tb)
+  # Process each layer and either mix or replace samples
+  for layerIndex in layerIndices:
+    if layerIndex < tl.a.len:
+      let layer = tl.a[layerIndex]
 
-      let getter = samples[key]
-      let srcData = getter.get(sampStart, sampEnd)
+      # Process each clip in this layer
+      for clip in layer.clips:
+        let key = (clip.src[], clip.stream)
+        if key in samples:
+          let sampStart = int(clip.offset.float64 * clip.speed * sr.float64 / tb)
+          let sampEnd = int(float64(clip.offset + clip.dur) * clip.speed * sr.float64 / tb)
 
-      let startSample = int(clip.start * sr.int64 * tb.den div tb.num)
-      let durSamples = int(clip.dur * sr.int64 * tb.den div tb.num)
-      let processedData = processAudioClip(clip, srcData, sr)
+          let getter = samples[key]
+          let srcData = getter.get(sampStart, sampEnd)
 
-      if processedData.len > 0:
-        let numChannels = min(targetChannels, processedData.len)
-        for i in 0 ..< min(durSamples, processedData[0].len):
-          let outputSampleIndex = startSample + i
-          if outputSampleIndex < totalSamples:
-            # Calculate the base index in the memory-mapped array for this sample
-            let baseIndex = outputSampleIndex * targetChannels
+          let startSample = int(clip.start * sr.int64 * tb.den div tb.num)
+          let durSamples = int(clip.dur * sr.int64 * tb.den div tb.num)
+          let processedData = processAudioClip(clip, srcData, sr)
 
-            for ch in 0 ..< numChannels:
-              let flatIndex = baseIndex + ch
-              if flatIndex < audioBuffer.len and i < processedData[ch].len:
-                let currentSample = audioBuffer[flatIndex].int32
-                let newSample = processedData[ch][i].int32
-                let mixed = currentSample + newSample
-                # Clamp to 16-bit range to prevent overflow distortion
-                audioBuffer[flatIndex] = int16(max(-32768, min(32767, mixed)))
+          if processedData.len > 0:
+            let numChannels = min(targetChannels, processedData.len)
+            for i in 0 ..< min(durSamples, processedData[0].len):
+              let outputSampleIndex = startSample + i
+              if outputSampleIndex < totalSamples:
+                # Calculate the base index in the memory-mapped array for this sample
+                let baseIndex = outputSampleIndex * targetChannels
 
-            # If source has fewer channels than target, duplicate the last channel
-            if numChannels < targetChannels:
-              for ch in numChannels ..< targetChannels:
-                let flatIndex = baseIndex + ch
-                let sourceChannel = numChannels - 1 # Use the last available channel
-                let sourceFlatIndex = baseIndex + sourceChannel
-                if flatIndex < audioBuffer.len and sourceFlatIndex < audioBuffer.len:
-                  audioBuffer[flatIndex] = audioBuffer[sourceFlatIndex]
+                for ch in 0 ..< numChannels:
+                  let flatIndex = baseIndex + ch
+                  if flatIndex < audioBuffer.len and i < processedData[ch].len:
+                    if mixLayers:
+                      # Mix: add new sample to existing
+                      let currentSample = audioBuffer[flatIndex].int32
+                      let newSample = processedData[ch][i].int32
+                      let mixed = currentSample + newSample
+                      # Clamp to 16-bit range to prevent overflow distortion
+                      audioBuffer[flatIndex] = int16(max(-32768, min(32767, mixed)))
+                    else:
+                      # Replace: direct assignment (for single layer)
+                      audioBuffer[flatIndex] = processedData[ch][i]
+
+                # If source has fewer channels than target, duplicate the last channel
+                if numChannels < targetChannels:
+                  for ch in numChannels ..< targetChannels:
+                    let flatIndex = baseIndex + ch
+                    let sourceChannel = numChannels - 1 # Use the last available channel
+                    let sourceFlatIndex = baseIndex + sourceChannel
+                    if flatIndex < audioBuffer.len and sourceFlatIndex <
+                        audioBuffer.len:
+                      audioBuffer[flatIndex] = audioBuffer[sourceFlatIndex]
 
   # Yield audio frames in chunks
   var samplesYielded = 0
@@ -508,11 +529,22 @@ proc makeNewAudioFrames*(fmt: AVSampleFormat, index: int32, tl: v3, frameSize: i
         frameIndex += 1
       samplesYielded += currentFrameSize
 
-
     # Ensure cleanup happens when iterator is done
     defer:
       av_frame_free(addr frame)
       for getter in samples.values:
         getter.close()
       audioBuffer.memFile.close()
+
+proc makeMixedAudioFrames*(fmt: AVSampleFormat, tl: v3, frameSize: int): iterator(): (
+    ptr AVFrame, int) =
+  # Create sequence of all layer indices
+  var allLayerIndices: seq[int] = @[]
+  for i in 0..<tl.a.len:
+    allLayerIndices.add(i)
+  return makeAudioFrames(fmt, tl, frameSize, allLayerIndices, mixLayers = true)
+
+proc makeNewAudioFrames*(fmt: AVSampleFormat, index: int32, tl: v3,
+    frameSize: int): iterator(): (ptr AVFrame, int) =
+  return makeAudioFrames(fmt, tl, frameSize, @[index.int], mixLayers = false)
 

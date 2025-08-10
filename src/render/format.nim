@@ -54,11 +54,18 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
   var audioEncoders: seq[ptr AVCodecContext] = @[]
   var audioFrameIters: seq[iterator(): (ptr AVFrame, int)] = @[]
 
-  for i in 0..<tl.a.len:
-    if tl.a[i].len > 0: # Only create stream if track has clips
+  if args.mixAudioStreams and tl.a.len > 0:
+    # Create a single audio stream for mixed output
+    var hasAnyClips = false
+    for i in 0..<tl.a.len:
+      if tl.a[i].len > 0:
+        hasAnyClips = true
+        break
+
+    if hasAnyClips:
       let rate = AVRational(num: tl.sr, den: 1)
       var (aOutStream, aEncCtx) = output.addStream(args.audioCodec, rate = rate,
-          layout = tl.layout, metadata = {"language": tl.a[i].lang}.toTable)
+          layout = tl.layout, metadata = {"language": "und"}.toTable)
       let encoder = aEncCtx.codec
       if encoder.sample_fmts == nil:
         error &"{encoder.name}: No known audio formats avail."
@@ -80,8 +87,38 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
       audioEncoders.add(aEncCtx)
 
       let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
-      let audioFrameIter = makeNewAudioFrames(encoder.sample_fmts[0], i.int32, tl, frameSize)
+      let audioFrameIter = makeMixedAudioFrames(encoder.sample_fmts[0], tl, frameSize)
       audioFrameIters.add(audioFrameIter)
+  else:
+    # Create separate streams for each timeline layer (existing behavior)
+    for i in 0..<tl.a.len:
+      if tl.a[i].len > 0: # Only create stream if track has clips
+        let rate = AVRational(num: tl.sr, den: 1)
+        var (aOutStream, aEncCtx) = output.addStream(args.audioCodec, rate = rate,
+            layout = tl.layout, metadata = {"language": tl.a[i].lang}.toTable)
+        let encoder = aEncCtx.codec
+        if encoder.sample_fmts == nil:
+          error &"{encoder.name}: No known audio formats avail."
+
+        aEncCtx.open()
+
+        # Update stream parameters after opening encoder for formats like AAC in MKV
+        # that need codec-specific extra data (global header) to be propagated to stream
+        if avcodec_parameters_from_context(aOutStream.codecpar, aEncCtx) < 0:
+          error "Could not update stream parameters after opening encoder"
+
+        if args.audioBitrate >= 0:
+          aEncCtx.bit_rate = args.audioBitrate
+          debug(&"audio bitrate: {aEncCtx.bit_rate}")
+        else:
+          debug(&"[auto] audio bitrate: {aEncCtx.bit_rate}")
+
+        audioStreams.add(aOutStream)
+        audioEncoders.add(aEncCtx)
+
+        let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
+        let audioFrameIter = makeNewAudioFrames(encoder.sample_fmts[0], i.int32, tl, frameSize)
+        audioFrameIters.add(audioFrameIter)
 
   defer:
     for aEncCtx in audioEncoders:
