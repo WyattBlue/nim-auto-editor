@@ -34,12 +34,12 @@ proc printYamlInfo(fileInfo: MediaInfo) =
 
     echo fmt"   - track {track}:"
     echo fmt"     - codec: {v.codec}"
-    echo fmt"     - fps: {v.avg_rate.num}/{v.avg_rate.den}"
+    echo fmt"     - fps: {v.avg_rate}"
     echo fmt"     - resolution: {v.width}x{v.height}"
     echo fmt"     - aspect ratio: {ratioWidth}:{ratioHeight}"
     echo fmt"     - pixel aspect ratio: {v.sar}"
     if v.duration != 0.0:
-      echo fmt"     - duration: {v.duration:.1f}"
+      echo fmt"     - duration: {v.duration}"
     echo fmt"     - pix fmt: {v.pix_fmt}"
 
     if v.color_range == 1:
@@ -67,7 +67,7 @@ proc printYamlInfo(fileInfo: MediaInfo) =
     echo fmt"     - layout: {a.layout}"
     echo fmt"     - samplerate: {a.samplerate}"
     if a.duration != 0.0:
-      echo fmt"     - duration: {a.duration:.1f}"
+      echo fmt"     - duration: {a.duration}"
     genericTrack(a.lang, a.bitrate)
 
   if fileInfo.s.len > 0:
@@ -86,7 +86,7 @@ proc printYamlInfo(fileInfo: MediaInfo) =
 
   echo " - container:"
   if fileInfo.duration != 0.0:
-    echo fmt"   - duration: {fileInfo.duration:.1f}"
+    echo fmt"   - duration: {fileInfo.duration}"
   echo fmt"   - bitrate: {fileInfo.bitrate}"
 
 
