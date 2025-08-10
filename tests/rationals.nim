@@ -10,6 +10,7 @@ import ../src/cmds/info
 import ../src/media
 import ../src/timeline
 import ../src/exports/fcp11
+import ../src/exports/kdenlive
 
 test "struct-sizes":
   check(sizeof(AVRational) == 8)
@@ -70,8 +71,10 @@ test "encoder":
 test "exports":
   check(parseExportString("premiere:name=a,version=3") == ("premiere", "a", "3"))
   check(parseExportString("premiere:name=a") == ("premiere", "a", "11"))
-  check(parseExportString("premiere:name=\"Hello \\\" World") == ("premiere", "Hello \" World", "11"))
-  check(parseExportString("premiere:name=\"Hello \\\\ World") == ("premiere", "Hello \\ World", "11"))
+  check(parseExportString("premiere:name=\"Hello \\\" World") == ("premiere",
+      "Hello \" World", "11"))
+  check(parseExportString("premiere:name=\"Hello \\\\ World") == ("premiere",
+      "Hello \\ World", "11"))
 
 test "info":
   main(@["example.mp4"])
@@ -138,7 +141,8 @@ test "mp4towav":
 proc `$`*(layout: AVChannelLayout): string =
   const bufSize = 256
   var buffer = newString(bufSize)
-  let ret = av_channel_layout_describe(layout.unsafeAddr, buffer.cstring, bufSize.csize_t)
+  let ret = av_channel_layout_describe(layout.unsafeAddr, buffer.cstring,
+      bufSize.csize_t)
 
   if ret > 0:
     let actualLen = buffer.find('\0')
@@ -164,3 +168,26 @@ test "mp3towav":
 test "dialogue":
   check("0,0,Default,,0,0,0,,oop".dialogue == "oop")
   check("0,0,Default,,0,0,0,,boop".dialogue == "boop")
+
+test "uuid":
+  # Test that genUuid generates valid RFC 4122 version 4 UUIDs
+  for i in 1..3:
+    let uuid = genUuid()
+
+    # Check format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+    check(uuid.len == 36)
+    check(uuid[8] == '-')
+    check(uuid[13] == '-')
+    check(uuid[18] == '-')
+    check(uuid[23] == '-')
+
+    # Check version (should be 4)
+    check(uuid[14] == '4')
+
+    # Check variant bits (should be 8, 9, a, or b)
+    check(uuid[19] in ['8', '9', 'a', 'b'])
+
+    # Check all other characters are valid hex
+    for j, c in uuid:
+      if j notin [8, 13, 18, 23]: # Skip dashes
+        check(c in "0123456789abcdef")

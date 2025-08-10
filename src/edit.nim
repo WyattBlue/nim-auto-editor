@@ -15,7 +15,7 @@ import cmds/levels
 import analyze/[audio, motion, subtitle]
 
 import imports/json
-import exports/[fcp7, fcp11, json, shotcut]
+import exports/[fcp7, fcp11, json, shotcut, kdenlive]
 import preview
 import render/format
 
@@ -141,6 +141,7 @@ proc setOutput(userOut, userExport, path: string): (string, string) =
       of ".xml": outExport = "premiere"
       of ".fcpxml": outExport = "final-cut-pro"
       of ".mlt": outExport = "shotcut"
+      of ".kdenlive": outExport = "kdenlive"
       of ".json", ".v1": outExport = "v1"
       of ".v3": outExport = "v3"
       else: outExport = "default"
@@ -149,6 +150,7 @@ proc setOutput(userOut, userExport, path: string): (string, string) =
     of "premiere", "resolve-fcp7": ext = ".xml"
     of "final-cut-pro", "resolve": ext = ".fcpxml"
     of "shotcut": ext = ".mlt"
+    of "kdenlive": ext = ".kdenlive"
     of "v1": ext = ".v1"
     of "v3": ext = ".v3"
     else: discard
@@ -328,6 +330,9 @@ proc editMedia*(args: var mainArgs) =
     return
   of "shotcut":
     shotcut_write_mlt(output, tlV3)
+    return
+  of "kdenlive":
+    kdenliveWrite(output, tlV3)
     return
   of "default", "clip-sequence":
     discard
