@@ -52,11 +52,9 @@ type Rules* = object
   maxSubtitles*: int = -1
 
 proc initRules*(ext: string): Rules =
-  let dummy = cstring(&".{ext}")
-  let format = av_guess_format(nil, dummy, nil)
+  let format = av_guess_format(nil, cstring(ext), nil)
   if format == nil:
-    echo $dummy
-    error "Why no formats?"
+    error &"Extension: {ext} has no known formats"
 
   result.defaultVid = format.defaultVideoCodec()
   result.defaultAud = format.defaultAudioCodec()

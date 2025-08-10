@@ -35,7 +35,7 @@ type mainArgs* = object
   # Editing Options
   margin*: (PackedInt, PackedInt) = (pack(true, 200), pack(true, 200)) # 0.2s
   edit*: string = "audio"
-  `export`*: string = "default"
+  `export`*: string = ""
   output*: string = ""
   silentSpeed*: float64 = 99999.0
   videoSpeed*: float64 = 1.0
@@ -123,7 +123,7 @@ proc error*(msg: string) {.noreturn.} =
     raise newException(ValueError, msg)
   else:
     conwrite("")
-    if noColor:
+    if not noColor:
       stderr.styledWriteLine(fgRed, bgBlack, "Error! ", msg, resetStyle)
     else:
       stderr.writeLine(&"Error! {msg}")

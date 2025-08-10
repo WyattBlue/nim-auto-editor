@@ -119,7 +119,7 @@ proc applyToRange(speedIndex: var seq[int], span: (PackedInt, PackedInt), tb: fl
   for i in start ..< min(stop, speedIndex.len):
     speedIndex[i] = value
 
-proc setOutput(userOut, userExport, path: string): (string, string) =
+proc setOutput(userOut, `export`, path: string): (string, string) =
   var dir, name, ext: string
   if userOut == "" or userOut == "-":
     if path == "":
@@ -134,34 +134,34 @@ proc setOutput(userOut, userExport, path: string): (string, string) =
     # Use `mp4` as the default, because it is most compatible.
     ext = (if path == "": ".mp4" else: splitFile(path).ext)
 
-  var outExport = userExport
-
-  if userExport == "":
+  var myExport = `export` # Create mutable copy
+  if myExport == "":
     case ext:
-      of ".xml": outExport = "premiere"
-      of ".fcpxml": outExport = "final-cut-pro"
-      of ".mlt": outExport = "shotcut"
-      of ".kdenlive": outExport = "kdenlive"
-      of ".json", ".v1": outExport = "v1"
-      of ".v3": outExport = "v3"
-      else: outExport = "default"
+      of ".xml": myExport = "premiere"
+      of ".fcpxml": myExport = "final-cut-pro"
+      of ".mlt": myExport = "shotcut"
+      of ".kdenlive": myExport = "kdenlive"
+      of ".json", ".v1": myExport = "v1"
+      of ".v3": myExport = "v3"
+      else: myExport = "default"
 
-  case userExport:
+  case myExport:
     of "premiere", "resolve-fcp7": ext = ".xml"
     of "final-cut-pro", "resolve": ext = ".fcpxml"
     of "shotcut": ext = ".mlt"
     of "kdenlive": ext = ".kdenlive"
-    of "v1": ext = ".v1"
+    of "v1":
+      if ext != ".json":
+        ext = ".v1"
     of "v3": ext = ".v3"
     else: discard
 
   if userOut == "-":
-    return ("-", outExport)
-
+    return ("-", myExport)
   if userOut == "":
-    return (&"{root}_ALTERED{ext}", outExport)
+    return (&"{root}_ALTERED{ext}", myExport)
 
-  return (&"{root}{ext}", outExport)
+  return (&"{root}{ext}", myExport)
 
 
 proc setAudioCodec(codec: var string, ext: string, src: MediaInfo, rule: Rules): string =
