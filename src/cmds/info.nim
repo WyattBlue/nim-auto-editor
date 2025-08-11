@@ -114,7 +114,7 @@ func getJsonInfo(fileInfo: MediaInfo): JsonNode =
       "color_space": v.color_space,
       "color_primaries": v.color_primaries,
       "color_transfer": v.color_transfer,
-      "timebase": v.timebase,
+      "timebase": $v.timebase,
       "bitrate": v.bitrate,
       "lang": v.lang
     })

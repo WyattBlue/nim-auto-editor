@@ -1,4 +1,3 @@
-import std/strformat
 import std/hashes
 
 import av
@@ -12,8 +11,8 @@ type
     codec*: string
     timecode: string
     lang*: string
-    timebase*: string
-    sar*: AvRational
+    timebase*: AVRational
+    sar*: AVRational
     pix_fmt*: string
     width*: cint
     height*: cint
@@ -127,7 +126,7 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext,
         codec: $avcodec_get_name(codecCtx.codec_id),
         timecode: timecodeStr,
         lang: lang,
-        timebase: fmt"{stream.time_base.num}/{stream.time_base.den}",
+        timebase: stream.time_base,
         sar: sar,
         pix_fmt: $av_get_pix_fmt_name(codecCtx.pix_fmt),
         width: codecCtx.width,
