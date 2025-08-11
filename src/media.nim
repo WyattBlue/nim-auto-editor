@@ -13,7 +13,7 @@ type
     timecode: string
     lang*: string
     timebase*: string
-    sar*: string
+    sar*: AvRational
     pix_fmt*: string
     width*: cint
     height*: cint
@@ -118,6 +118,8 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext,
       let timecodeEntry = av_dict_get(metadata, "timecode", nil, 0)
       let timecodeStr = (if timecodeEntry == nil: "" else: $timecodeEntry.value)
 
+      let sar = (if codecCtx.sample_aspect_ratio == 0: AVRational(1) else: codecCtx.sample_aspect_ratio)
+
       result.v.add(VideoStream(
         duration: duration,
         bitrate: codecCtx.bit_rate,
@@ -126,7 +128,7 @@ proc initMediaInfo*(formatContext: ptr AVFormatContext,
         timecode: timecodeStr,
         lang: lang,
         timebase: fmt"{stream.time_base.num}/{stream.time_base.den}",
-        sar: fmt"{codecCtx.sample_aspect_ratio.num}:{codecCtx.sample_aspect_ratio.den}",
+        sar: sar,
         pix_fmt: $av_get_pix_fmt_name(codecCtx.pix_fmt),
         width: codecCtx.width,
         height: codecCtx.height,

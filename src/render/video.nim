@@ -195,6 +195,10 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
   else:
     debug(&"[auto] video bitrate: {encoderCtx.bit_rate}")
 
+  let sar = src.video[0].codecpar.sample_aspect_ratio
+  if sar != 0:
+    encoderCtx.sample_aspect_ratio = sar
+
   for src, cn in cns:
     if len(cn.video) > 0:
       if args.noSeek:

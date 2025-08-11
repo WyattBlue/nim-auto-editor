@@ -18,7 +18,7 @@ test "struct-sizes":
   check(sizeof(string) == 16)
   check(sizeof(ref string) == 8)
   check(sizeof(ref seq) == 8)
-  check(sizeof(VideoStream) == 144)
+  check(sizeof(VideoStream) == 136)
   check(sizeof(AudioStream) == 72)
   check(sizeof(Clip) == 56)
 
