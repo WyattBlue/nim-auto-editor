@@ -23,6 +23,8 @@ task make, "Export the project":
   exec "nim c -d:danger --out:auto-editor src/main.nim"
   when defined(macosx):
     exec "strip -ur auto-editor"
+    exec "stat -f \"%z bytes\" ./auto-editor"
+    echo ""
   when defined(linux):
     exec "strip -s auto-editor"
 

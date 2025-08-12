@@ -191,7 +191,7 @@ proc setVideoCodec(codec: var string, ext: string, src: MediaInfo, rule: Rules):
       error &"Unknown encoder: {codec}"
 
     # Normalize encoder names
-    if avCodec.id notin rule.vcodecs.mapIt(it.id):
+    if not rule.vcodecs.anyIt(it.id == avCodec.id):
       error &"'{avCodec.name}' video encoder is not supported in the '{ext}' container"
 
   return codec
