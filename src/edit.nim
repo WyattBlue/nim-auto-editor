@@ -170,8 +170,9 @@ proc setAudioCodec(codec: var string, ext: string, src: MediaInfo, rule: Rules):
       codec = "aac"
     else:
       codec = src.a[0].codec
-      # if Codec(codec, "w").audio_formats is None:
-      #     codec = "aac"
+      let avCodec = initCodec(codec)
+      if avCodec == nil or avCodec.sample_fmts == nil:
+        codec = "aac"
     if codec notin rule.acodecs and rule.defaultAud != "none":
       codec = rule.defaultAud
 

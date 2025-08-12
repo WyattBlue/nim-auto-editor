@@ -13,7 +13,7 @@ proc `|=`*[T](a: var T, b: T) =
 #     return "nil"
 #   return &"<AVCodecContext width: {ctx.width}, height: {ctx.height}, bit_rate={ctx.bit_rate}, framerate={ctx.framerate}>"
 
-proc initCodec(name: string): ptr AVCodec =
+proc initCodec*(name: string): ptr AVCodec =
   result = avcodec_find_encoder_by_name(name.cstring)
   if result == nil:
     let desc = avcodec_descriptor_get_by_name(name.cstring)
