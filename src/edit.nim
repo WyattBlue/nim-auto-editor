@@ -173,7 +173,7 @@ proc setAudioCodec(codec: var string, ext: string, src: MediaInfo, rule: Rules):
       let avCodec = initCodec(codec)
       if avCodec == nil or avCodec.sample_fmts == nil:
         codec = "aac"
-    if codec notin rule.acodecs and rule.defaultAud != "none":
+    if codec notin rule.acodecs.mapIt($it.name) and rule.defaultAud != "none":
       codec = rule.defaultAud
 
   return codec
@@ -181,21 +181,18 @@ proc setAudioCodec(codec: var string, ext: string, src: MediaInfo, rule: Rules):
 proc setVideoCodec(codec: var string, ext: string, src: MediaInfo, rule: Rules): string =
   if codec == "auto":
     codec = (if src.v.len == 0: "h264" else: src.v[0].codec)
-    if codec notin rule.vcodecs and rule.defaultVid != "none":
+    if codec notin rule.vcodecs.mapIt($it.name) and rule.defaultVid != "none":
       return rule.default_vid
     return codec
 
-  # if codec notin rule.vcodecs:
-  #   if ctr.vcodecs is not None and codec not in ctr.vcodecs:
-  #       try:
-  #           cobj = Codec(codec, "w")
-  #       except av.codec.codec.UnknownCodecError:
-  #           log.error(f"Unknown encoder: {codec}")
-  #       # Normalize encoder names
-  #       if cobj.id not in (Codec(x, "w").id for x in ctr.vcodecs):
-  #           log.error(
-  #               f"'{codec}' video encoder is not supported in the '{out_ext}' container"
-  #           )
+  if codec notin rule.vcodecs.mapIt($it.name):
+    let avCodec = initCodec(codec)
+    if avCodec == nil:
+      error &"Unknown encoder: {codec}"
+
+    # Normalize encoder names
+    if avCodec.id notin rule.vcodecs.mapIt(it.id):
+      error &"'{avCodec.name}' video encoder is not supported in the '{ext}' container"
 
   return codec
 
