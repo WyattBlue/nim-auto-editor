@@ -10,9 +10,8 @@ import log
 import media
 import ffmpeg
 import timeline
+import palet/edit
 import util/[color, bar, fun, rules]
-import cmds/levels
-import analyze/[audio, motion, subtitle]
 
 import imports/json
 import exports/[fcp7, fcp11, json, shotcut, kdenlive]
@@ -233,42 +232,12 @@ proc editMedia*(args: var mainArgs) =
       if container.video.len > 0:
         tb = makeSaneTimebase(container.video[0].avg_frame_rate)
 
-      var hasLoud: seq[bool]
+      var hasLoud = interpretEdit(args, container, tb, bar)
+      let startMargin = toTb(args.margin[0], tb.float64)
+      let endMargin = toTb(args.margin[1], tb.float64)
+      mutMargin(hasLoud, startMargin, endMargin)
+
       var chunks: seq[(int64, int64, float64)] = @[]
-      mi = initMediaInfo(container.formatContext, args.input)
-
-      let (editMethod, threshold, stream, width, blur,
-        pattern) = parseEditString(args.edit)
-
-      if editMethod in ["audio", "motion"]:
-        let levels = (if editMethod == "audio":
-          audio(bar, container, args.input, tb, stream)
-          else:
-          motion(bar, container, args.input, tb, stream, width, blur)
-        )
-        hasLoud = levels.mapIt(it >= threshold)
-        if editMethod == "audio":
-          mutRemoveSmall(hasLoud, 3, true, false)  # minclip
-          mutRemoveSmall(hasLoud, 6, false, true)  # mincut
-      elif editMethod == "subtitle":
-        hasLoud = subtitle(container, tb, pattern, stream)
-      elif editMethod == "none":
-        let length = mediaLength(container)
-        let tbLength = (round((length * tb).float64)).int64
-
-        hasLoud = newSeqWith(tbLength, true)
-      elif editMethod in ["all", "all/e"]:
-        let length = mediaLength(container)
-        let tbLength = (round((length * tb).float64)).int64
-
-        hasLoud = newSeqWith(tbLength, false)
-      else:
-        error &"Unknown edit method: {editMethod}"
-
-      if editMethod != "none":
-        let startMargin = toTb(args.margin[0], tb.float64)
-        let endMargin = toTb(args.margin[1], tb.float64)
-        mutMargin(hasLoud, startMargin, endMargin)
 
       var speedIndex = hasLoud.map(proc(x: bool): int = int(x))
       var speedMap = @[args.silentSpeed, args.videoSpeed]
@@ -293,6 +262,7 @@ proc editMedia*(args: var mainArgs) =
         applyToRange(speedIndex, span, tb.float64, getSpeedIndex(speed))
 
       chunks = chunkify(speedIndex, speedHash)
+      mi = initMediaInfo(container.formatContext, args.input)
       tlV3 = toNonLinear(addr args.input, tb, args.background, mi, chunks)
       applyArgs(tlV3, args)
 

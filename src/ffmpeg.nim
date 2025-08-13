@@ -29,7 +29,7 @@ proc av_q2d*(a: AVRational): cdouble {.importc, header: "<libavutil/rational.h>"
 proc av_inv_q*(a: AVRational): AVRational {.importc, header: "<libavutil/rational.h>".}
 proc av_parse_ratio(q: ptr AVRational, str: cstring, max: cint, log_offset: cint,
     log_ctx: pointer): cint {.importc, header: "<libavutil/parseutils.h>".}
-proc av_cmp_q(a, b: AVRational): cint {.importc, header: "<libavutil/rational.h>".}
+proc av_cmp_q*(a, b: AVRational): cint {.importc, header: "<libavutil/rational.h>".}
 
 proc `+`*(a, b: AVRational): AVRational =
   av_add_q(a, b)
@@ -75,16 +75,6 @@ converter toAVRational*(s: string): AVRational =
     raise newException(ValueError, "Failed to rational: " & s)
 
   return rational
-
-proc `==`*(a, b: AVRational): bool =
-  0 == av_cmp_q(a, b)
-
-proc `==`*(a: int, b: AVRational): bool =
-  0 == av_cmp_q(AVRational(a), b)
-
-proc `==`*(a: AVRational, b: int): bool =
-  0 == av_cmp_q(a, AVRational(b))
-
 
 proc av_parse_color*(rgba_color: ptr uint8, color_string: cstring, slen: cint,
     log_ctx: pointer): cint {.importc, header: "<libavutil/parseutils.h>".}

@@ -45,6 +45,9 @@ type CacheEntry = tuple[path: string, mtime: Time]
 
 proc writeCache*(data: seq[float32], path: string, tb: AVRational, kind,
     args: string) =
+  if data.len <= 10:
+    return
+
   let workdir = getTempDir() / fmt"ae-{version}"
   try:
     createDir(workdir)

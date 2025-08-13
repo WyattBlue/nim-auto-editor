@@ -38,7 +38,7 @@ test "maths":
   check(AVRational(num: 9, den: 3).int64 == intThree)
   check(AVRational(num: 10, den: 3).int64 == intThree)
   check(AVRational(num: 11, den: 3).int64 == intThree)
-  check(AVRational(num: 10, den: 5) == AVRational(num: 2, den: 1))
+  check(AVRational(num: 10, den: 5) != AVRational(num: 2, den: 1)) # use compare
 
 test "strings":
   check(AVRational("42") == AVRational(42))

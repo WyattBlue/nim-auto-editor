@@ -6,86 +6,7 @@ import ../ffmpeg
 import ../analyze/[audio, motion, subtitle]
 import ../log
 import ../cache
-
-import tinyre
-
-# TODO: Make a generic version
-proc parseEditString*(exportStr: string): (string, float32, int32, int32, int32, Re) =
-  var
-    kind = exportStr
-    threshold: float32 = 0.04
-    stream: int32 = 0
-    width: int32 = 400
-    blur: int32 = 9
-    pattern: Re = re("")
-
-  let colonPos = exportStr.find(':')
-  if colonPos == -1:
-    return (kind, threshold, stream, width, blur, pattern)
-
-  kind = exportStr[0..colonPos-1]
-  let paramsStr = exportStr[colonPos+1..^1]
-
-  var i = 0
-  while i < paramsStr.len:
-    while i < paramsStr.len and paramsStr[i] == ' ':
-      inc i
-
-    if i >= paramsStr.len:
-      break
-
-    var paramStart = i
-    while i < paramsStr.len and paramsStr[i] != '=':
-      inc i
-
-    if i >= paramsStr.len:
-      break
-
-    let paramName = paramsStr[paramStart..i-1]
-    inc i
-
-    var value = ""
-    if i < paramsStr.len and paramsStr[i] == '"':
-      inc i
-      while i < paramsStr.len:
-        if paramsStr[i] == '\\' and i + 1 < paramsStr.len:
-          # Handle escape sequences
-          inc i
-          case paramsStr[i]:
-            of '"': value.add('"')
-            of '\\': value.add('\\')
-            else:
-              value.add('\\')
-              value.add(paramsStr[i])
-        elif paramsStr[i] == '"':
-          inc i
-          break
-        else:
-          value.add(paramsStr[i])
-        inc i
-    else:
-      # Unquoted value (until comma or end)
-      while i < paramsStr.len and paramsStr[i] != ',':
-        value.add(paramsStr[i])
-        inc i
-
-    case paramName:
-      of "stream": stream = parseInt(value).int32
-      of "threshold": threshold = parseFloat(value).float32
-      of "width": width = parseInt(value).int32
-      of "blur": blur = parseInt(value).int32
-      of "pattern":
-        try:
-          pattern = re(value)
-        except ValueError:
-          error &"Invalid regex expression: {value}"
-      else: error &"Unknown paramter: {paramName}"
-
-    # Skip comma
-    if i < paramsStr.len and paramsStr[i] == ',':
-      inc i
-
-  return (kind, threshold, stream, width, blur, pattern)
+import ../palet/edit
 
 type levelArgs* = object
   timebase*: string = "30/1"
@@ -131,7 +52,7 @@ proc main*(strArgs: seq[string]) =
   av_log_set_level(AV_LOG_QUIET)
   let tb = AVRational(args.timebase)
   let chunkDuration: float64 = av_inv_q(tb)
-  let (editMethod, _, userStream, width, blur, pattern) = parseEditString(args.edit)
+  let (editMethod, _, userStream, width, blur, pattern) = parseEditString2(args.edit)
   if editMethod notin ["audio", "motion", "subtitle"]:
     error fmt"Unknown editing method: {editMethod}"
 
