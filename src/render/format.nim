@@ -48,13 +48,14 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
   var videoFrameIter: iterator(): (ptr AVFrame, int) = iterator(): (ptr AVFrame, int) =
     return
   if rules.defaultVid notin ["none", "png"] and tl.v.len > 0 and tl.v[0].len > 0:
-    (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(output, tl, args)
+    if not args.vn:
+      (vEncCtx, vOutStream, videoFrameIter) = makeNewVideoFrames(output, tl, args)
 
   var audioStreams: seq[ptr AVStream] = @[]
   var audioEncoders: seq[ptr AVCodecContext] = @[]
   var audioFrameIters: seq[iterator(): (ptr AVFrame, int)] = @[]
 
-  if args.mixAudioStreams and tl.a.len > 0:
+  if not args.an and args.mixAudioStreams and tl.a.len > 0:
     # Create a single audio stream for mixed output
     var hasAnyClips = false
     for i in 0..<tl.a.len:
@@ -89,7 +90,7 @@ proc makeMedia*(args: mainArgs, tl: v3, outputPath: string, rules: Rules, bar: B
       let frameSize = if aEncCtx.frame_size > 0: aEncCtx.frame_size else: 1024
       let audioFrameIter = makeMixedAudioFrames(encoder.sample_fmts[0], tl, frameSize)
       audioFrameIters.add(audioFrameIter)
-  else:
+  elif not args.an:
     # Create separate streams for each timeline layer (existing behavior)
     for i in 0..<tl.a.len:
       if tl.a[i].len > 0: # Only create stream if track has clips

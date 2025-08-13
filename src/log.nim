@@ -59,6 +59,10 @@ type mainArgs* = object
   preview*: bool = false
 
   # Container Settings
+  vn*: bool = false
+  an*: bool = false
+  sn*: bool = false
+  dn*: bool = false
   faststart*: bool = false
   noFaststart*: bool = false
   fragmented*: bool = false

@@ -70,10 +70,10 @@ Options:
                                   and halt
 
   Container Settings:
-    -sn                           Disable the inclusion of subtitle streams in
-                                  the output file
-    -dn                           Disable the inclusion of data streams in the
-                                  output file
+    -vn                           Disable the inclusion of video streams
+    -an                           Disable the inclusion of audio streams
+    -sn                           Disable the inclusion of subtitle streams
+    -dn                           Disable the inclusion of data streams
     --faststart                   Enable movflags +faststart, recommended for
                                   web (default)
     --no-faststart                Disable movflags +faststart, will be faster
@@ -295,8 +295,14 @@ judge making cuts.
       args.noFragmented = true
     of "--mix-audio-streams":
       args.mixAudioStreams = true
-    of "-dn", "-sn":
-      discard
+    of "-vn":
+      args.vn = true
+    of "-an":
+      args.an = true
+    of "-dn":
+      args.dn = true
+    of "-sn":
+      args.sn = true
     of "-ex", "--export":
       expecting = "export"
     of "-exp", "--export-to-premiere":
