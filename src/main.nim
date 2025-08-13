@@ -307,6 +307,8 @@ judge making cuts.
       args.`export` = "final-cut-pro"
     of "-exs", "--export-to-shotcut":
       args.`export` = "shotcut"
+    of "-exk", "--export-to-kdenlive":
+      args.`export` = "kdenlive"
     of "-o", "--output":
       expecting = "output"
     of "-m", "--margin", "--frame-margin":
