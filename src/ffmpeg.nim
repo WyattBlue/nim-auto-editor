@@ -3,7 +3,8 @@ when defined(macosx):
   {.passL: "-framework VideoToolbox -framework AudioToolbox -framework CoreFoundation -framework CoreMedia -framework CoreVideo".}
 when defined(linux):
   {.passL: "-L./build/lib/x86_64-linux-gnu -L./build/lib64"}
-{.passL: "-L./build/lib -lavfilter -lavformat -lavcodec -lswresample -lswscale -lavutil -lmp3lame -lopus -lvpx -lx264 -lx265 -ldav1d -lSvtAv1Enc -lm".}
+{.passL: "-L./build/lib -lavfilter -lavformat -lavcodec -lswresample -lswscale -lavutil".}
+{.passL: "-lmp3lame -lopus -lvpx -lx264 -lx265 -ldav1d -lSvtAv1Enc -lm".}
 
 when defined(macosx): # For x265
   {.passL: "-lc++"}

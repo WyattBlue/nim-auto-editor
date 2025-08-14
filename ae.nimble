@@ -430,15 +430,7 @@ proc ffmpegSetup(crossWindows: bool) =
         else:
           # Special handling for nv-codec-headers which doesn't use configure
           if package.name == "nv-codec-headers":
-            exec &"mkdir -p \"{buildPath}/include\""
-            exec &"mkdir -p \"{buildPath}/lib/pkgconfig\""
-            when defined(macosx):
-              exec "make -j$(sysctl -n hw.ncpu)"
-            elif defined(linux):
-              exec "make -j$(nproc)"
-            else:
-              exec "make -j4"
-            exec &"make install DESTDIR= PREFIX=\"{buildPath}\""
+            exec &"make install PREFIX=\"{buildPath}\""
           else:
             if not fileExists("Makefile") or package.name == "x264":
               var args = package.buildArguments
@@ -453,7 +445,6 @@ proc ffmpegSetup(crossWindows: bool) =
               echo "RUN: ", cmd
               exec cmd
             makeInstall()
-
 
 var commonFlags = &"""
   --enable-version3 \
@@ -486,6 +477,9 @@ if defined(arm) or defined(arm64):
 if defined(macosx):
   commonFlags &= "  --enable-videotoolbox \\\n"
   commonFlags &= "  --enable-audiotoolbox \\\n"
+else:
+  commonFlags &= "  --enable-nvenc \\\n"
+  commonFlags &= "  --enable-ffnvcodec \\\n"
 
 commonFlags &= "--disable-autodetect"
 
@@ -510,6 +504,7 @@ task makeff, "Build FFmpeg from source":
     var ldflags = &"-L{buildPath}/lib"
     when defined(linux):
       ldflags &= &" -L{buildPath}/lib/x86_64-linux-gnu -L{buildPath}/lib64"
+
     exec &"""./configure --prefix="{buildPath}" \
       --pkg-config-flags="--static" \
       --extra-cflags="-I{buildPath}/include" \
@@ -524,22 +519,17 @@ task makeffwin, "Build FFmpeg for Windows cross-compilation":
 
   ffmpegSetup(crossWindows=true)
 
-
   # Configure and build FFmpeg with MinGW
   withDir "ffmpeg_sources/ffmpeg":
     var ldflags = &"-L{buildPath}/lib"
-    var extraLibs = "-lpthread -lm -lstdc++"
     when defined(linux):
       ldflags &= &" -L{buildPath}/lib/x86_64-linux-gnu -L{buildPath}/lib64"
-    
-    # For cross-compilation, manually specify x265 since pkg-config might not work
-    extraLibs &= " -lx265"
     
     exec (&"""CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib PKG_CONFIG_PATH="{buildPath}/lib/pkgconfig" ./configure --prefix="{buildPath}" \
       --pkg-config-flags="--static" \
       --extra-cflags="-I{buildPath}/include" \
       --extra-ldflags="{ldflags}" \
-      --extra-libs="{extraLibs}" \
+      --extra-libs="-lpthread -lm -lstdc++" \
       --arch=x86_64 \
       --target-os=mingw32 \
       --cross-prefix=x86_64-w64-mingw32- \
