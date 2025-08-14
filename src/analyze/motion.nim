@@ -200,7 +200,7 @@ proc motion*(bar: Bar, container: InputContainer, path: string, tb: AVRational,
     return cacheData.get()
 
   if stream < 0 or stream >= container.video.len:
-    error fmt"audio: audio stream '{stream}' does not exist."
+    error fmt"motion: video stream '{stream}' does not exist."
 
   let videoStream: ptr AVStream = container.video[stream]
 

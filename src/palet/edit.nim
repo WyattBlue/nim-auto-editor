@@ -109,7 +109,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, b
           argPos += 1
 
       if stream == -1:
-        for i in 0 ..< container.audio.len:
+        for i in 0 ..< max(container.audio.len, 1): # Trigger err when no streams pres.
           let levels = audio(bar, container, args.input, tb, i.int32)
           if result.len == 0:
             result = levels.mapIt(it >= threshold)
