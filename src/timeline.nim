@@ -133,6 +133,8 @@ proc applyArgs*(tl: var v3, args: mainArgs) =
     tl.res = args.resolution
   if args.audioLayout != "":
     tl.layout = args.audioLayout
+  if args.frameRate != AVRational(num: 0, den: 0):
+    tl.tb = args.frameRate
 
 func stem(path: string): string =
   splitFile(path).name

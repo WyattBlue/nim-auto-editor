@@ -229,7 +229,9 @@ proc editMedia*(args: var mainArgs) =
 
       usePath = args.input
       var tb = AVRational(30)
-      if container.video.len > 0:
+      if args.frameRate != AVRational(num: 0, den: 0):
+        tb = args.frameRate
+      elif container.video.len > 0:
         tb = makeSaneTimebase(container.video[0].avg_frame_rate)
 
       var hasLoud = interpretEdit(args, container, tb, bar)

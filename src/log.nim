@@ -7,7 +7,7 @@ import std/[strutils, strformat]
 import std/math
 
 import util/color
-
+import ffmpeg
 
 type BarType* = enum
   modern, classic, ascii, machine, none
@@ -45,6 +45,7 @@ type mainArgs* = object
 
   # Timeline Options
   sampleRate*: cint = -1
+  frameRate*: AVRational = AVRational(num: 0, den: 0)
   background* = RGBColor(red: 0, green: 0, blue: 0)
   resolution*: (int, int) = (0, 0)
 

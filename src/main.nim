@@ -7,6 +7,7 @@ import std/parseutils
 import about
 import edit
 import log
+import ffmpeg
 import cmds/[info, desc, cache, levels, subdump]
 import util/[color, fun]
 
@@ -184,6 +185,17 @@ proc parseSampleRate(val: string): cint =
   if result < 1:
     error "Samplerate must be positive"
 
+proc parseFrameRate(val: string): AVRational =
+  if val == "ntsc":
+    return AVRational(num: 30000, den: 1001)
+  if val == "ntsc_film":
+    return AVRational(num: 24000, den: 1001)
+  if val == "pal":
+    return AVRational(num: 25, den: 1)
+  if val == "film":
+    return AVRational(num: 24, den: 1)
+  return AVRational(val)
+
 
 func handleKey(val: string): string =
   if val.startsWith("--") and val.len >= 3:
@@ -341,8 +353,8 @@ judge making cuts.
       expecting = "background"
     of "-ar", "--sample-rate":
       expecting = "sample-rate"
-    # of "-tb", "--time-base", "-r", "-fps", "--frame-rate":
-    #   expecting = "frame-rate"
+    of "-tb", "--time-base", "-r", "-fps", "--frame-rate":
+      expecting = "frame-rate"
     of "-res", "--resolution":
       expecting = "resolution"
     of "--temp-dir", "--progress", "--add-in", "--cut-out",  "--scale", "--audio-normalize",
@@ -387,6 +399,8 @@ judge making cuts.
         args.background = parseColor(key)
       of "sample-rate":
         args.sampleRate = parseSampleRate(key)
+      of "frame-rate":
+        args.frameRate = parseFrameRate(key)
       of "video-codec":
         args.videoCodec = key
       of "video-bitrate":
