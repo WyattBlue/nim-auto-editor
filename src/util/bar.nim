@@ -129,11 +129,8 @@ proc start*(bar: Bar, total: float, title: string) =
     elif c == 'm':
       inEscape = false
 
-  bar.stack.add((title: title, lenTitle: lenTitle, total: total,
-      begin: epochTime()))
+  bar.stack.add((title: title, lenTitle: lenTitle, total: total, begin: epochTime()))
 
-  when defined(windows):
-    hideCursor()
   try:
     bar.tick(0)
   except:
@@ -145,8 +142,6 @@ proc start*(bar: Bar, total: float, title: string) =
     bar.tick(0)
 
 proc `end`*(bar: Bar) =
-  when defined(windows):
-    showCursor()
   let columns = terminalWidth()
   stdout.write(" ".repeat(max(0, columns - 2)) & "\r")
   stdout.flushFile()

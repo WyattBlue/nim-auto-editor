@@ -120,9 +120,6 @@ proc closeTempDir*() =
       discard
 
 proc error*(msg: string) {.noreturn.} =
-  when defined(windows):
-    showCursor()
-
   closeTempDir()
   when defined(debug):
     raise newException(ValueError, msg)
