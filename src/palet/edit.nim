@@ -18,10 +18,22 @@ func isSymbol(self: Expr, name, text: string): bool =
 
 func `or`(a, b: seq[bool]): seq[bool] =
   result = newSeq[bool](max(a.len, b.len))
-  for i in 0..<result.len:
+  for i in 0 ..< result.len:
     let aVal = if i < a.len: a[i] else: false
     let bVal = if i < b.len: b[i] else: false
     result[i] = aVal or bVal
+
+func `and`(a, b: seq[bool]): seq[bool] =
+  result = newSeq[bool](min(a.len, b.len))
+  for i in 0 ..< result.len:
+    result[i] = a[i] or b[i]
+
+func `xor`(a, b: seq[bool]): seq[bool] =
+  result = newSeq[bool](max(a.len, b.len))
+  for i in 0 ..< result.len:
+    let aVal = if i < a.len: a[i] else: false
+    let bVal = if i < b.len: b[i] else: false
+    result[i] = aVal xor bVal
 
 func `not`(a: seq[bool]): seq[bool] =
   result = newSeq[bool](a.len)
@@ -68,7 +80,14 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, b
       result = editEval(node[1], text)
       for i in 2 ..< node.len:
         result = result or editEval(node[i], text)
-
+    elif node[0].isSymbol("and", text):
+      result = editEval(node[1], text)
+      for i in 2 ..< node.len:
+        result = result and editEval(node[i], text)
+    elif node[0].isSymbol("xor", text):
+      result = editEval(node[1], text)
+      for i in 2 ..< node.len:
+        result = result xor editEval(node[i], text)
     elif node[0].isSymbol("not", text):
       if node.len != 2:
         error "Wrong arity"

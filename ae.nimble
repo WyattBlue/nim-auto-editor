@@ -59,6 +59,11 @@ type Package = object
   buildArguments: seq[string]
   buildSystem: string = "autoconf"
 
+let nvheaders = Package(
+  name: "nv-codec-headers",
+  sourceUrl: "https://github.com/FFmpeg/nv-codec-headers/archive/refs/tags/n13.0.19.0.tar.gz",
+  sha256: "86d15d1a7c0ac73a0eafdfc57bebfeba7da8264595bf531cf4d8db1c22940116",
+)
 let lame = Package(
   name: "lame",
   sourceUrl: "http://deb.debian.org/debian/pool/main/l/lame/lame_3.100.orig.tar.gz",
@@ -113,17 +118,24 @@ let ffmpeg = Package(
   sourceUrl: "https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz",
   sha256: "733984395e0dbbe5c046abda2dc49a5544e7e0e1e2366bba849222ae9e3a03b1",
 )
-let packages = @[lame, twolame, opus, vpx, dav1d, svtav1, x264, x265]
+var packages: seq[Package] = @[]
+if not defined(macosx):
+  packages.add nvheaders
+packages &= [lame, twolame, opus, vpx, dav1d, svtav1, x264, x265]
 
 func location(package: Package): string = # tar location
   if package.name == "libvpx":
     "v1.15.2.tar.gz"
+  elif package.name == "nv-codec-headers":
+    "n13.0.19.0.tar.gz"
   else:
     package.sourceUrl.split("/")[^1]
 
 func dirName(package: Package): string =
   if package.name == "libvpx":
     return "libvpx-1.15.2"
+  if package.name == "nv-codec-headers":
+    return "nv-codec-headers-n13.0.19.0"
 
   var name = package.location
   for ext in [".tar.gz", ".tar.xz", ".tar.bz2", ".orig"]:
@@ -416,19 +428,31 @@ proc ffmpegSetup(crossWindows: bool) =
         elif package.buildSystem == "meson":
           mesonBuild(buildPath, crossWindows)
         else:
-          if not fileExists("Makefile") or package.name == "x264":
-            var args = package.buildArguments
-            var envPrefix = ""
-            if crossWindows:
-              if package.name == "libvpx":
-                args.add("--target=x86_64-win64-gcc")
-              else:
-                args.add("--host=x86_64-w64-mingw32")
-              envPrefix = "CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib "
-            let cmd = &"{envPrefix}./configure --prefix=\"{buildPath}\" --disable-shared --enable-static " & args.join(" ")
-            echo "RUN: ", cmd
-            exec cmd
-          makeInstall()
+          # Special handling for nv-codec-headers which doesn't use configure
+          if package.name == "nv-codec-headers":
+            exec &"mkdir -p \"{buildPath}/include\""
+            exec &"mkdir -p \"{buildPath}/lib/pkgconfig\""
+            when defined(macosx):
+              exec "make -j$(sysctl -n hw.ncpu)"
+            elif defined(linux):
+              exec "make -j$(nproc)"
+            else:
+              exec "make -j4"
+            exec &"make install DESTDIR= PREFIX=\"{buildPath}\""
+          else:
+            if not fileExists("Makefile") or package.name == "x264":
+              var args = package.buildArguments
+              var envPrefix = ""
+              if crossWindows:
+                if package.name == "libvpx":
+                  args.add("--target=x86_64-win64-gcc")
+                else:
+                  args.add("--host=x86_64-w64-mingw32")
+                envPrefix = "CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ AR=x86_64-w64-mingw32-ar STRIP=x86_64-w64-mingw32-strip RANLIB=x86_64-w64-mingw32-ranlib "
+              let cmd = &"{envPrefix}./configure --prefix=\"{buildPath}\" --disable-shared --enable-static " & args.join(" ")
+              echo "RUN: ", cmd
+              exec cmd
+            makeInstall()
 
 
 var commonFlags = &"""

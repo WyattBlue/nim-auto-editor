@@ -97,6 +97,13 @@ proc initParser*(lexer: var Lexer): Parser =
 proc eat(self: var Parser) =
   self.currentToken = self.lexer.getNextToken()
 
+proc peek(self: var Parser): Token =
+  let savedPos = self.lexer.pos
+  let savedChar = self.lexer.`char`
+  result = self.lexer.getNextToken()
+  self.lexer.pos = savedPos
+  self.lexer.`char` = savedChar
+
 # Forward declaration
 proc expr(self: var Parser): Expr
 
@@ -133,6 +140,13 @@ proc expr(self: var Parser): Expr =
       var elements: seq[Expr] = @[symExpr]
 
       while self.currentToken.kind in {Num, Sym}:
+        # Check if this is another function call (symbol followed by colon)
+        if self.currentToken.kind == Sym:
+          let nextToken = self.peek()
+          if nextToken.kind == Colon:
+            # This is another function call, stop processing arguments for current function
+            break
+
         var arg = self.expr()
 
         # Check if this argument is followed by = (assignment syntax)
