@@ -75,7 +75,7 @@ func `end`*(self: v3): int64 =
       let a = alayer.c[^1]
       result = max(result, a.start + a.dur)
 
-func toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
+proc toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
     chunks: seq[(int64, int64, float64)]): v3 =
   var clips: seq[Clip] = @[]
   var i: int64 = 0
@@ -125,6 +125,9 @@ func toNonLinear*(src: ptr string, tb: AvRational, bg: RGBColor, mi: MediaInfo,
   if mi.a.len > 0:
     result.sr = mi.a[0].sampleRate
     result.layout = mi.a[0].layout
+
+  if (result.v.len == 0 or result.v[0].len == 0) and (result.a.len == 0 or result.a[0].len == 0):
+    error "Timeline is empty, nothing to do."
 
 proc applyArgs*(tl: var v3, args: mainArgs) =
   if args.sampleRate != -1:
