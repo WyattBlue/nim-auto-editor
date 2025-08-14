@@ -2,7 +2,7 @@ import std/strutils
 
 type
   TokenKind = enum
-    Lparen, Rparen, Sym, Num, Colon, Comma, Eof
+    Lparen, Rparen, Sym, Num, Colon, Comma, Equal, Eof
 
   Token = object
     kind: TokenKind
@@ -69,6 +69,10 @@ proc getNextToken(self: var Lexer): Token =
       self.advance()
       return Token(kind: Colon, `from`: self.pos - 1, to: self.pos)
 
+    if self.`char` == '=':
+      self.advance()
+      return Token(kind: Equal, `from`: self.pos - 1, to: self.pos)
+
     if self.`char` == ',':
       self.advance()
       return Token(kind: Comma, `from`: self.pos - 1, to: self.pos)
@@ -80,7 +84,7 @@ proc getNextToken(self: var Lexer): Token =
       return Token(kind: Num, `from`: `from`, to: self.pos)
 
     let `from` = self.pos
-    while self.`char` notin "'.()[]{}\",:;\0 \t\n\r\x0b\x0c":
+    while self.`char` notin "'.()[]{}=\",:;\0 \t\n\r\x0b\x0c":
       self.advance()
 
     return Token(kind: Sym, `from`: `from`, to: self.pos)
@@ -125,22 +129,32 @@ proc expr(self: var Parser): Expr =
 
     # Check if this symbol is followed by a colon (function call syntax)
     if self.currentToken.kind == Colon:
-      self.eat() # consume the colon
+      self.eat()
       var elements: seq[Expr] = @[symExpr]
 
       while self.currentToken.kind in {Num, Sym}:
-        elements.add(self.expr())
+        var arg = self.expr()
+
+        # Check if this argument is followed by = (assignment syntax)
+        if self.currentToken.kind == Equal:
+          self.eat()
+          let equalExpr = Expr(kind: ExprSym, `from`: self.currentToken.`from` - 1, to: self.currentToken.`from`)
+          let value = self.expr()
+          arg = Expr(kind: ExprList, elements: @[equalExpr, arg, value], `from`: arg.`from`, to: value.to)
+
+        elements.add(arg)
+
         if self.currentToken.kind == Comma:
           self.eat() # consume the comma
-        elif self.currentToken.kind in {Num, Sym}:
-          # If we see another number/symbol without a comma, stop parsing this expression
-          break
         else:
           break
 
       return Expr(kind: ExprList, elements: elements, `from`: token.`from`, to: self.currentToken.`from`)
     else:
       return symExpr
+  of Equal:
+    self.eat()
+    return Expr(kind: ExprSym, `from`: token.`from`, to: token.to)
   else:
     # This should not happen with valid input
     raise newException(ValueError, "Unexpected token")
