@@ -541,7 +541,7 @@ task windows, "Cross-compile to Windows (requires mingw-w64)":
   if not dirExists("build"):
     echo "FFmpeg for Windows not found. Run 'nimble makeffwin' first."
   else:
-    exec "nim c -d:danger --os:windows --cpu:amd64 --cc:gcc " &
+    exec "nim c --os:windows --cpu:amd64 --cc:gcc " &
          "--gcc.exe:x86_64-w64-mingw32-gcc " &
          "--gcc.linkerexe:x86_64-w64-mingw32-gcc " &
          "--passL:-lbcrypt " & # Add Windows Bcrypt library
