@@ -175,10 +175,7 @@ proc interpretEdit*(args: mainArgs, container: InputContainer, tb: AVRational, b
 
       return newSeqWith(tbLength, false)
     else:
-      echo node[0].printExpr(text)
-      echo node[0].isSymbol("audio", text)
-      let name = text[node[0].`from` ..< node[0].to]
-      error &"Unknown function: {name}"
+      error &"Unknown function: {text[node[0].`from` ..< node[0].to]}"
 
   return editEval(expr, args.edit)
 
