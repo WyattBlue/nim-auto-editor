@@ -6,6 +6,7 @@ on:
     paths-ignore:
       - '**.md'
       - '**.txt'
+      - 'src/about.nim'
     branches:
       - master
   pull_request:

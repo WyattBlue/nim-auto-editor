@@ -6,6 +6,9 @@
 - Port kdenlive export code to Nim
 - Add `-vn` and `-an` options
 - Implement `--mix-audio-streams`
+- Implement `--frame-rate`
+- Implement `or` `and` `xor` in edit
 
 ## Fixes
 - Handle SAR correctly
+- Add empty timeline error
