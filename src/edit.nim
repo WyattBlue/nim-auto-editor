@@ -95,6 +95,9 @@ proc parseExportString*(exportStr: string): (string, string, string) =
 # Turn long silent/loud array to formatted chunk list.
 # Example: [1, 1, 1, 2, 2], {1: 1.0, 2: 1.5} => [(0, 3, 1.0), (3, 5, 1.5)]
 proc chunkify(arr: seq[int], smap: Table[int, float64]): seq[(int64, int64, float64)] =
+  if arr.len == 0:
+    return @[]
+
   var start: int64 = 0
   var j: int64 = 1
   while j < arr.len:
