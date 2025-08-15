@@ -9,8 +9,8 @@ import ../ffmpeg
 import ../util/bar
 import ../resampler
 
-# Enable project wide, see: https://simonbyrne.github.io/notes/fastmath/
-{.passC: "-ffast-math".}
+# Enable project wide
+{.passC: "-fno-signaling-nans -fno-math-errno -fno-trapping-math -freciprocal-math".}
 {.passL: "-flto".}
 
 type
@@ -116,6 +116,10 @@ proc readChunk(iter: AudioIterator): float32 =
 
   var maxAbs: float32 = 0.0
 
+  # Apply fast-math locally: see https://simonbyrne.github.io/notes/fastmath/
+  {.push optimization: speed.}
+  {.passC: "-ffast-math".}
+
   # SIMD-style loop (unrolled)
   for i in countup(0, simdSamples - 1, simdWidth):
     let v0 = abs(samples[i])
@@ -128,6 +132,8 @@ proc readChunk(iter: AudioIterator): float32 =
   # Handle remaining samples
   for i in simdSamples ..< totalSamples:
     maxAbs = max(maxAbs, abs(samples[i]))
+
+  {.pop.}
 
   return maxAbs
 
