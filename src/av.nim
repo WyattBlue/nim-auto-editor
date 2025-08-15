@@ -1,5 +1,4 @@
-import std/strformat
-import std/[tables, sets]
+import std/[strformat, strutils, sequtils, tables, sets]
 
 import ffmpeg
 import log
@@ -372,6 +371,30 @@ proc open*(ctx: ptr AVCodecContext) =
       ctx.time_base = AVRational(num: 1, den: AV_TIME_BASE)
   if avcodec_open2(ctx, ctx.codec, nil) < 0:
     error "Could not open encoder"
+
+proc setProfileOrErr*(ctx: ptr AVCodecContext, to: string) =
+  if ctx.codec == nil:
+    error "This codec does not support profiles"
+
+  let desc = avcodec_descriptor_get(ctx.codec.id)
+  if desc == nil or desc.profiles == nil:
+    error "This codec does not support profiles"
+
+  const FF_PROFILE_UNKNOWN = -99
+
+  var allProfiles: seq[string] = @[]
+  var i = 0
+  let profiles = cast[ptr UncheckedArray[AVProfile]](desc.profiles)
+  while profiles[i].profile != FF_PROFILE_UNKNOWN:
+    allProfiles.add $profiles[i].name
+    if to.toLowerAscii == ($profiles[i].name).toLowerAscii:
+      ctx.profile = profiles[i].profile
+      return
+    inc i
+
+  let allow = allProfiles.mapIt("\"" & it.toLowerAscii & "\"").join(" ")
+  let encName = $ctx.codec.name
+  error &"`{to}` is not a valid profile for encoder: {encName}\nprofiles supported: {allow}"
 
 proc mux*(self: var OutputContainer, packet: var AVPacket) =
   self.startEncoding()

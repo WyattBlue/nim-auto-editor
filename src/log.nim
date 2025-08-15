@@ -72,6 +72,7 @@ type mainArgs* = object
   # Video Rendering
   videoCodec*: string = "auto"
   videoBitrate*: int = -1
+  vprofile*: string
   noSeek*: bool = false
   scale*: float = 1.0
 

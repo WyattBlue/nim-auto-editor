@@ -231,6 +231,9 @@ proc makeNewVideoFrames*(output: var OutputContainer, tl: v3, args: mainArgs):
     else:
       pix_fmt = AV_PIX_FMT_YUV420P
 
+  if args.vprofile != "":
+    encoderCtx.setProfileOrErr(args.vprofile)
+
   encoderCtx.pix_fmt = pix_fmt
   encoderCtx.open()
   if avcodec_parameters_from_context(outputStream.codecpar, encoderCtx) < 0:

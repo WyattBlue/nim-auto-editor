@@ -339,6 +339,8 @@ judge making cuts.
       expecting = "video-codec"
     of "-b:v", "--video-bitrate":
       expecting = "video-bitrate"
+    of "-profile:v", "-vprofile":
+      expecting = "vprofile"
     of "-c:a", "-acodec", "--audio-codec":
       expecting = "audio-codec"
     of "-b:a", "--audio-bitrate":
@@ -405,6 +407,8 @@ judge making cuts.
         args.videoCodec = key
       of "video-bitrate":
         args.videoBitrate = parseBitrate(key)
+      of "vprofile":
+        args.vprofile = key
       of "audio-codec":
         args.audioCodec = key
       of "layout":

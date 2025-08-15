@@ -255,6 +255,7 @@ type
     colorspace*: AVColorSpace
     chroma_sample_location*: cint
     max_b_frames*: cint
+    profile*: cint
     # ... other fields omitted for brevity
 
 const
@@ -603,9 +604,14 @@ const
   AVFMT_NOFILE* = 0x0001
   AVIO_FLAG_WRITE* = 2
 
+type AVProfile* {.importc, header: "<libavcodec/avcodec.h>".} = object
+  profile*: cint
+  name*: cstring
+
 type AVCodecDescriptor* {.importc, header: "<libavcodec/avcodec.h>".} = object
   id*: AVCodecID
   `type`*: AVMediaType
+  profiles*: ptr AVProfile
 
 proc avformat_alloc_output_context2*(ctx: ptr ptr AVFormatContext,
     oformat: pointer, format_name: cstring, filename: cstring): cint {.importc,
@@ -617,6 +623,8 @@ proc avcodec_find_encoder*(id: AVCodecID): ptr AVCodec {.importc,
 proc avcodec_find_encoder_by_name*(name: cstring): ptr AVCodec {.importc,
     header: "<libavcodec/avcodec.h>".}
 proc avcodec_descriptor_get_by_name*(name: cstring): ptr AVCodecDescriptor {.importc,
+    header: "<libavcodec/avcodec.h>".}
+proc avcodec_descriptor_get*(id: AVCodecID): ptr AVCodecDescriptor {.importc,
     header: "<libavcodec/avcodec.h>".}
 proc avcodec_parameters_from_context*(par: ptr AVCodecParameters,
     codec: ptr AVCodecContext): cint {.importc,

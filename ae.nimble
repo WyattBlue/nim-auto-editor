@@ -70,12 +70,6 @@ let lame = Package(
   sha256: "ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e",
   buildArguments: @["--disable-frontend", "--disable-decoder", "--disable-gtktest"],
 )
-let twolame = Package(
-  name: "twolame",
-  sourceUrl: "http://deb.debian.org/debian/pool/main/t/twolame/twolame_0.4.0.orig.tar.gz",
-  sha256: "cc35424f6019a88c6f52570b63e1baf50f62963a3eac52a03a800bb070d7c87d",
-  buildArguments: @["--disable-sndfile"],
-)
 let opus = Package(
   name: "opus",
   sourceUrl: "https://github.com/xiph/opus/releases/download/v1.5.2/opus-1.5.2.tar.gz",
@@ -121,7 +115,7 @@ let ffmpeg = Package(
 var packages: seq[Package] = @[]
 if not defined(macosx):
   packages.add nvheaders
-packages &= [lame, twolame, opus, vpx, dav1d, svtav1, x264, x265]
+packages &= [lame, opus, vpx, dav1d, svtav1, x264, x265]
 
 func location(package: Package): string = # tar location
   if package.name == "libvpx":

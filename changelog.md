@@ -7,6 +7,7 @@
 - Add `-vn` and `-an` options
 - Implement `--mix-audio-streams`
 - Implement `--frame-rate`
+- Implement `-v:profile`
 - Implement `or` `and` `xor` in edit
 
 ## Fixes
